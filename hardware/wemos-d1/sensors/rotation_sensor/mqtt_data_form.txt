@@ -1,0 +1,9 @@
+{
+    "sensor_id": "Rotation-001",
+    "data": {
+        "raw": 512,
+        "position": 50,
+        "angle": 90
+    },
+    "timestamp": 1770733931
+}

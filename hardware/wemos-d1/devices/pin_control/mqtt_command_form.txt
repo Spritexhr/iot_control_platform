@@ -1,0 +1,31 @@
+{
+    "high": {
+        "mqtt_message": {
+            "command": "high"
+        },
+        "description": "高电平",
+        "params": []
+    },
+    "low": {
+        "mqtt_message": {
+            "command": "low"
+        },
+        "description": "低电平",
+        "params": []
+    },
+    "current_status": {
+        "mqtt_message": {
+            "command": "current_status"
+        },
+        "description": "获取当前状态",
+        "params": []
+    },
+    "set_status_interval": {
+        "mqtt_message": {
+            "command": "set_status_interval",
+            "interval": "{val}"
+        },
+        "description": "设置状态上报间隔（心跳间隔），30-600秒",
+        "params": ["val"]
+    }
+}

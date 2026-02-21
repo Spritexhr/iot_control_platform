@@ -1,0 +1,44 @@
+{
+    "device_id": "SG_80_001",
+    "event": "level_updated" | "check_current_level" | "heartbeat" | "online" | "status_interval_updated",
+    "status": {
+        "level": "high" | "low",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
+# 上线
+{
+    "device_id": "SG_80_001",
+    "event": "online",
+    "status": {
+        "level": "low",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 心跳（定期上报以证明在线）
+{
+    "device_id": "SG_80_001",
+    "event": "heartbeat",
+    "status": {
+        "level": "high",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 状态上报间隔更新后
+{
+    "device_id": "SG_80_001",
+    "event": "status_interval_updated",
+    "status": {
+        "level": "low",
+        "statusReportInterval": 60
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}

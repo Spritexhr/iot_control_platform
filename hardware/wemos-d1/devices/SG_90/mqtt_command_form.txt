@@ -1,0 +1,17 @@
+{
+    "set_angle": {
+        "mqtt_message": {"command": "set_angle", "angle": "{val}"},
+        "description": "设置舵机角度 0-180°",
+        "params": ["val"]
+    },
+    "current_status": {
+        "mqtt_message": {"command": "current_status"},
+        "description": "获取当前角度",
+        "params": []
+    },
+    "set_status_interval": {
+        "mqtt_message": {"command": "set_status_interval", "interval": "{val}"},
+        "description": "设置状态上报间隔（心跳），10-600秒",
+        "params": ["val"]
+    }
+}

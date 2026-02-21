@@ -1,0 +1,23 @@
+{
+  "name": "sensor-dashboard-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "axios": "^1.6.7",
+    "element-plus": "^2.13.2",
+    "pinia": "^3.0.4",
+    "sass": "^1.97.3",
+    "vue": "^3.4.21",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.1.6"
+  }
+}

@@ -1,0 +1,144 @@
+/* ============================================
+   IoT 控制平台 - CSS 变量 / 主题系统
+   基于 CSS Custom Properties 实现亮色/暗色切换
+   ============================================ */
+
+:root {
+  /* ---------- 主色调 ---------- */
+  --iot-color-primary: #1A73E8;
+  --iot-color-primary-light: #4A90E2;
+  --iot-color-primary-dark: #1557B0;
+  --iot-color-primary-bg: rgba(26, 115, 232, 0.08);
+
+  /* ---------- 语义色 ---------- */
+  --iot-color-success: #00BFA5;
+  --iot-color-success-light: #33CCBB;
+  --iot-color-success-bg: rgba(0, 191, 165, 0.08);
+  --iot-color-warning: #FF9800;
+  --iot-color-warning-light: #FFB74D;
+  --iot-color-warning-bg: rgba(255, 152, 0, 0.08);
+  --iot-color-danger: #F44336;
+  --iot-color-danger-light: #EF5350;
+  --iot-color-danger-bg: rgba(244, 67, 54, 0.08);
+  --iot-color-info: #909399;
+
+  /* ---------- 背景色 ---------- */
+  --iot-bg-page: #F5F7FA;
+  --iot-bg-card: #FFFFFF;
+  --iot-bg-card-hover: #FAFBFC;
+  --iot-bg-sidebar: #1E293B;
+  --iot-bg-header: #FFFFFF;
+  --iot-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* ---------- 文字颜色 ---------- */
+  --iot-text-primary: #303133;
+  --iot-text-regular: #606266;
+  --iot-text-secondary: #909399;
+  --iot-text-placeholder: #C0C4CC;
+  --iot-text-inverse: #FFFFFF;
+
+  /* ---------- 边框 ---------- */
+  --iot-border-color: #E4E7ED;
+  --iot-border-color-light: #EBEEF5;
+  --iot-border-color-lighter: #F2F6FC;
+
+  /* ---------- 阴影 ---------- */
+  --iot-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --iot-shadow-base: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --iot-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --iot-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* ---------- 圆角 ---------- */
+  --iot-radius-sm: 4px;
+  --iot-radius-base: 8px;
+  --iot-radius-lg: 12px;
+  --iot-radius-xl: 16px;
+  --iot-radius-round: 50%;
+
+  /* ---------- 间距 ---------- */
+  --iot-spacing-xs: 4px;
+  --iot-spacing-sm: 8px;
+  --iot-spacing-md: 16px;
+  --iot-spacing-lg: 24px;
+  --iot-spacing-xl: 32px;
+
+  /* ---------- 布局尺寸 ---------- */
+  --iot-sidebar-width: 220px;
+  --iot-sidebar-collapsed-width: 64px;
+  --iot-header-height: 56px;
+
+  /* ---------- 字体 ---------- */
+  --iot-font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --iot-font-size-xs: 12px;
+  --iot-font-size-sm: 13px;
+  --iot-font-size-base: 14px;
+  --iot-font-size-md: 16px;
+  --iot-font-size-lg: 20px;
+  --iot-font-size-xl: 24px;
+  --iot-font-size-data: 28px;
+  --iot-font-size-data-lg: 36px;
+
+  /* ---------- 过渡 ---------- */
+  --iot-transition-fast: 0.15s ease;
+  --iot-transition-base: 0.3s ease;
+  --iot-transition-slow: 0.5s ease;
+
+  /* ---------- 侧边栏文字/图标色（深色侧边栏专用） ---------- */
+  --iot-sidebar-text: #B0BEC5;
+  --iot-sidebar-text-active: #FFFFFF;
+  --iot-sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --iot-sidebar-item-active: rgba(26, 115, 232, 0.3);
+
+  /* ---------- Element Plus 主题覆盖 ---------- */
+  --el-color-primary: var(--iot-color-primary);
+  --el-color-success: var(--iot-color-success);
+  --el-color-warning: var(--iot-color-warning);
+  --el-color-danger: var(--iot-color-danger);
+  --el-color-info: var(--iot-color-info);
+  --el-border-radius-base: var(--iot-radius-base);
+  --el-font-size-base: var(--iot-font-size-base);
+}
+
+/* ============================================
+   暗色主题
+   ============================================ */
+html.dark {
+  --iot-color-primary: #409EFF;
+  --iot-color-primary-light: #66B1FF;
+  --iot-color-primary-dark: #3375B9;
+  --iot-color-primary-bg: rgba(64, 158, 255, 0.1);
+
+  --iot-color-success: #00E5CC;
+  --iot-color-success-light: #33EBD6;
+  --iot-color-success-bg: rgba(0, 229, 204, 0.1);
+  --iot-color-warning: #FFB74D;
+  --iot-color-warning-bg: rgba(255, 183, 77, 0.1);
+  --iot-color-danger: #EF5350;
+  --iot-color-danger-bg: rgba(239, 83, 80, 0.1);
+
+  --iot-bg-page: #0D1117;
+  --iot-bg-card: #1C2333;
+  --iot-bg-card-hover: #222D3F;
+  --iot-bg-sidebar: #161B22;
+  --iot-bg-header: #161B22;
+  --iot-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  --iot-text-primary: #E6E6E6;
+  --iot-text-regular: #B0BEC5;
+  --iot-text-secondary: #78909C;
+  --iot-text-placeholder: #546E7A;
+
+  --iot-border-color: #30363D;
+  --iot-border-color-light: #21262D;
+  --iot-border-color-lighter: #161B22;
+
+  --iot-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.2);
+  --iot-shadow-base: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --iot-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --iot-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  --iot-sidebar-text: #8B949E;
+  --iot-sidebar-text-active: #E6E6E6;
+  --iot-sidebar-item-hover: rgba(255, 255, 255, 0.04);
+  --iot-sidebar-item-active: rgba(64, 158, 255, 0.2);
+}

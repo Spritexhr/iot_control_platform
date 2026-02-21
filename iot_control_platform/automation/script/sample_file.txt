@@ -1,0 +1,59 @@
+# Python 脚本，Arduino 风格：setup() / loop()，支持 sleep(秒)
+# sensors、devices 由引擎注入，无需 import
+
+# 【sensors.get(device_id)】传感器
+# - current_state: 最新 SensorData.data，如 temperature、humidity
+
+# 【devices.get(device_id)】设备
+# - current_state: 最新 DeviceData.data
+# - send_command(name, params): 发送命令，如 high、low
+
+# 示例 - 温度过高时开启 LED（device_list 需配置 DHT11-WEMOS-001、SG_80_01）：
+# 版本1 
+
+from engine import sensors, devices  # engine 由引擎注入，含 sensors、devices 
+
+class TemperatureMonitor:
+    """温度监控控制器"""
+    
+    # 将常量提取出来，方便修改
+    TEMP_THRESHOLD = 30.0
+    SENSOR_ID = 'DHT11-WEMOS-001'
+    LED_ID = 'SG_80_01'
+
+    def __init__(self):
+        """相当于 Arduino 的 setup()"""
+        self.sensor = sensors.get(self.SENSOR_ID)
+        self.led = devices.get(self.LED_ID)
+        print(f"System Initialized: Sensor={bool(self.sensor)}, LED={bool(self.led)}")
+
+    def _get_temperature(self) -> Optional[float]:
+        """辅助方法：安全地获取当前温度"""
+        if not self.sensor:
+            return None
+        
+        # 假设 sensor.current_state 返回的是字典
+        state = self.sensor.current_state or {}
+        return state.get('temperature')
+
+    def loop(self) -> bool:
+        """相当于 Arduino 的 loop()"""
+        current_temp = self._get_temperature()
+
+        # 卫语句 (Guard Clause)：让主逻辑缩进更少，更清晰
+        if current_temp is None or not self.led:
+            return False
+
+        if float(current_temp) > self.TEMP_THRESHOLD:
+            self.led.send_command('high', {})
+            return True
+        
+        return True
+
+# --- 运行逻辑 ---
+def main():
+    monitor = TemperatureMonitor()
+    while True:
+        monitor.loop()
+        # 实际运行通常需要加上 sleep 防止 CPU 占用过高
+        # time.sleep(1)

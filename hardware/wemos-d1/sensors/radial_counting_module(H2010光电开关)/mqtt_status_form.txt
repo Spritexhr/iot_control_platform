@@ -1,0 +1,23 @@
+{
+    "sensor_id": "H2010-PHOTO-001",
+    "event": "heartbeat",
+    "status": {
+        "is_enabled": true,
+        "statusReportInterval": 120,
+        "switch": true
+    },
+    "timestamp": 1770731525
+}
+
+# 状态上报间隔更新后
+{
+    "sensor_id": "H2010-PHOTO-001",
+    "event": "status_interval_updated",
+    "status": {
+        "is_enabled": true,
+        "statusReportInterval": 60,
+        "switch": true
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}

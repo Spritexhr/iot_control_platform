@@ -1,0 +1,8 @@
+{
+  "sensor_id": "DHT11-WEMOS-001",
+  "data": {
+    "temperature": 12.3,
+    "humidity": 64.5
+  },
+  "timestamp": 1770733931
+}

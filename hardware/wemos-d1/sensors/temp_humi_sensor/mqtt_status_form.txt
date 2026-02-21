@@ -1,0 +1,35 @@
+{
+    "sensor_id":"DHT11-WEMOS-001",
+    "event":"interval_updated",
+    "status":{
+        "is_enabled":true,
+        "samplingInterval":120,
+        "statusReportInterval":60
+    },
+    "timestamp":1770731525
+}
+
+# 心跳（定期上报以证明在线）
+{
+    "sensor_id":"DHT11-WEMOS-001",
+    "event":"heartbeat",
+    "status":{
+        "is_enabled":true,
+        "samplingInterval":60,
+        "statusReportInterval":60
+    },
+    "timestamp":1770731525
+}
+
+# 状态上报间隔更新后
+{
+    "sensor_id":"DHT11-WEMOS-001",
+    "event":"status_interval_updated",
+    "status":{
+        "is_enabled":true,
+        "samplingInterval":60,
+        "statusReportInterval":120
+    },
+    "timestamp":1770731525,
+    "check_code":"123456"
+}

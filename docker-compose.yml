@@ -1,0 +1,56 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: iot-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-iot_platform}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "${MYSQL_HOST_PORT:-3307}:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./iot_control_platform
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DB_USE_MYSQL=true
+      - DB_NAME=${DB_NAME:-iot_platform}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+        gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    ports:
+      - "0.0.0.0:${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

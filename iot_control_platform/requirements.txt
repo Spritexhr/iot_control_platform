@@ -1,0 +1,8 @@
+Django
+paho-mqtt
+django-cors-headers
+django-extensions
+djangorestframework
+djangorestframework-simplejwt
+mysqlclient
+gunicorn

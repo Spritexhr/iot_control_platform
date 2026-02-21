@@ -1,0 +1,392 @@
+/* ============================================
+   IoT 控制平台 - 全局样式
+   ============================================ */
+
+@use './variables.scss';
+
+/* ---------- Reset / 基础重置 ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--iot-font-family);
+  font-size: var(--iot-font-size-base);
+  color: var(--iot-text-primary);
+  background-color: var(--iot-bg-page);
+  line-height: 1.6;
+  transition: background-color var(--iot-transition-base),
+              color var(--iot-transition-base);
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--iot-color-primary);
+  text-decoration: none;
+  transition: color var(--iot-transition-fast);
+
+  &:hover {
+    color: var(--iot-color-primary-light);
+  }
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--iot-border-color);
+  border-radius: 3px;
+
+  &:hover {
+    background: var(--iot-text-secondary);
+  }
+}
+
+/* ---------- 选中文本 ---------- */
+::selection {
+  background-color: var(--iot-color-primary);
+  color: #fff;
+}
+
+/* ============================================
+   通用工具类
+   ============================================ */
+
+/* ---------- 卡片 ---------- */
+.iot-card {
+  background: var(--iot-bg-card);
+  border-radius: var(--iot-radius-lg);
+  box-shadow: var(--iot-shadow-base);
+  border: 1px solid var(--iot-border-color-light);
+  transition: transform var(--iot-transition-base),
+              box-shadow var(--iot-transition-base),
+              background-color var(--iot-transition-base);
+}
+
+.iot-card--hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--iot-shadow-md);
+}
+
+.iot-card__header {
+  padding: var(--iot-spacing-md) var(--iot-spacing-lg);
+  border-bottom: 1px solid var(--iot-border-color-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.iot-card__body {
+  padding: var(--iot-spacing-lg);
+}
+
+.iot-card__footer {
+  padding: var(--iot-spacing-md) var(--iot-spacing-lg);
+  border-top: 1px solid var(--iot-border-color-light);
+}
+
+/* ---------- 状态指示圆点 ---------- */
+.iot-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--iot-radius-round);
+  flex-shrink: 0;
+
+  &--online {
+    background-color: var(--iot-color-success);
+    box-shadow: 0 0 6px rgba(0, 191, 165, 0.4);
+    animation: iot-pulse 2s ease-in-out infinite;
+  }
+
+  &--offline {
+    background-color: var(--iot-color-info);
+  }
+
+  &--loading {
+    background-color: var(--iot-color-primary);
+    animation: iot-spin 1s linear infinite;
+  }
+
+  &--warning {
+    background-color: var(--iot-color-warning);
+  }
+
+  &--danger {
+    background-color: var(--iot-color-danger);
+  }
+
+  &--lg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* ---------- 状态标签 ---------- */
+.iot-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: var(--iot-font-size-xs);
+  font-weight: 500;
+  line-height: 20px;
+
+  &--online {
+    color: var(--iot-color-success);
+    background: var(--iot-color-success-bg);
+  }
+
+  &--offline {
+    color: var(--iot-color-info);
+    background: rgba(144, 147, 153, 0.08);
+  }
+
+  &--warning {
+    color: var(--iot-color-warning);
+    background: var(--iot-color-warning-bg);
+  }
+
+  &--danger {
+    color: var(--iot-color-danger);
+    background: var(--iot-color-danger-bg);
+  }
+}
+
+/* ---------- 数据数值（大号） ---------- */
+.iot-data-value {
+  font-size: var(--iot-font-size-data);
+  font-weight: 700;
+  color: var(--iot-text-primary);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+
+  &--lg {
+    font-size: var(--iot-font-size-data-lg);
+  }
+
+  &--sm {
+    font-size: var(--iot-font-size-lg);
+  }
+}
+
+.iot-data-unit {
+  font-size: var(--iot-font-size-sm);
+  font-weight: 400;
+  color: var(--iot-text-secondary);
+  margin-left: 4px;
+}
+
+.iot-data-label {
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
+  margin-bottom: 4px;
+}
+
+/* ---------- 页面标题区 ---------- */
+.iot-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--iot-spacing-lg);
+}
+
+.iot-page-title {
+  font-size: var(--iot-font-size-xl);
+  font-weight: 600;
+  color: var(--iot-text-primary);
+}
+
+.iot-page-subtitle {
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-secondary);
+  margin-top: 4px;
+}
+
+/* ---------- 网格布局 ---------- */
+.iot-grid {
+  display: grid;
+  gap: var(--iot-spacing-md);
+}
+
+.iot-grid--cards {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.iot-grid--stats {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* ---------- Flex 工具 ---------- */
+.iot-flex {
+  display: flex;
+  align-items: center;
+}
+
+.iot-flex--between {
+  justify-content: space-between;
+}
+
+.iot-flex--center {
+  justify-content: center;
+}
+
+.iot-flex--gap-sm {
+  gap: var(--iot-spacing-sm);
+}
+
+.iot-flex--gap-md {
+  gap: var(--iot-spacing-md);
+}
+
+/* ---------- 间距工具 ---------- */
+.iot-mt-sm { margin-top: var(--iot-spacing-sm); }
+.iot-mt-md { margin-top: var(--iot-spacing-md); }
+.iot-mt-lg { margin-top: var(--iot-spacing-lg); }
+.iot-mb-sm { margin-bottom: var(--iot-spacing-sm); }
+.iot-mb-md { margin-bottom: var(--iot-spacing-md); }
+.iot-mb-lg { margin-bottom: var(--iot-spacing-lg); }
+
+/* ---------- 文字工具 ---------- */
+.iot-text-primary { color: var(--iot-text-primary); }
+.iot-text-regular { color: var(--iot-text-regular); }
+.iot-text-secondary { color: var(--iot-text-secondary); }
+.iot-text-success { color: var(--iot-color-success); }
+.iot-text-warning { color: var(--iot-color-warning); }
+.iot-text-danger { color: var(--iot-color-danger); }
+.iot-text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   动画
+   ============================================ */
+@keyframes iot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes iot-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes iot-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.iot-animate-fade-in {
+  animation: iot-fade-in 0.3s ease forwards;
+}
+
+/* ============================================
+   Element Plus 全局样式覆盖
+   ============================================ */
+
+/* 按钮圆角 */
+.el-button {
+  border-radius: var(--iot-radius-base) !important;
+}
+
+/* 弹窗圆角 */
+.el-dialog {
+  border-radius: var(--iot-radius-lg) !important;
+}
+
+/* 抽屉内容 */
+.el-drawer__body {
+  padding: var(--iot-spacing-lg);
+}
+
+/* 表格样式 */
+.el-table {
+  --el-table-border-color: var(--iot-border-color-light);
+  --el-table-header-bg-color: var(--iot-bg-card);
+}
+
+/* 标签页 */
+.el-tabs__nav-wrap::after {
+  height: 1px !important;
+}
+
+/* ============================================
+   暗色模式下 Element Plus 适配
+   ============================================ */
+html.dark {
+  .el-table {
+    --el-table-bg-color: var(--iot-bg-card);
+    --el-table-tr-bg-color: var(--iot-bg-card);
+    --el-table-header-bg-color: var(--iot-bg-sidebar);
+    --el-table-row-hover-bg-color: var(--iot-bg-card-hover);
+    --el-table-text-color: var(--iot-text-primary);
+  }
+
+  .el-dialog,
+  .el-drawer {
+    background-color: var(--iot-bg-card);
+  }
+
+  .el-input__wrapper {
+    background-color: var(--iot-bg-page);
+    box-shadow: 0 0 0 1px var(--iot-border-color) inset;
+  }
+
+  .el-card {
+    background-color: var(--iot-bg-card);
+    border-color: var(--iot-border-color);
+  }
+}
+
+/* ============================================
+   过渡动画（Vue Router）
+   ============================================ */
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+/* 简单淡入淡出 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}

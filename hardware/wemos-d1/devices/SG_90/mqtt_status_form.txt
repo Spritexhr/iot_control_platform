@@ -1,0 +1,56 @@
+{
+    "device_id": "sg90_001",
+    "event": "angle_updated" | "check_current_angle" | "heartbeat" | "online" | "status_interval_updated",
+    "status": {
+        "angle": 90,
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
+# 上线
+{
+    "device_id": "sg90_001",
+    "event": "online",
+    "status": {
+        "angle": 90,
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 心跳（定期上报以证明在线）
+{
+    "device_id": "sg90_001",
+    "event": "heartbeat",
+    "status": {
+        "angle": 90,
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 角度更新后
+{
+    "device_id": "sg90_001",
+    "event": "angle_updated",
+    "status": {
+        "angle": 45,
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
+# 状态上报间隔更新后
+{
+    "device_id": "sg90_001",
+    "event": "status_interval_updated",
+    "status": {
+        "angle": 90,
+        "statusReportInterval": 60
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}

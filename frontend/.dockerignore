@@ -1,0 +1,17 @@
+# 依赖目录（构建时重新安装）
+node_modules
+dist
+
+# 开发与 IDE
+.idea
+.vscode
+*.log
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# 文档
+*.md
+!README.md

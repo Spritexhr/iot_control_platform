@@ -1,0 +1,30 @@
+# 虚拟环境
+.venv
+venv
+env
+
+# Python 缓存
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+.eggs
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# 测试与文档
+.coverage
+htmlcov
+.pytest_cache
+*.md
+!README.md
+
+# Git
+.git
+.gitignore

@@ -1,0 +1,44 @@
+{
+    "sensor_id": "Rotation-001",
+    "event": "interval_updated",
+    "status": {
+        "is_enabled": true,
+        "samplingInterval": 1,
+        "statusReportInterval": 60,
+        "raw": 512,
+        "position": 50,
+        "angle": 90
+    },
+    "timestamp": 1770731525
+}
+
+# 心跳（定期上报以证明在线）
+{
+    "sensor_id": "Rotation-001",
+    "event": "heartbeat",
+    "status": {
+        "is_enabled": true,
+        "samplingInterval": 1,
+        "statusReportInterval": 120,
+        "raw": 512,
+        "position": 50,
+        "angle": 90
+    },
+    "timestamp": 1770731525
+}
+
+# 状态上报间隔更新后
+{
+    "sensor_id": "Rotation-001",
+    "event": "status_interval_updated",
+    "status": {
+        "is_enabled": true,
+        "samplingInterval": 1,
+        "statusReportInterval": 120,
+        "raw": 512,
+        "position": 50,
+        "angle": 90
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}

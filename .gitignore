@@ -1,0 +1,36 @@
+# ===== 项目根目录 .gitignore =====
+
+# Python 虚拟环境 (所有位置)
+.venv/
+venv/
+ENV/
+env/
+platform/.venv/
+
+# Node
+node_modules/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志和临时文件
+*.log
+*.log.*
+*.tmp
+*.temp
+
+# IoT 平台日志目录
+iot_control_platform/logs/
