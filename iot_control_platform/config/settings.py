@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS中间件，需要放在前面
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -147,17 +148,21 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
+# Whitenoise 在 Gunicorn 下提供 Admin 等静态文件
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # CORS配置 - 允许前端访问
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vue.js开发服务器
     "http://localhost:3000",
     "http://localhost:8080",  # Docker 前端
+    "http://localhost:8081",  # Docker Admin 管理界面
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -167,9 +172,11 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:8080",
+    "http://localhost:8081",  # Docker Admin 管理界面
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
     # 开发时若从局域网设备访问，请添加如 "http://192.168.x.x:5173"
 ]
 

@@ -99,7 +99,7 @@ iot_control_platform/           # 项目根目录
 |-------------|------------------------------|----------|
 | `mysql`     | MySQL 8.0 数据库             | 3307（可配置） |
 | `frontend`  | Vue 前端构建 + Nginx 提供静态文件与 API 代理 | 8080（可配置） |
-| `backend`   | Django REST API + Gunicorn + MQTT 客户端（连接公网 EMQX） | 内部 8000（不直接对外） |
+| `backend`   | Django REST API + Gunicorn + MQTT 客户端（连接公网 EMQX） | 8000 → 8081（Admin 直连，可配置） |
 | 数据卷       | 持久化 MySQL 数据            | -        |
 
 ---
@@ -121,6 +121,8 @@ cp .env.example .env               # Linux/Mac
 ```env
 # 前端访问端口
 FRONTEND_PORT=8080
+# Admin 管理界面端口（Django Admin 直连）
+ADMIN_PORT=8081
 
 # Django 配置
 SECRET_KEY=your-secret-key-change-in-production
@@ -173,10 +175,10 @@ docker compose exec backend python manage.py createsuperuser
 
 ### 4.4 访问应用
 
-- **前端页面**：http://localhost:80 （若 `.env` 中 `FRONTEND_PORT=8080`，则访问 http://localhost:8080）
-- **Django Admin**：http://localhost:80/admin/
+- **前端页面**：http://localhost:8080（`.env` 中 `FRONTEND_PORT=8080`）
+- **Django Admin**：http://localhost:8081/admin/（`.env` 中 `ADMIN_PORT=8081`，直连后端）
 
-使用上一步创建的超级管理员账号登录。
+使用上一步创建的超级管理员账号登录 Admin。
 
 ---
 

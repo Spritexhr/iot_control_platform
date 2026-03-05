@@ -170,7 +170,7 @@ docker compose exec backend python manage.py createsuperuser
 
 4. 访问系统：
    - 前端界面：`http://localhost:8080`（或 `.env` 中 `FRONTEND_PORT` 指定端口）
-   - 管理后台：`http://localhost:8080/admin/`
+   - 管理后台：`http://localhost:8081/admin/`（`.env` 中 `ADMIN_PORT` 指定端口）
 
 详细说明请参阅 [docs/deployment/docker.md](../docs/deployment/docker.md)。
 

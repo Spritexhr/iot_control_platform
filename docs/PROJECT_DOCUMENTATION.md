@@ -57,7 +57,7 @@
     ```
 5.  **访问系统**：
     *   前端界面：`http://localhost:8080`
-    *   管理后台：`http://localhost:8080/admin/`
+    *   管理后台：`http://localhost:8081/admin/`
 
 ---
 
