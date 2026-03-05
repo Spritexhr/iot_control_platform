@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from django.db.models import Q
 from django.utils import timezone
@@ -15,18 +16,29 @@ from .serializers import (
 
 
 class DeviceTypeViewSet(viewsets.ModelViewSet):
-    """设备类型 CRUD API"""
+    """设备类型 CRUD API，创建/修改/删除仅限工作人员（is_staff）"""
     queryset = DeviceType.objects.all()
     serializer_class = DeviceTypeSerializer
+
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated()]
 
 
 class DeviceViewSet(viewsets.ModelViewSet):
     """
     设备 CRUD API
     支持按 device_id 查找、筛选、搜索
+    创建/修改/删除/发送命令仅限工作人员，非工作人员仅可查看
     """
     queryset = Device.objects.select_related('device_type').all()
     lookup_field = 'device_id'
+
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy', 'send_command'):
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

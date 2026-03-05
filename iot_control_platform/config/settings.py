@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "devices",
     "sensors",
     "automation",
+    "platform_settings",
 ]
 
 MIDDLEWARE = [
@@ -172,14 +173,20 @@ CSRF_TRUSTED_ORIGINS = [
     # 开发时若从局域网设备访问，请添加如 "http://192.168.x.x:5173"
 ]
 
-# MQTT配置（支持环境变量，Docker 部署时便于修改）
-# 若 EMQX 在本机运行，Docker 中应使用 host.docker.internal（Windows/Mac）
-# 生产环境请务必通过 .env 设置 MQTT_BROKER、MQTT_PASSWORD
-MQTT_BROKER = os.environ.get("MQTT_BROKER", "127.0.0.1")  # 本地开发默认，部署时请设置
-MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
-MQTT_KEEPALIVE = int(os.environ.get("MQTT_KEEPALIVE", "60"))
-MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
-MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
+# MQTT 与设备配置：优先从 platform_settings 读取，不存在时回退到环境变量
+# 使用 SimpleLazyObject 延迟读取，避免 settings 加载时 DB 未就绪
+# 使用 seed_platform_config 命令可将 .env 默认值写入 platform_settings
+from django.utils.functional import SimpleLazyObject
+from config.platform_config import get_config
+
+def _lazy_config(key, env_key, default, value_type=str):
+    return SimpleLazyObject(lambda: get_config(key, env_key, default, value_type))
+
+MQTT_BROKER = _lazy_config("mqtt_broker", "MQTT_BROKER", "127.0.0.1")
+MQTT_PORT = _lazy_config("mqtt_port", "MQTT_PORT", 1883, int)
+MQTT_KEEPALIVE = _lazy_config("mqtt_keepalive", "MQTT_KEEPALIVE", 60, int)
+MQTT_USERNAME = _lazy_config("mqtt_username", "MQTT_USERNAME", "")
+MQTT_PASSWORD = _lazy_config("mqtt_password", "MQTT_PASSWORD", "")
 
 # MQTT主题配置
 MQTT_TOPICS = {
@@ -188,10 +195,10 @@ MQTT_TOPICS = {
     "DEVICE_STATUS": "iot/devices/+/status",  # 设备状态反馈主题
 }
 
-# 设备离线检测配置（秒）
-DEVICE_OFFLINE_TIMEOUT = 300  # 5分钟无响应视为离线
-DEVICE_RECONNECT_ATTEMPTS = 3  # 重连尝试次数
-DEVICE_RECONNECT_INTERVAL = 10  # 重连间隔（秒）
+# 设备离线检测配置（秒）：优先 platform_settings，回退 env
+DEVICE_OFFLINE_TIMEOUT = _lazy_config("device_offline_timeout", "DEVICE_OFFLINE_TIMEOUT", 300, int)
+DEVICE_RECONNECT_ATTEMPTS = _lazy_config("device_reconnect_attempts", "DEVICE_RECONNECT_ATTEMPTS", 3, int)
+DEVICE_RECONNECT_INTERVAL = _lazy_config("device_reconnect_interval", "DEVICE_RECONNECT_INTERVAL", 10, int)
 
 # 默认主键字段类型
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

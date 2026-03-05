@@ -16,6 +16,7 @@
       </div>
       <div v-if="rule" class="header-right">
         <el-button
+          v-if="isStaff"
           type="success"
           :icon="VideoPlay"
           :loading="executing"
@@ -25,6 +26,7 @@
           执行测试
         </el-button>
         <el-button
+          v-if="isSuperuser"
           type="primary"
           :icon="Check"
           :loading="saving"
@@ -46,13 +48,13 @@
           <div class="iot-card__body">
             <el-form label-width="90px" size="default">
               <el-form-item label="规则名称">
-                <el-input v-model="rule.name" placeholder="规则名称" />
+                <el-input v-model="rule.name" placeholder="规则名称" :disabled="!isSuperuser" />
               </el-form-item>
               <el-form-item label="脚本 ID">
-                <el-input v-model="rule.script_id" placeholder="唯一标识，如 temp_alert（选填）" />
+                <el-input v-model="rule.script_id" placeholder="唯一标识，如 temp_alert（选填）" :disabled="!isSuperuser" />
               </el-form-item>
               <el-form-item label="描述">
-                <el-input v-model="rule.description" type="textarea" :rows="2" placeholder="规则的功能说明" />
+                <el-input v-model="rule.description" type="textarea" :rows="2" placeholder="规则的功能说明" :disabled="!isSuperuser" />
               </el-form-item>
             </el-form>
           </div>
@@ -62,7 +64,7 @@
         <div class="iot-card">
           <div class="iot-card__header">
             <span class="section-title">关联设备 / 传感器</span>
-            <el-button type="primary" size="small" :icon="Plus" @click="addDeviceRow">添加</el-button>
+            <el-button v-if="isSuperuser" type="primary" size="small" :icon="Plus" @click="addDeviceRow">添加</el-button>
           </div>
           <div class="iot-card__body">
             <div v-if="!rule.device_list || rule.device_list.length === 0" class="empty-hint">
@@ -75,8 +77,9 @@
                   placeholder="传感器/设备 ID"
                   size="small"
                   style="width: 180px"
+                  :disabled="!isSuperuser"
                 />
-                <el-select v-model="item.device_type" size="small" style="width: 120px" placeholder="类型">
+                <el-select v-model="item.device_type" size="small" style="width: 120px" placeholder="类型" :disabled="!isSuperuser">
                   <el-option label="Sensor" value="Sensor" />
                   <el-option label="Device" value="Device" />
                 </el-select>
@@ -85,8 +88,10 @@
                   placeholder="备注名称（选填）"
                   size="small"
                   style="flex: 1"
+                  :disabled="!isSuperuser"
                 />
                 <el-button
+                  v-if="isSuperuser"
                   text
                   type="danger"
                   size="small"
@@ -110,7 +115,7 @@
         </div>
         <div class="iot-card__body script-editor-body">
           <div class="script-toolbar">
-            <el-button size="small" @click="insertTemplate">插入模板</el-button>
+            <el-button v-if="isSuperuser" size="small" @click="insertTemplate">插入模板</el-button>
             <span class="line-count">{{ scriptLineCount }} 行</span>
           </div>
           <textarea
@@ -118,6 +123,7 @@
             v-model="rule.script"
             class="script-editor"
             spellcheck="false"
+            :readonly="!isSuperuser"
             placeholder="# 在此编写自动化脚本...
 from engine import sensors, devices
 
@@ -132,8 +138,8 @@ class MyController:
         </div>
       </div>
 
-      <!-- ========== 第三行：轮询执行控制台 ========== -->
-      <div class="iot-card iot-mt-lg">
+      <!-- ========== 第三行：轮询执行控制台（仅工作人员可见） ========== -->
+      <div v-if="isStaff" class="iot-card iot-mt-lg">
         <div class="iot-card__header">
           <span class="section-title">执行控制台</span>
           <div class="poll-controls">
@@ -268,6 +274,7 @@ class MyController:
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, VideoPlay, VideoPause, RefreshRight, Check, Plus, Delete } from '@element-plus/icons-vue'
 import {
@@ -280,6 +287,9 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
+const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 
 // ==================== 规则数据 ====================
 const rule = ref(null)

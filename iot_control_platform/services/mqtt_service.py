@@ -42,26 +42,23 @@ class MQTTService:
             # 创建MQTT客户端
             self.client = mqtt.Client(client_id="django_iot_platform")
 
-            # 设置认证信息
-            if hasattr(settings, 'MQTT_USERNAME') and hasattr(settings, 'MQTT_PASSWORD'):
-                if settings.MQTT_USERNAME and settings.MQTT_PASSWORD:
-                    self.client.username_pw_set(
-                        settings.MQTT_USERNAME,
-                        settings.MQTT_PASSWORD
-                    )
+            # 设置认证信息（显式取值以解析 LazyObject）
+            username = str(settings.MQTT_USERNAME or "")
+            password = str(settings.MQTT_PASSWORD or "")
+            if username and password:
+                self.client.username_pw_set(username, password)
 
             # 设置回调函数
             self.client.on_connect = self._on_connect
             self.client.on_disconnect = self._on_disconnect
             self.client.on_message = self._on_message
 
-            # 连接到MQTT服务器
-            logger.info(f"正在连接MQTT服务器: {settings.MQTT_BROKER}:{settings.MQTT_PORT}")
-            self.client.connect(
-                settings.MQTT_BROKER,
-                settings.MQTT_PORT,
-                settings.MQTT_KEEPALIVE
-            )
+            # 连接到MQTT服务器（str 先触发 LazyObject 求值，再转换类型）
+            broker = str(settings.MQTT_BROKER)
+            port = int(str(settings.MQTT_PORT))
+            keepalive = int(str(settings.MQTT_KEEPALIVE))
+            logger.info(f"正在连接MQTT服务器: {broker}:{port}")
+            self.client.connect(broker, port, keepalive)
 
             # 启动网络循环（后台线程）
             self.client.loop_start()

@@ -1,6 +1,6 @@
 # Django 数据模型设计文档
 
-本文档描述物联网控制平台（IoT Control Platform）的 Django 数据模型设计，涵盖设备管理、传感器管理和自动化规则三大模块。
+本文档描述物联网控制平台（IoT Control Platform）的 Django 数据模型设计，涵盖设备管理、传感器管理、自动化规则和平台配置四大模块。
 
 ---
 
@@ -11,8 +11,10 @@
 | `devices` | 输出器/执行器（如 LED、舵机、继电器）管理 | DeviceType, Device, DeviceData |
 | `sensors` | 输入器/传感器（如 DHT11、DHT22）管理 | SensorType, Sensor, SensorStatusCollection, SensorData |
 | `automation` | 自动化规则与脚本执行 | AutomationRule |
+| `platform_settings` | 平台级可调配置（MQTT、设备离线等） | PlatformConfig |
 
-三个模块通过 `device_id` 在 `AutomationRule.device_list` 中与 `devices.Device`、`sensors.Sensor` 进行逻辑关联。
+- 设备/传感器/自动化：通过 `device_id` 在 `AutomationRule.device_list` 中与 `devices.Device`、`sensors.Sensor` 进行逻辑关联。
+- 平台配置：详见 [platform_settings_design.md](./platform_settings_design.md)。
 
 ---
 
@@ -255,3 +257,4 @@
 3. **在线判定**：基于 `last_seen`，设备按心跳 3 倍超时，传感器按 3 分钟内有过上报。
 4. **JSON 存储**：`data`、`commands`、`device_list` 等使用 JSONField，便于扩展字段。
 5. **自动化与设备解耦**：`AutomationRule` 通过 `device_list` 中的 `device_id` 与 `Device`/`Sensor` 关联，无外键，方便跨模块引用。
+6. **平台配置**：`platform_settings.PlatformConfig` 存储 MQTT、设备离线等可调参数，优先于环境变量，支持前端管理。详见 [platform_settings_design.md](./platform_settings_design.md)。

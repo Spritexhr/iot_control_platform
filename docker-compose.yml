@@ -31,8 +31,13 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql
       - DB_PORT=3306
+      - MQTT_BROKER=${MQTT_BROKER:-116.62.68.29}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
     command: >
       sh -c "python manage.py migrate --noinput &&
+        python manage.py seed_platform_config &&
         gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
     env_file:
       - .env

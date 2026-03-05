@@ -92,8 +92,8 @@
             </div>
           </div>
 
-          <!-- 命令控制 -->
-          <div class="iot-card">
+          <!-- 命令控制（仅工作人员可见） -->
+          <div v-if="isStaff" class="iot-card">
             <div class="iot-card__header">
               <span class="section-title">命令控制</span>
             </div>
@@ -192,9 +192,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Refresh } from '@element-plus/icons-vue'
 import CommandPanel from '@/components/common/CommandPanel.vue'
+import { useUserStore } from '@/stores/user'
 import { getSensor, getSensorData, getSensorStatus, sendSensorCommand } from '@/api/sensors'
 
 const route = useRoute()
+const userStore = useUserStore()
+const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 const router = useRouter()
 
 // ==================== 传感器详情 ====================

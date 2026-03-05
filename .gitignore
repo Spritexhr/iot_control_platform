@@ -34,3 +34,6 @@ Thumbs.db
 
 # IoT 平台日志目录
 iot_control_platform/logs/
+
+# 自动化迁移（不追踪，由 makemigrations 生成）
+iot_control_platform/automation/migrations/

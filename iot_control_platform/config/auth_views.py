@@ -59,11 +59,13 @@ def register(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # 创建用户
+    # 创建用户（注册仅能创建非工作人员，is_staff/is_superuser 必须为 False）
     user = User.objects.create_user(
         username=username,
         password=password,
         email=email,
+        is_staff=False,
+        is_superuser=False,
     )
 
     return Response(
@@ -98,6 +100,7 @@ def user_profile(request):
             'last_name': user.last_name,
             'date_joined': user.date_joined,
             'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser,
         })
 
     # PUT 更新

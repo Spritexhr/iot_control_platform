@@ -29,8 +29,7 @@ def handle_mqtt_device_status_message(topic: str, payload: Dict) -> bool:
 
         device = _get_device(device_id)
         if not device:
-            logger.error(f"✗ 设备不存在: {device_id}")
-            return False
+            return False  # _get_device 已记录日志
 
         event_name = payload['event']
         status_to_save = _extract_status_fields(payload)

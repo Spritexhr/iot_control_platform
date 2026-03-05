@@ -3,6 +3,8 @@ import io
 import contextlib
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from config.permissions import IsSuperuser
 from rest_framework.response import Response
 from django.db.models import Q
 from .models import AutomationRule
@@ -35,9 +37,16 @@ class _LogCaptureHandler(logging.Handler):
 class AutomationRuleViewSet(viewsets.ModelViewSet):
     """
     自动化规则 CRUD API
-    支持搜索、手动执行、启动/停止轮询
+    创建、修改、删除仅限超级用户；执行、启动、停止仅限工作人员；非工作人员仅可查看
     """
     queryset = AutomationRule.objects.all()
+
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [IsAuthenticated(), IsSuperuser()]
+        if self.action in ('execute', 'launch', 'stop'):
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

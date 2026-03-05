@@ -26,7 +26,10 @@ from django.utils import timezone
 from devices.models import DeviceType, Device, DeviceData
 from sensors.models import SensorType, Sensor, SensorData, SensorStatusCollection
 from automation.models import AutomationRule
+from platform_settings.models import PlatformConfig
 ```
+
+平台配置详细用法见 [platform_settings_guide.md](./platform_settings_guide.md)。
 
 ---
 
@@ -426,3 +429,36 @@ DeviceType.objects.annotate(cnt=Count('devices')).values('name', 'cnt')
 | 时间范围 | `dev.data_records.filter(timestamp__gte=start, timestamp__lte=end)` |
 | 存在性 | `Sensor.objects.filter(sensor_id='xxx').exists()` |
 | 计数 | `Sensor.objects.count()` / `dev.get_data_count(24)` |
+
+---
+
+## 八、平台配置模块 (platform_settings)
+
+### 8.1 PlatformConfig（平台配置）
+
+**查询**
+
+```python
+PlatformConfig.objects.all()
+cfg = PlatformConfig.objects.get(key='mqtt_broker')
+PlatformConfig.objects.filter(category='mqtt')
+```
+
+**创建 / 更新**
+
+```python
+PlatformConfig.objects.create(key='mqtt_broker', value='127.0.0.1', category='mqtt', description='MQTT 地址')
+cfg = PlatformConfig.objects.get(key='mqtt_broker')
+cfg.value = '192.168.1.100'
+cfg.save()
+```
+
+**统一读取（优先数据库，回退环境变量）**
+
+```python
+from config.platform_config import get_config
+broker = get_config('mqtt_broker', 'MQTT_BROKER', '127.0.0.1')
+port = get_config('mqtt_port', 'MQTT_PORT', 1883, int)
+```
+
+**初始化命令**：`python manage.py seed_platform_config` 将 .env 默认值写入数据库。详见 [platform_settings_guide.md](./platform_settings_guide.md)。

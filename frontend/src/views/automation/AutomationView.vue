@@ -5,7 +5,7 @@
         <h1 class="iot-page-title">自动化规则</h1>
         <p class="iot-page-subtitle">管理设备自动化控制脚本</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建规则</el-button>
+      <el-button v-if="isSuperuser" type="primary" :icon="Plus" @click="openCreateDialog">新建规则</el-button>
     </div>
 
     <!-- 筛选栏 -->
@@ -49,8 +49,8 @@
                 {{ getStatusText(rule) }}
               </el-tag>
             </div>
-            <div class="rule-card__actions">
-              <template v-if="rule.is_launched && localTimers[rule.id]">
+            <div v-if="isStaff || isSuperuser" class="rule-card__actions">
+              <template v-if="isStaff && rule.is_launched && localTimers[rule.id]">
                 <span class="poll-interval-label">间隔 {{ rule.poll_interval || 30 }}s</span>
                 <el-button
                   type="danger"
@@ -62,7 +62,7 @@
                   停止轮询 ({{ countdowns[rule.id] ?? 0 }}s)
                 </el-button>
               </template>
-              <template v-else>
+              <template v-else-if="isStaff">
                 <el-input-number
                   v-model="rule.poll_interval"
                   :min="1"
@@ -84,6 +84,7 @@
                 </el-button>
               </template>
               <el-button
+                v-if="isStaff"
                 type="success"
                 size="small"
                 plain
@@ -94,6 +95,7 @@
                 执行
               </el-button>
               <el-button
+                v-if="isSuperuser"
                 text
                 size="small"
                 type="danger"
@@ -171,8 +173,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, VideoPlay, VideoPause, Delete, Connection, Clock, RefreshRight } from '@element-plus/icons-vue'
 import {
@@ -185,6 +188,9 @@ import {
 } from '@/api/automation'
 
 const router = useRouter()
+const userStore = useUserStore()
+const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
+const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 
 // ==================== 筛选 ====================
 const searchText = ref('')

@@ -18,7 +18,7 @@
 ### 1.2 前置条件
 
 - MQTT Broker 已启动（如 EMQX、Mosquitto）
-- `config/settings.py` 中已配置 `MQTT_BROKER`、`MQTT_PORT`、`MQTT_USERNAME`、`MQTT_PASSWORD`
+- MQTT 配置：优先从 `platform_settings` 读取，回退到环境变量 `MQTT_BROKER`、`MQTT_PORT` 等。详见 [platform_settings_guide.md](./platform_settings_guide.md)
 - **传感器**：已创建 `SensorType` 和 `Sensor`，`SensorType.commands` 中定义好命令
 - **设备**：已创建 `DeviceType` 和 `Device`，`DeviceType.commands` 中定义好命令
 

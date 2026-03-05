@@ -18,8 +18,8 @@ def mqtt_status(request):
         is_connected = False
 
     return Response({
-        'broker': settings.MQTT_BROKER,
-        'port': settings.MQTT_PORT,
+        'broker': str(settings.MQTT_BROKER),
+        'port': int(str(settings.MQTT_PORT)),
         'is_connected': is_connected,
     })
 

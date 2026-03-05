@@ -36,246 +36,115 @@
       </div>
     </div>
 
-    <!-- ==================== 传感器类型管理 ==================== -->
+    <!-- ==================== 平台配置 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">传感器类型管理</span>
-        <el-button type="primary" :icon="Plus" @click="openSensorTypeDialog(null)">
-          新增类型
+        <span class="section-title">平台配置</span>
+        <el-button
+          v-if="isSuperuser"
+          type="primary"
+          :icon="Plus"
+          size="small"
+          @click="openConfigDialog(null)"
+        >
+          新增配置
         </el-button>
       </div>
       <div class="iot-card__body">
-        <el-table :data="sensorTypes" v-loading="sensorTypesLoading" stripe>
-          <el-table-column prop="SensorType_id" label="类型ID" width="160" />
-          <el-table-column prop="name" label="名称" width="180" />
-          <el-table-column label="数据字段" min-width="200">
+        <el-table :data="platformConfigs" v-loading="configsLoading" stripe>
+          <el-table-column prop="key" label="配置键" width="200" />
+          <el-table-column prop="category" label="分类" width="100" />
+          <el-table-column label="配置值" min-width="200">
             <template #default="{ row }">
-              <el-tag
-                v-for="field in (row.data_fields || [])"
-                :key="field"
-                size="small"
-                class="field-tag"
-              >
-                {{ field }}
-              </el-tag>
-              <span v-if="!row.data_fields || row.data_fields.length === 0" class="iot-text-secondary">-</span>
+              <span class="config-value">{{ formatValue(row.value) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="命令数" width="80" align="center">
+          <el-table-column prop="description" label="说明" min-width="120" show-overflow-tooltip />
+          <el-table-column v-if="isSuperuser" label="操作" width="140" align="center" fixed="right">
             <template #default="{ row }">
-              {{ row.commands ? Object.keys(row.commands).length : 0 }}
-            </template>
-          </el-table-column>
-          <el-table-column label="关联传感器" width="100" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" type="info">{{ row.sensor_count || 0 }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="160" align="center" fixed="right">
-            <template #default="{ row }">
-              <el-button text type="primary" size="small" @click="openSensorTypeDialog(row)">
-                编辑
-              </el-button>
-              <el-popconfirm
-                title="确定删除此传感器类型？"
-                confirm-button-text="删除"
-                cancel-button-text="取消"
-                @confirm="handleDeleteSensorType(row.id)"
-              >
-                <template #reference>
-                  <el-button text type="danger" size="small">删除</el-button>
-                </template>
-              </el-popconfirm>
+              <div class="config-actions">
+                <el-button plain type="primary" size="small" @click="openConfigDialog(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  title="确定删除此配置？"
+                  confirm-button-text="删除"
+                  cancel-button-text="取消"
+                  @confirm="handleDeleteConfig(row.key)"
+                >
+                  <template #reference>
+                    <el-button plain type="danger" size="small">删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </div>
             </template>
           </el-table-column>
         </el-table>
+        <div v-if="!configsLoading && platformConfigs.length === 0" class="empty-hint">
+          <el-empty description="暂无配置，可运行 seed_platform_config 命令从 .env 初始化" />
+        </div>
       </div>
     </div>
 
-    <!-- ==================== 设备类型管理 ==================== -->
-    <div class="iot-card iot-mb-lg">
-      <div class="iot-card__header">
-        <span class="section-title">设备类型管理</span>
-        <el-button type="primary" :icon="Plus" @click="openDeviceTypeDialog(null)">
-          新增类型
-        </el-button>
-      </div>
-      <div class="iot-card__body">
-        <el-table :data="deviceTypes" v-loading="deviceTypesLoading" stripe>
-          <el-table-column prop="DeviceType_id" label="类型ID" width="160" />
-          <el-table-column prop="name" label="名称" width="180" />
-          <el-table-column label="状态字段" min-width="200">
-            <template #default="{ row }">
-              <el-tag
-                v-for="field in (row.state_fields || [])"
-                :key="field"
-                size="small"
-                type="warning"
-                class="field-tag"
-              >
-                {{ field }}
-              </el-tag>
-              <span v-if="!row.state_fields || row.state_fields.length === 0" class="iot-text-secondary">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="命令数" width="80" align="center">
-            <template #default="{ row }">
-              {{ row.commands ? Object.keys(row.commands).length : 0 }}
-            </template>
-          </el-table-column>
-          <el-table-column label="关联设备" width="100" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" type="info">{{ row.device_count || 0 }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="160" align="center" fixed="right">
-            <template #default="{ row }">
-              <el-button text type="primary" size="small" @click="openDeviceTypeDialog(row)">
-                编辑
-              </el-button>
-              <el-popconfirm
-                title="确定删除此设备类型？"
-                confirm-button-text="删除"
-                cancel-button-text="取消"
-                @confirm="handleDeleteDeviceType(row.id)"
-              >
-                <template #reference>
-                  <el-button text type="danger" size="small">删除</el-button>
-                </template>
-              </el-popconfirm>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </div>
-
-    <!-- ==================== 传感器类型编辑弹窗 ==================== -->
+    <!-- 配置编辑弹窗 -->
     <el-dialog
-      v-model="sensorTypeDialogVisible"
-      :title="sensorTypeForm.id ? '编辑传感器类型' : '新增传感器类型'"
+      v-model="configDialogVisible"
+      :title="configForm.id ? '编辑配置' : '新增配置'"
       width="600px"
       destroy-on-close
     >
-      <el-form :model="sensorTypeForm" label-width="100px" :rules="sensorTypeRules" ref="sensorTypeFormRef">
-        <el-form-item label="类型 ID" prop="SensorType_id">
-          <el-input v-model="sensorTypeForm.SensorType_id" placeholder="如: DHT11-01" />
-        </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="sensorTypeForm.name" placeholder="如: DHT11 温湿度传感器" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="sensorTypeForm.description" type="textarea" :rows="2" placeholder="类型描述（选填）" />
-        </el-form-item>
-        <el-form-item label="数据字段">
-          <el-select
-            v-model="sensorTypeForm.data_fields"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入字段名后回车添加，如 temperature"
-            style="width: 100%"
+      <el-form :model="configForm" label-width="100px" :rules="configRules" ref="configFormRef">
+        <el-form-item label="配置键" prop="key">
+          <el-input
+            v-model="configForm.key"
+            placeholder="如 mqtt_broker、sensor_data_retention_days"
+            :disabled="!!configForm.id"
           />
         </el-form-item>
-        <el-form-item label="配置参数">
-          <el-select
-            v-model="sensorTypeForm.config_parameters"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入参数名后回车添加，如 samplingInterval"
-            style="width: 100%"
+        <el-form-item label="分类" prop="category">
+          <el-select v-model="configForm.category" placeholder="选择或输入分类" filterable allow-create style="width: 100%">
+            <el-option label="mqtt" value="mqtt" />
+            <el-option label="devices" value="devices" />
+            <el-option label="data_retention" value="data_retention" />
+            <el-option label="general" value="general" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="配置值" prop="value">
+          <el-input
+            v-model="configForm.valueJson"
+            type="textarea"
+            :rows="4"
+            placeholder='JSON 格式，如 "127.0.0.1"、1883、["id1","id2"]、{"a":1}'
           />
         </el-form-item>
-        <el-form-item label="命令列表">
-          <div class="commands-editor">
-            <el-input
-              v-model="sensorTypeForm.commands_json"
-              type="textarea"
-              :rows="6"
-              placeholder='JSON 格式，如: {"turn_on": {"mqtt_message": {"command": "enable"}, "description": "启动", "params": []}}'
-            />
-            <div v-if="sensorTypeCmdError" class="cmd-error">{{ sensorTypeCmdError }}</div>
-          </div>
+        <el-form-item label="说明">
+          <el-input v-model="configForm.description" placeholder="选填" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="sensorTypeDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="sensorTypeSaving" @click="handleSaveSensorType">
-          保存
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- ==================== 设备类型编辑弹窗 ==================== -->
-    <el-dialog
-      v-model="deviceTypeDialogVisible"
-      :title="deviceTypeForm.id ? '编辑设备类型' : '新增设备类型'"
-      width="600px"
-      destroy-on-close
-    >
-      <el-form :model="deviceTypeForm" label-width="100px" :rules="deviceTypeRules" ref="deviceTypeFormRef">
-        <el-form-item label="类型 ID" prop="DeviceType_id">
-          <el-input v-model="deviceTypeForm.DeviceType_id" placeholder="如: LED-01" />
-        </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="deviceTypeForm.name" placeholder="如: LED灯" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="deviceTypeForm.description" type="textarea" :rows="2" placeholder="类型描述（选填）" />
-        </el-form-item>
-        <el-form-item label="状态字段">
-          <el-select
-            v-model="deviceTypeForm.state_fields"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入字段名后回车添加，如 power_state"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="配置参数">
-          <el-select
-            v-model="deviceTypeForm.config_parameters"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入参数名后回车添加，如 heartbeat_interval"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="命令列表">
-          <div class="commands-editor">
-            <el-input
-              v-model="deviceTypeForm.commands_json"
-              type="textarea"
-              :rows="6"
-              placeholder='JSON 格式，如: {"turn_on": {"mqtt_message": {"command": "power_on"}, "description": "打开设备", "params": []}}'
-            />
-            <div v-if="deviceTypeCmdError" class="cmd-error">{{ deviceTypeCmdError }}</div>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="deviceTypeDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="deviceTypeSaving" @click="handleSaveDeviceType">
-          保存
-        </el-button>
+        <el-button @click="configDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="configSaving" @click="handleSaveConfig">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Refresh, Plus } from '@element-plus/icons-vue'
 import { getMqttStatus } from '@/api/system'
-import { getSensorTypes, createSensorType, updateSensorType, deleteSensorType } from '@/api/sensors'
-import { getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType } from '@/api/devices'
+import {
+  getPlatformConfigs,
+  createPlatformConfig,
+  updatePlatformConfig,
+  deletePlatformConfig,
+} from '@/api/platformConfig'
+import { useUserStore } from '@/stores/user'
+
+// ==================== 权限 ====================
+const userStore = useUserStore()
+const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
 
 // ==================== MQTT 状态 ====================
 const mqttInfo = ref({ broker: '', port: '', is_connected: false })
@@ -293,231 +162,128 @@ async function fetchMqttStatus() {
   }
 }
 
-// ==================== 传感器类型管理 ====================
-const sensorTypes = ref([])
-const sensorTypesLoading = ref(false)
-const sensorTypeDialogVisible = ref(false)
-const sensorTypeSaving = ref(false)
-const sensorTypeFormRef = ref(null)
-const sensorTypeCmdError = ref('')
+// ==================== 平台配置 ====================
+const platformConfigs = ref([])
+const configsLoading = ref(false)
+const configDialogVisible = ref(false)
+const configSaving = ref(false)
+const configFormRef = ref(null)
 
-const sensorTypeRules = {
-  SensorType_id: [{ required: true, message: '请输入类型 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+const configRules = {
+  key: [{ required: true, message: '请输入配置键', trigger: 'blur' }],
 }
 
-const emptySensorTypeForm = () => ({
+const configForm = ref({
   id: null,
-  SensorType_id: '',
-  name: '',
+  key: '',
+  value: null,
+  valueJson: '',
+  category: 'general',
   description: '',
-  data_fields: [],
-  config_parameters: [],
-  commands_json: '{}',
 })
 
-const sensorTypeForm = ref(emptySensorTypeForm())
+function formatValue(val) {
+  if (val === null || val === undefined) return '-'
+  if (typeof val === 'object') return JSON.stringify(val)
+  return String(val)
+}
 
-async function fetchSensorTypes() {
-  sensorTypesLoading.value = true
+async function fetchPlatformConfigs() {
+  configsLoading.value = true
   try {
-    const data = await getSensorTypes()
-    sensorTypes.value = data.results || data
+    const data = await getPlatformConfigs()
+    platformConfigs.value = data.results || data
   } catch {
-    ElMessage.error('获取传感器类型列表失败')
+    ElMessage.error('获取平台配置失败')
   } finally {
-    sensorTypesLoading.value = false
+    configsLoading.value = false
   }
 }
 
-function openSensorTypeDialog(row) {
-  sensorTypeCmdError.value = ''
+function openConfigDialog(row) {
   if (row) {
-    sensorTypeForm.value = {
+    configForm.value = {
       id: row.id,
-      SensorType_id: row.SensorType_id,
-      name: row.name,
+      key: row.key,
+      value: row.value,
+      valueJson: typeof row.value === 'object' ? JSON.stringify(row.value, null, 2) : String(row.value ?? ''),
+      category: row.category || 'general',
       description: row.description || '',
-      data_fields: row.data_fields || [],
-      config_parameters: row.config_parameters || [],
-      commands_json: JSON.stringify(row.commands || {}, null, 2),
     }
   } else {
-    sensorTypeForm.value = emptySensorTypeForm()
+    configForm.value = {
+      id: null,
+      key: '',
+      value: null,
+      valueJson: '',
+      category: 'general',
+      description: '',
+    }
   }
-  sensorTypeDialogVisible.value = true
+  configDialogVisible.value = true
 }
 
-async function handleSaveSensorType() {
-  const formEl = sensorTypeFormRef.value
+async function handleSaveConfig() {
+  const formEl = configFormRef.value
   if (formEl) {
     const valid = await formEl.validate().catch(() => false)
     if (!valid) return
   }
 
-  let commands
-  try {
-    commands = JSON.parse(sensorTypeForm.value.commands_json)
-    sensorTypeCmdError.value = ''
-  } catch {
-    sensorTypeCmdError.value = 'JSON 格式不正确，请检查'
-    return
-  }
-
-  const payload = {
-    SensorType_id: sensorTypeForm.value.SensorType_id,
-    name: sensorTypeForm.value.name,
-    description: sensorTypeForm.value.description,
-    data_fields: sensorTypeForm.value.data_fields,
-    config_parameters: sensorTypeForm.value.config_parameters,
-    commands: commands,
-  }
-
-  sensorTypeSaving.value = true
-  try {
-    if (sensorTypeForm.value.id) {
-      await updateSensorType(sensorTypeForm.value.id, payload)
-      ElMessage.success('传感器类型更新成功')
-    } else {
-      await createSensorType(payload)
-      ElMessage.success('传感器类型创建成功')
-    }
-    sensorTypeDialogVisible.value = false
-    fetchSensorTypes()
-  } catch (err) {
-    const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '保存失败'
-    ElMessage.error(msg)
-  } finally {
-    sensorTypeSaving.value = false
-  }
-}
-
-async function handleDeleteSensorType(id) {
-  try {
-    await deleteSensorType(id)
-    ElMessage.success('删除成功')
-    fetchSensorTypes()
-  } catch {
-    ElMessage.error('删除失败，可能有关联的传感器')
-  }
-}
-
-// ==================== 设备类型管理 ====================
-const deviceTypes = ref([])
-const deviceTypesLoading = ref(false)
-const deviceTypeDialogVisible = ref(false)
-const deviceTypeSaving = ref(false)
-const deviceTypeFormRef = ref(null)
-const deviceTypeCmdError = ref('')
-
-const deviceTypeRules = {
-  DeviceType_id: [{ required: true, message: '请输入类型 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-}
-
-const emptyDeviceTypeForm = () => ({
-  id: null,
-  DeviceType_id: '',
-  name: '',
-  description: '',
-  state_fields: [],
-  config_parameters: [],
-  commands_json: '{}',
-})
-
-const deviceTypeForm = ref(emptyDeviceTypeForm())
-
-async function fetchDeviceTypes() {
-  deviceTypesLoading.value = true
-  try {
-    const data = await getDeviceTypes()
-    deviceTypes.value = data.results || data
-  } catch {
-    ElMessage.error('获取设备类型列表失败')
-  } finally {
-    deviceTypesLoading.value = false
-  }
-}
-
-function openDeviceTypeDialog(row) {
-  deviceTypeCmdError.value = ''
-  if (row) {
-    deviceTypeForm.value = {
-      id: row.id,
-      DeviceType_id: row.DeviceType_id,
-      name: row.name,
-      description: row.description || '',
-      state_fields: row.state_fields || [],
-      config_parameters: row.config_parameters || [],
-      commands_json: JSON.stringify(row.commands || {}, null, 2),
-    }
+  let value
+  const raw = configForm.value.valueJson.trim()
+  if (raw === '') {
+    value = null
   } else {
-    deviceTypeForm.value = emptyDeviceTypeForm()
-  }
-  deviceTypeDialogVisible.value = true
-}
-
-async function handleSaveDeviceType() {
-  const formEl = deviceTypeFormRef.value
-  if (formEl) {
-    const valid = await formEl.validate().catch(() => false)
-    if (!valid) return
-  }
-
-  let commands
-  try {
-    commands = JSON.parse(deviceTypeForm.value.commands_json)
-    deviceTypeCmdError.value = ''
-  } catch {
-    deviceTypeCmdError.value = 'JSON 格式不正确，请检查'
-    return
+    try {
+      value = JSON.parse(raw)
+    } catch {
+      ElMessage.error('配置值必须是合法 JSON 格式')
+      return
+    }
   }
 
   const payload = {
-    DeviceType_id: deviceTypeForm.value.DeviceType_id,
-    name: deviceTypeForm.value.name,
-    description: deviceTypeForm.value.description,
-    state_fields: deviceTypeForm.value.state_fields,
-    config_parameters: deviceTypeForm.value.config_parameters,
-    commands: commands,
+    key: configForm.value.key,
+    value,
+    category: configForm.value.category,
+    description: configForm.value.description,
   }
 
-  deviceTypeSaving.value = true
+  configSaving.value = true
   try {
-    if (deviceTypeForm.value.id) {
-      await updateDeviceType(deviceTypeForm.value.id, payload)
-      ElMessage.success('设备类型更新成功')
+    if (configForm.value.id) {
+      await updatePlatformConfig(configForm.value.key, payload)
+      ElMessage.success('配置更新成功')
     } else {
-      await createDeviceType(payload)
-      ElMessage.success('设备类型创建成功')
+      await createPlatformConfig(payload)
+      ElMessage.success('配置创建成功')
     }
-    deviceTypeDialogVisible.value = false
-    fetchDeviceTypes()
+    configDialogVisible.value = false
+    fetchPlatformConfigs()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '保存失败'
+    const msg = typeof detail === 'object' ? (detail.detail || Object.values(detail).flat().join('；')) : '保存失败'
     ElMessage.error(msg)
   } finally {
-    deviceTypeSaving.value = false
+    configSaving.value = false
   }
 }
 
-async function handleDeleteDeviceType(id) {
+async function handleDeleteConfig(key) {
   try {
-    await deleteDeviceType(id)
+    await deletePlatformConfig(key)
     ElMessage.success('删除成功')
-    fetchDeviceTypes()
+    fetchPlatformConfigs()
   } catch {
-    ElMessage.error('删除失败，可能有关联的设备')
+    ElMessage.error('删除失败')
   }
 }
 
 // ==================== 初始化 ====================
 onMounted(() => {
   fetchMqttStatus()
-  fetchSensorTypes()
-  fetchDeviceTypes()
+  fetchPlatformConfigs()
 })
 </script>
 
@@ -550,17 +316,20 @@ onMounted(() => {
   font-family: 'Courier New', monospace;
 }
 
-.field-tag {
-  margin: 2px 4px 2px 0;
+.config-value {
+  font-family: 'Courier New', monospace;
+  font-size: var(--iot-font-size-sm);
+  word-break: break-all;
 }
 
-.commands-editor {
-  width: 100%;
+.config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--iot-spacing-sm);
 }
 
-.cmd-error {
-  color: var(--iot-color-danger);
-  font-size: var(--iot-font-size-xs);
-  margin-top: 4px;
+.empty-hint {
+  padding: var(--iot-spacing-lg) 0;
 }
 </style>
