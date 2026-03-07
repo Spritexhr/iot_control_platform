@@ -1,10 +1,12 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import RedirectView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .api_views import mqtt_status, dashboard_stats
 from .auth_views import register, user_profile, change_password
 
 urlpatterns = [
+    path("", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
 
     # 用户认证 API
