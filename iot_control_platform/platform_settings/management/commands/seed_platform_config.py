@@ -1,7 +1,9 @@
 """
-将 .env 中的配置作为默认值写入 platform_settings
-仅当 key 不存在时创建，已存在的配置不会被覆盖
+从 default_config.json 读取默认配置，与 .env 中的必备项合并后写入 platform_settings
+.env 仅保留启动必备信息（DB、MQTT 连接等），其他配置在 JSON 中定义默认值
 """
+import json
+import logging
 import os
 from pathlib import Path
 
@@ -9,18 +11,25 @@ from django.core.management.base import BaseCommand
 
 from platform_settings.models import PlatformConfig
 
+logger = logging.getLogger("platform_settings")
 
-# 配置项定义：(platform_key, env_key, default, category, description, value_type)
-CONFIG_ITEMS = [
-    ("mqtt_broker", "MQTT_BROKER", "127.0.0.1", "mqtt", "MQTT/EMQX 服务器地址", str),
-    ("mqtt_port", "MQTT_PORT", 1883, "mqtt", "MQTT 端口", int),
-    ("mqtt_keepalive", "MQTT_KEEPALIVE", 60, "mqtt", "MQTT 保活间隔（秒）", int),
-    ("mqtt_username", "MQTT_USERNAME", "", "mqtt", "MQTT 用户名（可选）", str),
-    ("mqtt_password", "MQTT_PASSWORD", "", "mqtt", "MQTT 密码（可选）", str),
-    ("device_offline_timeout", "DEVICE_OFFLINE_TIMEOUT", 300, "devices", "设备离线判定超时（秒）", int),
-    ("device_reconnect_attempts", "DEVICE_RECONNECT_ATTEMPTS", 3, "devices", "设备重连尝试次数", int),
-    ("device_reconnect_interval", "DEVICE_RECONNECT_INTERVAL", 10, "devices", "设备重连间隔（秒）", int),
-]
+
+def _get_default_config_path() -> Path:
+    """获取 default_config.json 路径"""
+    return Path(__file__).resolve().parent.parent.parent / "default_config.json"
+
+
+def load_default_config() -> list:
+    """
+    加载 default_config.json，返回 configs 列表
+    每项: {key, default, env_key, category, description}
+    """
+    path = _get_default_config_path()
+    if not path.exists():
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("configs", [])
 
 
 def _load_dotenv(env_path: Path) -> None:
@@ -36,30 +45,43 @@ def _load_dotenv(env_path: Path) -> None:
                 key, _, value = line.partition("=")
                 key = key.strip()
                 value = value.strip().strip("'\"").strip()
-                if key and value:
+                if key:
                     os.environ.setdefault(key, value)
 
 
-def _to_value(raw: str, value_type: type):
-    """将字符串转换为目标类型"""
+def _to_value(raw, default, value_type: type):
+    """将值转换为目标类型"""
+    if raw is None or raw == "":
+        return default
     if value_type == int:
         try:
             return int(raw)
         except (ValueError, TypeError):
-            return 0
+            return default
     if value_type == bool:
         return str(raw).lower() in ("true", "1", "yes")
     return str(raw)
 
 
+def _infer_value_type(default) -> type:
+    """从默认值推断类型"""
+    if isinstance(default, bool):
+        return bool
+    if isinstance(default, int):
+        return int
+    if isinstance(default, float):
+        return float
+    return str
+
+
 class Command(BaseCommand):
-    help = "将 .env 中的配置作为默认值写入 platform_settings（仅创建不存在的 key）"
+    help = "从 default_config.json 与 .env 合并配置，写入 platform_settings"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--force",
             action="store_true",
-            help="强制更新已存在的配置（使用 env 值覆盖）",
+            help="强制更新已存在的配置",
         )
         parser.add_argument(
             "--env",
@@ -72,24 +94,46 @@ class Command(BaseCommand):
         force = options["force"]
         env_path = options["env"]
 
-        # 查找 .env 文件
+        # 加载 default_config.json
+        configs = load_default_config()
+        if not configs:
+            msg = "未找到 default_config.json 或 configs 为空"
+            logger.error(msg)
+            self.stdout.write(self.style.ERROR(msg))
+            return
+
+        logger.info(f"已加载 {len(configs)} 项默认配置")
+        self.stdout.write(f"已加载 {len(configs)} 项默认配置")
+
+        # 加载 .env
         if env_path:
             env_file = Path(env_path)
         else:
-            # 项目根目录：manage.py 所在目录的父级
             base = Path(__file__).resolve().parent.parent.parent.parent.parent
             env_file = base / ".env"
 
+        logger.info(f"加载 .env: {env_file}")
         self.stdout.write(f"加载 .env: {env_file}")
         _load_dotenv(env_file)
 
         created = 0
         updated = 0
 
-        for key, env_key, default, category, description, value_type in CONFIG_ITEMS:
-            raw = os.environ.get(env_key)
-            if raw is not None and raw != "":
-                value = _to_value(raw, value_type)
+        for item in configs:
+            key = item.get("key")
+            if not key:
+                continue
+
+            default = item.get("default")
+            env_key = item.get("env_key")
+            category = item.get("category", "general")
+            description = item.get("description", "")
+            value_type = _infer_value_type(default)
+
+            # 优先使用 env，否则用 JSON 默认值
+            if env_key:
+                raw = os.environ.get(env_key)
+                value = _to_value(raw, default, value_type)
             else:
                 value = default
 
@@ -103,6 +147,7 @@ class Command(BaseCommand):
             )
             if was_created:
                 created += 1
+                logger.info(f"  创建: {key} = {value}")
                 self.stdout.write(self.style.SUCCESS(f"  创建: {key} = {value}"))
             elif force:
                 obj.value = value
@@ -110,8 +155,12 @@ class Command(BaseCommand):
                 obj.description = description
                 obj.save()
                 updated += 1
+                logger.info(f"  更新: {key} = {value}")
                 self.stdout.write(self.style.WARNING(f"  更新: {key} = {value}"))
             else:
+                logger.debug(f"  跳过（已存在）: {key}")
                 self.stdout.write(f"  跳过（已存在）: {key}")
 
-        self.stdout.write(self.style.SUCCESS(f"\n完成: 创建 {created} 条, 更新 {updated} 条"))
+        summary = f"完成: 创建 {created} 条, 更新 {updated} 条"
+        logger.info(summary)
+        self.stdout.write(self.style.SUCCESS(f"\n{summary}"))

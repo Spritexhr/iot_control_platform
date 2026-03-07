@@ -36,19 +36,53 @@
       </div>
     </div>
 
+    <!-- ==================== 可用命令 ==================== -->
+    <div v-if="isSuperuser" class="iot-card iot-mb-lg">
+      <div class="iot-card__header">
+        <span class="section-title">可用命令</span>
+      </div>
+      <div class="iot-card__body">
+        <div class="command-item">
+          <div class="command-item__info">
+            <span class="command-item__name">清理过期数据</span>
+            <span class="command-item__desc">按配置的留存天数清理传感器/设备历史数据</span>
+          </div>
+          <el-button
+            type="primary"
+            :icon="VideoPlay"
+            :loading="cleanupLoading"
+            @click="handleCleanupOldData"
+          >
+            执行
+          </el-button>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== 平台配置 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
         <span class="section-title">平台配置</span>
-        <el-button
-          v-if="isSuperuser"
-          type="primary"
-          :icon="Plus"
-          size="small"
-          @click="openConfigDialog(null)"
-        >
-          新增配置
-        </el-button>
+        <div class="header-actions">
+          <el-button
+            v-if="isSuperuser"
+            :icon="Refresh"
+            size="small"
+            :loading="reloadLoading"
+            @click="handleReloadConfig"
+          >
+            使配置生效
+          </el-button>
+          <el-button
+            v-if="isSuperuser"
+            type="primary"
+            :icon="Plus"
+            size="small"
+            @click="openConfigDialog(null)"
+          >
+            新增配置
+          </el-button>
+        </div>
       </div>
       <div class="iot-card__body">
         <el-table :data="platformConfigs" v-loading="configsLoading" stripe>
@@ -132,13 +166,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Plus } from '@element-plus/icons-vue'
+import { Refresh, Plus, VideoPlay } from '@element-plus/icons-vue'
 import { getMqttStatus } from '@/api/system'
 import {
   getPlatformConfigs,
   createPlatformConfig,
   updatePlatformConfig,
   deletePlatformConfig,
+  reloadPlatformConfig,
+  runCleanupOldData,
 } from '@/api/platformConfig'
 import { useUserStore } from '@/stores/user'
 
@@ -168,6 +204,8 @@ const configsLoading = ref(false)
 const configDialogVisible = ref(false)
 const configSaving = ref(false)
 const configFormRef = ref(null)
+const reloadLoading = ref(false)
+const cleanupLoading = ref(false)
 
 const configRules = {
   key: [{ required: true, message: '请输入配置键', trigger: 'blur' }],
@@ -280,6 +318,44 @@ async function handleDeleteConfig(key) {
   }
 }
 
+async function handleCleanupOldData() {
+  cleanupLoading.value = true
+  try {
+    const res = await runCleanupOldData()
+    const output = res?.output || ''
+    ElMessage.success(output || '过期数据清理完成')
+  } catch (err) {
+    const detail = err.response?.data
+    const msg = typeof detail === 'object' ? (detail.detail || '清理失败') : '清理失败'
+    ElMessage.error(msg)
+  } finally {
+    cleanupLoading.value = false
+  }
+}
+
+async function handleReloadConfig() {
+  reloadLoading.value = true
+  try {
+    const res = await reloadPlatformConfig()
+    const results = res?.results || {}
+    const mqtt = results.mqtt
+    if (mqtt === 'reconnected') {
+      ElMessage.success('配置已生效，MQTT 已重连')
+    } else if (mqtt === 'not_running') {
+      ElMessage.success('配置已保存，MQTT 未运行')
+    } else if (mqtt === 'reconnect_failed') {
+      ElMessage.warning('MQTT 重连失败，请检查配置')
+    } else {
+      ElMessage.success('配置已生效')
+    }
+    fetchMqttStatus()
+  } catch {
+    ElMessage.error('使配置生效失败')
+  } finally {
+    reloadLoading.value = false
+  }
+}
+
 // ==================== 初始化 ====================
 onMounted(() => {
   fetchMqttStatus()
@@ -291,6 +367,12 @@ onMounted(() => {
 .section-title {
   font-weight: 600;
   font-size: var(--iot-font-size-md);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--iot-spacing-sm);
 }
 
 .setting-item {
@@ -331,5 +413,33 @@ onMounted(() => {
 
 .empty-hint {
   padding: var(--iot-spacing-lg) 0;
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--iot-spacing-md) 0;
+  border-bottom: 1px solid var(--iot-border-color-light);
+}
+
+.command-item:last-child {
+  border-bottom: none;
+}
+
+.command-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.command-item__name {
+  font-weight: 500;
+  color: var(--iot-text-primary);
+}
+
+.command-item__desc {
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-secondary);
 }
 </style>

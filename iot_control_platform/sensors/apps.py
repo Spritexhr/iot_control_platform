@@ -58,6 +58,12 @@ class SensorsConfig(AppConfig):
     def _start_mqtt_service(self) -> None:
         """启动 MQTT 服务，绑定命令服务并注册设备状态处理器"""
         try:
+            # 启动前自动执行 seed_platform_config，确保配置已写入数据库
+            from django.core.management import call_command
+            call_command("seed_platform_config")
+            # 启动时执行一次数据清理
+            call_command("cleanup_old_data")
+
             from services.mqtt_service import mqtt_service
             from services.sensors_service.sensor_command_send_service import sensor_command_send_service
             from services.devices_service.device_command_send_service import device_command_send_service

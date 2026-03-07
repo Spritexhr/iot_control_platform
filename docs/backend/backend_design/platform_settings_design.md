@@ -9,7 +9,7 @@
 ### 1.1 设计目标
 
 - **非敏感配置集中管理**：MQTT、设备离线超时等可调参数统一存储，支持运行时修改
-- **配置来源优先级**：数据库（platform_settings）> 环境变量 > 默认值
+- **配置来源**：仅从 platform_settings 数据库读取，防止多来源混乱
 - **前端可管理**：超级用户可在系统设置中增删改平台配置，无需重启服务
 
 ### 1.2 模块关系
@@ -22,13 +22,11 @@
 │   settings.py (MQTT_PORT 等)                                              │
 │         │                                                                │
 │         ▼                                                                │
-│   get_config(key, env_key, default, value_type)  ← config/platform_config.py
+│   get_config(key, default, value_type)  ← config/platform_config.py      │
 │         │                                                                │
-│         ├──► PlatformConfig.get_value(key)  ← 优先：数据库                 │
-│         │         │                                                       │
-│         │         └── 不存在/异常 → os.environ.get(env_key)  ← 回退：环境变量
-│         │                              │                                  │
-│         │                              └── 无 → default                   │
+│         └──► PlatformConfig.get_value(key)  ← 仅数据库                     │
+│                   │                                                       │
+│                   └── 不存在/异常 → default                               │
 │         │                                                                │
 │         ▼                                                                │
 │   返回配置值（str/int/bool/float）                                         │
@@ -39,9 +37,9 @@
 │                        配置写入流程                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   .env 文件  ──►  seed_platform_config  ──►  PlatformConfig (仅创建不存在的 key)
-│                                                                         │
-│   Docker 部署：env_file 注入环境变量 → seed_platform_config 从 os.environ 读取
+│   default_config.json  ──┐                                                │
+│   .env (仅必备项)  ──────┼──►  seed_platform_config  ──►  PlatformConfig   │
+│                         │     (合并后仅创建不存在的 key)                    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -82,17 +80,14 @@
 ```python
 def get_config(
     key: str,        # PlatformConfig 的 key
-    env_key: str,    # 环境变量名，回退时使用
-    default: T,      # 默认值
+    default: T,      # 默认值（数据库无此 key 时返回）
     value_type: type = str,  # 目标类型 str/int/bool/float
 ) -> T
 ```
 
-### 3.2 读取优先级
+### 3.2 读取规则
 
-1. **PlatformConfig.get_value(key)**：数据库中存在则返回
-2. **os.environ.get(env_key)**：数据库无或异常时，使用环境变量
-3. **default**：以上均无则返回默认值
+**仅从 platform_settings 数据库读取**，不存在或异常时返回 default，防止多来源混乱。
 
 ### 3.3 类型转换
 
@@ -106,11 +101,11 @@ def get_config(
 from django.utils.functional import SimpleLazyObject
 from config.platform_config import get_config
 
-def _lazy_config(key, env_key, default, value_type=str):
-    return SimpleLazyObject(lambda: get_config(key, env_key, default, value_type))
+def _lazy_config(key, default, value_type=str):
+    return SimpleLazyObject(lambda: get_config(key, default, value_type))
 
-MQTT_BROKER = _lazy_config("mqtt_broker", "MQTT_BROKER", "127.0.0.1")
-MQTT_PORT = _lazy_config("mqtt_port", "MQTT_PORT", 1883, int)
+MQTT_BROKER = _lazy_config("mqtt_broker", "127.0.0.1")
+MQTT_PORT = _lazy_config("mqtt_port", 1883, int)
 ```
 
 **注意**：MQTT 服务等使用 `str(settings.MQTT_PORT)` 或 `int(str(...))` 解析 LazyObject，因 LazyObject 在首次访问时才求值。

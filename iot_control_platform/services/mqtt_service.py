@@ -1,13 +1,15 @@
 """
 MQTT服务模块
 负责MQTT连接管理、主题订阅、消息接收和发送
+连接参数从 platform_config 读取，支持 reload 后重连以应用新配置
 """
 import json
 import logging
 import re
 from typing import Callable, Dict, Optional
 import paho.mqtt.client as mqtt
-from django.conf import settings
+
+from config.platform_config import get_config
 from .sensors_service.sensor_upload_data_handlers import handle_mqtt_data_message
 from .sensors_service.sensor_upload_status_handlers import handle_mqtt_status_message
 from .devices_service.device_upload_status_handlers import handle_mqtt_device_status_message
@@ -39,12 +41,15 @@ class MQTTService:
             bool: 连接成功返回True
         """
         try:
+            # 从 platform_settings 数据库读取连接参数（支持 reload 后重连生效）
+            broker = get_config("mqtt_broker", "127.0.0.1", str)
+            port = get_config("mqtt_port", 1883, int)
+            keepalive = get_config("mqtt_keepalive", 60, int)
+            username = get_config("mqtt_username", "", str)
+            password = get_config("mqtt_password", "", str)
+
             # 创建MQTT客户端
             self.client = mqtt.Client(client_id="django_iot_platform")
-
-            # 设置认证信息（显式取值以解析 LazyObject）
-            username = str(settings.MQTT_USERNAME or "")
-            password = str(settings.MQTT_PASSWORD or "")
             if username and password:
                 self.client.username_pw_set(username, password)
 
@@ -52,11 +57,6 @@ class MQTTService:
             self.client.on_connect = self._on_connect
             self.client.on_disconnect = self._on_disconnect
             self.client.on_message = self._on_message
-
-            # 连接到MQTT服务器（str 先触发 LazyObject 求值，再转换类型）
-            broker = str(settings.MQTT_BROKER)
-            port = int(str(settings.MQTT_PORT))
-            keepalive = int(str(settings.MQTT_KEEPALIVE))
             logger.info(f"正在连接MQTT服务器: {broker}:{port}")
             self.client.connect(broker, port, keepalive)
 
@@ -101,7 +101,17 @@ class MQTTService:
         if self.client:
             self.client.loop_stop()
             self.client.disconnect()
+            self.client = None
+            self.is_connected = False
             logger.info("MQTT服务已停止")
+
+    def reconnect(self, timeout: int = 5) -> bool:
+        """
+        断开并重新连接，使用最新 platform_config 配置
+        用于配置修改后无需重启服务即可生效
+        """
+        self.stop()
+        return self.connect(timeout=timeout)
 
     def subscribe(self, topic: str, qos: int = 1):
         """

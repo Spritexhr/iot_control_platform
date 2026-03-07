@@ -3,14 +3,15 @@
 """
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+
+from config.platform_config import get_config
 
 
 @api_view(['GET'])
 def mqtt_status(request):
-    """获取 MQTT 连接状态"""
+    """获取 MQTT 连接状态（从 platform_config 读取当前配置）"""
     try:
         from services.mqtt_service import mqtt_service
         is_connected = mqtt_service.is_connected
@@ -18,8 +19,8 @@ def mqtt_status(request):
         is_connected = False
 
     return Response({
-        'broker': str(settings.MQTT_BROKER),
-        'port': int(str(settings.MQTT_PORT)),
+        'broker': get_config("mqtt_broker", "127.0.0.1", str),
+        'port': get_config("mqtt_port", 1883, int),
         'is_connected': is_connected,
     })
 

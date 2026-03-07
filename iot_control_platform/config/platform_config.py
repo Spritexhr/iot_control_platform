@@ -1,9 +1,8 @@
 """
 配置读取辅助模块
-优先从 platform_settings 读取，不存在或异常时回退到环境变量
+仅从 platform_settings 数据库读取，防止多来源混乱
 """
-import os
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -23,19 +22,13 @@ def _coerce(value: Any, target_type: type, default: T) -> T:
     return str(value) if target_type == str else value
 
 
-def get_config(
-    key: str,
-    env_key: str,
-    default: T,
-    value_type: type = str,
-) -> T:
+def get_config(key: str, default: T, value_type: type = str) -> T:
     """
-    获取配置：优先 platform_settings，回退到环境变量
+    仅从 platform_settings 数据库读取配置，不存在时返回 default
 
     Args:
         key: PlatformConfig 的 key
-        env_key: 环境变量名
-        default: 默认值
+        default: 默认值（数据库无此 key 时返回）
         value_type: 目标类型 str/int/bool/float
 
     Returns:
@@ -50,7 +43,4 @@ def get_config(
     except Exception:
         pass
 
-    env_val = os.environ.get(env_key)
-    if env_val is None or env_val == "":
-        return default
-    return _coerce(env_val, value_type, default)
+    return default

@@ -24,3 +24,13 @@ export function updatePlatformConfig(key, data) {
 export function deletePlatformConfig(key) {
   return request.delete(`/platform-configs/${encodeURIComponent(key)}/`)
 }
+
+/** 使配置生效（MQTT 重连等，仅管理员） */
+export function reloadPlatformConfig() {
+  return request.post('/platform-configs/reload/')
+}
+
+/** 执行数据清理（按留存天数清理过期数据，仅管理员） */
+export function runCleanupOldData() {
+  return request.post('/platform-configs/cleanup-old-data/')
+}

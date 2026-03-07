@@ -1,8 +1,9 @@
 """
 IoT 控制平台 - 日志配置
 
-将日志按模块分离到不同文件，支持轮转与持久化。
-详见 docs/LOGGING_MANAGEMENT_PLAN.md
+将日志按模块分离到不同文件，支持按天轮转与持久化。
+默认保留 2 天日志（TimedRotatingFileHandler backupCount=1）
+详见 docs/backend/backend_design/logsystem_design.md
 """
 
 from pathlib import Path
@@ -12,9 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-# 单个日志文件最大 10MB，保留 5 个备份
-MAX_BYTES = 10 * 1024 * 1024
-BACKUP_COUNT = 5
+# 按天轮转，保留 2 天（当前 + 1 个备份）
+LOG_RETENTION_DAYS = 1  # backupCount，当前日 + 1 备份 = 2 天
 
 
 def get_logging_config() -> dict:
@@ -51,63 +51,80 @@ def get_logging_config() -> dict:
                 "formatter": "verbose",
                 "filters": ["ignore_browser_extensions"],
             },
-            # 主应用日志
+            # 主应用日志（按天轮转，保留 2 天）
             "file_app": {
                 "level": "INFO",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "app.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
             # MQTT 专用
             "file_mqtt": {
                 "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "mqtt.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
             # 传感器
             "file_sensors": {
                 "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "sensors.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
             # 设备
             "file_devices": {
                 "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "devices.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
             # 自动化
             "file_automation": {
                 "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "automation.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
+                "formatter": "verbose",
+                "encoding": "utf-8",
+            },
+            # 平台配置（seed、cleanup 等）
+            "file_platform_settings": {
+                "level": "INFO",
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "filename": str(LOG_DIR / "platform_settings.log"),
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
             # 错误汇总
             "file_error": {
                 "level": "ERROR",
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.handlers.TimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "error.log"),
-                "maxBytes": MAX_BYTES,
-                "backupCount": BACKUP_COUNT,
+                "when": "midnight",
+                "interval": 1,
+                "backupCount": LOG_RETENTION_DAYS,
                 "formatter": "verbose",
                 "encoding": "utf-8",
             },
@@ -164,6 +181,12 @@ def get_logging_config() -> dict:
             "sensors.apps": {
                 "handlers": ["console", "file_mqtt", "file_app", "file_error"],
                 "level": "DEBUG",
+                "propagate": False,
+            },
+            # 平台配置（seed_platform_config、cleanup_old_data）
+            "platform_settings": {
+                "handlers": ["console", "file_platform_settings", "file_app", "file_error"],
+                "level": "INFO",
                 "propagate": False,
             },
         },

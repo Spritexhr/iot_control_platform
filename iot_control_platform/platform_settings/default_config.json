@@ -1,0 +1,75 @@
+{
+  "_comment": "平台配置默认值。启动时 seed_platform_config 会读取此文件，与 .env 中的必备项合并后写入数据库。.env 仅保留 DB、MQTT 连接等启动必备信息。",
+  "configs": [
+    {
+      "key": "mqtt_broker",
+      "default": "127.0.0.1",
+      "env_key": "MQTT_BROKER",
+      "category": "mqtt",
+      "description": "MQTT/EMQX 服务器地址"
+    },
+    {
+      "key": "mqtt_port",
+      "default": 1883,
+      "env_key": "MQTT_PORT",
+      "category": "mqtt",
+      "description": "MQTT 端口"
+    },
+    {
+      "key": "mqtt_keepalive",
+      "default": 60,
+      "env_key": null,
+      "category": "mqtt",
+      "description": "MQTT 保活间隔（秒）"
+    },
+    {
+      "key": "mqtt_username",
+      "default": "",
+      "env_key": "MQTT_USERNAME",
+      "category": "mqtt",
+      "description": "MQTT 用户名（可选）"
+    },
+    {
+      "key": "mqtt_password",
+      "default": "",
+      "env_key": "MQTT_PASSWORD",
+      "category": "mqtt",
+      "description": "MQTT 密码（可选）"
+    },
+    {
+      "key": "device_offline_timeout",
+      "default": 300,
+      "env_key": null,
+      "category": "devices",
+      "description": "设备离线判定超时（秒）"
+    },
+    {
+      "key": "device_reconnect_attempts",
+      "default": 3,
+      "env_key": null,
+      "category": "devices",
+      "description": "设备重连尝试次数"
+    },
+    {
+      "key": "device_reconnect_interval",
+      "default": 10,
+      "env_key": null,
+      "category": "devices",
+      "description": "设备重连间隔（秒）"
+    },
+    {
+      "key": "sensor_data_retention_days",
+      "default": 30,
+      "env_key": null,
+      "category": "data_retention",
+      "description": "传感器数据保留天数，超过则清理"
+    },
+    {
+      "key": "device_data_retention_days",
+      "default": 30,
+      "env_key": null,
+      "category": "data_retention",
+      "description": "设备状态数据保留天数，超过则清理"
+    }
+  ]
+}

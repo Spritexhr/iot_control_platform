@@ -56,7 +56,7 @@ logger.info("✓ MQTT连接成功")
 # 项目根目录下
 cd iot_control_platform/logs
 ls
-# app.log  mqtt.log  sensors.log  devices.log  automation.log  error.log
+# app.log  mqtt.log  sensors.log  devices.log  automation.log  platform_settings.log  error.log
 ```
 
 ### 2.2 实时查看
@@ -76,6 +76,9 @@ tail -f iot_control_platform/logs/sensors.log
 
 # 设备相关
 tail -f iot_control_platform/logs/devices.log
+
+# 平台配置（seed、cleanup、reload）
+tail -f iot_control_platform/logs/platform_settings.log
 
 # 自动化相关
 tail -f iot_control_platform/logs/automation.log

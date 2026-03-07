@@ -1,6 +1,6 @@
 # PlatformConfig 配置说明示例
-# value 使用 JSON 格式存储，支持：字符串、数字、列表、字典、布尔、null
-# 通过 Admin 或 API 维护
+# 默认配置在 platform_settings/default_config.json，启动时 seed 与 .env 合并写入数据库
+# .env 仅保留启动必备项（DB、MQTT 连接等），其他在此或 Admin/API 维护
 
 # ========== 一、MQTT 公网服务器 ==========
 # category: mqtt
@@ -31,7 +31,8 @@ description: 关联传感器 ID 列表
 
 # ========== 三、数据留存时间 ==========
 # category: data_retention
-# 单位：天
+# 单位：天，cleanup_old_data 命令会按此配置清理过期数据
+# 修改后调用 POST /api/platform-configs/reload/ 使配置生效（无需重启服务）
 
 key: sensor_data_retention_days
 value: 30
@@ -39,8 +40,12 @@ description: 传感器数据保留天数，超过则清理
 
 key: device_data_retention_days
 value: 30
-description: 设备状态数据保留天数
+description: 设备状态数据保留天数，超过则清理
 
-key: device_offline_timeout_seconds
+# ========== 四、设备离线检测 ==========
+# category: devices
+# 修改后调用 POST /api/platform-configs/reload/ 使配置生效（MQTT 等服务会重连）
+
+key: device_offline_timeout
 value: 300
 description: 设备离线判定超时（秒），无心跳则视为离线

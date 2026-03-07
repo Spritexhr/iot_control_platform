@@ -180,20 +180,20 @@ CSRF_TRUSTED_ORIGINS = [
     # 开发时若从局域网设备访问，请添加如 "http://192.168.x.x:5173"
 ]
 
-# MQTT 与设备配置：优先从 platform_settings 读取，不存在时回退到环境变量
+# MQTT 与设备配置：仅从 platform_settings 数据库读取
 # 使用 SimpleLazyObject 延迟读取，避免 settings 加载时 DB 未就绪
-# 使用 seed_platform_config 命令可将 .env 默认值写入 platform_settings
+# 启动前需执行 seed_platform_config 将 default_config.json + .env 写入数据库
 from django.utils.functional import SimpleLazyObject
 from config.platform_config import get_config
 
-def _lazy_config(key, env_key, default, value_type=str):
-    return SimpleLazyObject(lambda: get_config(key, env_key, default, value_type))
+def _lazy_config(key, default, value_type=str):
+    return SimpleLazyObject(lambda: get_config(key, default, value_type))
 
-MQTT_BROKER = _lazy_config("mqtt_broker", "MQTT_BROKER", "127.0.0.1")
-MQTT_PORT = _lazy_config("mqtt_port", "MQTT_PORT", 1883, int)
-MQTT_KEEPALIVE = _lazy_config("mqtt_keepalive", "MQTT_KEEPALIVE", 60, int)
-MQTT_USERNAME = _lazy_config("mqtt_username", "MQTT_USERNAME", "")
-MQTT_PASSWORD = _lazy_config("mqtt_password", "MQTT_PASSWORD", "")
+MQTT_BROKER = _lazy_config("mqtt_broker", "127.0.0.1")
+MQTT_PORT = _lazy_config("mqtt_port", 1883, int)
+MQTT_KEEPALIVE = _lazy_config("mqtt_keepalive", 60, int)
+MQTT_USERNAME = _lazy_config("mqtt_username", "")
+MQTT_PASSWORD = _lazy_config("mqtt_password", "")
 
 # MQTT主题配置
 MQTT_TOPICS = {
@@ -202,10 +202,10 @@ MQTT_TOPICS = {
     "DEVICE_STATUS": "iot/devices/+/status",  # 设备状态反馈主题
 }
 
-# 设备离线检测配置（秒）：优先 platform_settings，回退 env
-DEVICE_OFFLINE_TIMEOUT = _lazy_config("device_offline_timeout", "DEVICE_OFFLINE_TIMEOUT", 300, int)
-DEVICE_RECONNECT_ATTEMPTS = _lazy_config("device_reconnect_attempts", "DEVICE_RECONNECT_ATTEMPTS", 3, int)
-DEVICE_RECONNECT_INTERVAL = _lazy_config("device_reconnect_interval", "DEVICE_RECONNECT_INTERVAL", 10, int)
+# 设备离线检测配置（秒）
+DEVICE_OFFLINE_TIMEOUT = _lazy_config("device_offline_timeout", 300, int)
+DEVICE_RECONNECT_ATTEMPTS = _lazy_config("device_reconnect_attempts", 3, int)
+DEVICE_RECONNECT_INTERVAL = _lazy_config("device_reconnect_interval", 10, int)
 
 # 默认主键字段类型
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

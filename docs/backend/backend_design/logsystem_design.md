@@ -11,7 +11,7 @@
 | 配置入口 | `config/logging_config.py`，由 `settings.LOGGING` 导入 |
 | 日志根目录 | `iot_control_platform/logs/`，启动时自动创建 |
 | 输出方式 | 控制台（开发）+ 按模块分离的文件 |
-| 轮转策略 | RotatingFileHandler，单文件 10MB，保留 5 个备份 |
+| 轮转策略 | TimedRotatingFileHandler，按天轮转，默认保留 2 天 |
 
 ---
 
@@ -25,6 +25,7 @@ iot_control_platform/
     ├── sensors.log          # 传感器数据/状态/命令
     ├── devices.log          # 设备状态/命令
     ├── automation.log       # 自动化规则执行
+    ├── platform_settings.log # 平台配置（seed、cleanup、reload）
     └── error.log            # 所有 ERROR 及以上汇总
 ```
 
@@ -44,6 +45,7 @@ iot_control_platform/
 | `services.devices_service` | 设备状态/命令 | console, file_devices, file_app, file_error | DEBUG |
 | `automation` | 自动化引擎、规则、视图 | console, file_automation, file_app, file_error | DEBUG |
 | `sensors` / `sensors.apps` | MQTT 自启动 | console, file_mqtt, file_app, file_error | DEBUG |
+| `platform_settings` | seed、cleanup、reload | console, file_platform_settings, file_app, file_error | INFO |
 | root | 未明确指定的模块 | console, file_app, file_error | INFO |
 
 ### 3.2 Handler 与输出文件
@@ -57,6 +59,7 @@ iot_control_platform/
 | file_sensors | sensors.log | DEBUG | 传感器专用 |
 | file_devices | devices.log | DEBUG | 设备专用 |
 | file_automation | automation.log | DEBUG | 自动化专用 |
+| file_platform_settings | platform_settings.log | INFO | 平台配置（seed、cleanup、reload） |
 | file_error | error.log | ERROR | 错误汇总 |
 
 ### 3.3 子模块继承
@@ -108,11 +111,12 @@ ERROR 2025-02-21 14:35:10 [services.devices_service.device_command_send_service]
 
 | 参数 | 值 | 说明 |
 |-----|-----|------|
-| maxBytes | 10 * 1024 * 1024 (10MB) | 单文件最大容量 |
-| backupCount | 5 | 保留备份数量 |
+| when | midnight | 每天 0 点轮转 |
+| interval | 1 | 轮转间隔（天） |
+| backupCount | 1 | 保留备份数量（当前 + 1 备份 = 2 天） |
 | encoding | utf-8 | 编码 |
 
-超过 10MB 时自动轮转为 `app.log.1`、`app.log.2` 等。
+轮转后生成 `app.log.2026-03-06` 等带日期后缀的备份文件。
 
 ### 4.4 Filter
 
@@ -128,6 +132,7 @@ ERROR 2025-02-21 14:35:10 [services.devices_service.device_command_send_service]
 | sensor_upload_data_handlers | 同上 | `logger.error("✗ 传感器不存在")` |
 | device_command_send_service | 同上 | `logger.warning("⚠ check_code 校验失败")` |
 | automation.engine | 同上 | `logger.exception("自动化规则执行异常")` |
+| platform_settings（seed、cleanup、views） | `logger = logging.getLogger("platform_settings")` | `logger.info("已加载 10 项默认配置")` |
 | sensors.apps | 同上 | `logger.info("✓ MQTT服务启动成功")` |
 
 ---
@@ -176,5 +181,6 @@ iot_control_platform/
     ├── sensors.log
     ├── devices.log
     ├── automation.log
+    ├── platform_settings.log
     └── error.log
 ```
