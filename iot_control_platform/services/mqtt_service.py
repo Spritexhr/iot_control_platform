@@ -5,6 +5,7 @@ MQTT服务模块
 """
 import json
 import logging
+import os
 import re
 from typing import Callable, Dict, Optional
 import paho.mqtt.client as mqtt
@@ -48,8 +49,9 @@ class MQTTService:
             username = get_config("mqtt_username", "", str)
             password = get_config("mqtt_password", "", str)
 
-            # 创建MQTT客户端
-            self.client = mqtt.Client(client_id="django_iot_platform")
+            # 创建MQTT客户端（client_id 含进程ID，避免 autoreload 重启时与旧连接冲突导致错误码 7）
+            client_id = f"django_iot_platform_{os.getpid()}"
+            self.client = mqtt.Client(client_id=client_id)
             if username and password:
                 self.client.username_pw_set(username, password)
 
@@ -238,10 +240,11 @@ class MQTTService:
             logger.error(f"✗ MQTT连接失败: {error_msg}")
 
     def _on_disconnect(self, client, userdata, rc):
-        """MQTT断开连接回调"""
+        """MQTT断开连接回调。rc=7 表示连接丢失，常见于 client_id 冲突或网络波动。"""
         self.is_connected = False
         if rc != 0:
-            logger.warning(f"⚠ MQTT意外断开，错误码: {rc}")
+            hint = "（连接丢失，多为 client_id 冲突或网络问题）" if rc == 7 else ""
+            logger.warning(f"⚠ MQTT意外断开，错误码: {rc}{hint}")
         else:
             logger.info("MQTT正常断开")
 
