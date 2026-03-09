@@ -1,0 +1,8 @@
+{
+  "sensor_id": "BMP280-WEMOS-001",
+  "data": {
+    "temperature": 25.3,
+    "pressure": 1013.25
+  },
+  "timestamp": 1770733931
+}
