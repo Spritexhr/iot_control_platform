@@ -1,24 +1,41 @@
 {
     "high": {
         "mqtt_message": {
-            "command": "high"
+            "command": "high",
+            "pin": "{pin}"
         },
-        "description": "高电平",
-        "params": []
+        "description": "设置引脚为高电平，支持 D5, D6, D7，默认 D5",
+        "params": ["pin"]
     },
     "low": {
         "mqtt_message": {
-            "command": "low"
+            "command": "low",
+            "pin": "{pin}"
         },
-        "description": "低电平",
+        "description": "设置引脚为低电平，支持 D5, D6, D7，默认 D5",
+        "params": ["pin"]
+    },
+    "high_all": {
+        "mqtt_message": {
+            "command": "high_all"
+        },
+        "description": "将所有引脚（D5, D6, D7）依次设为高电平，间隔 1000ms",
+        "params": []
+    },
+    "low_all": {
+        "mqtt_message": {
+            "command": "low_all"
+        },
+        "description": "将所有引脚（D5, D6, D7）依次设为低电平，间隔 1000ms",
         "params": []
     },
     "current_status": {
         "mqtt_message": {
-            "command": "current_status"
+            "command": "current_status",
+            "pin": "{pin}"
         },
-        "description": "获取当前状态",
-        "params": []
+        "description": "获取当前状态，支持 D5, D6, D7，不传 pin 则返回全部",
+        "params": ["pin"]
     },
     "set_status_interval": {
         "mqtt_message": {

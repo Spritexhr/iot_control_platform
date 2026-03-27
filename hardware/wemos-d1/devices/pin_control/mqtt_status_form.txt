@@ -1,8 +1,10 @@
 {
-    "device_id": "SG_80_001",
-    "event": "level_updated" | "check_current_level" | "heartbeat" | "online" | "status_interval_updated",
+    "device_id": "potential_controler_001",
+    "event": "level_updated" | "all_level_updated" | "check_current_level" | "heartbeat" | "online" | "status_interval_updated",
     "status": {
-        "level": "high" | "low",
+        "level_d5": "high" | "low",
+        "level_d6": "high" | "low",
+        "level_d7": "high" | "low",
         "statusReportInterval": 120
     },
     "timestamp": 1770731525,
@@ -11,10 +13,12 @@
 
 # 上线
 {
-    "device_id": "SG_80_001",
+    "device_id": "potential_controler_001",
     "event": "online",
     "status": {
-        "level": "low",
+        "level_d5": "low",
+        "level_d6": "low",
+        "level_d7": "low",
         "statusReportInterval": 120
     },
     "timestamp": 1770731525
@@ -22,21 +26,39 @@
 
 # 心跳（定期上报以证明在线）
 {
-    "device_id": "SG_80_001",
+    "device_id": "potential_controler_001",
     "event": "heartbeat",
     "status": {
-        "level": "high",
+        "level_d5": "high",
+        "level_d6": "low",
+        "level_d7": "low",
         "statusReportInterval": 120
     },
     "timestamp": 1770731525
 }
 
+# 批量状态更新响应 (high_all / low_all)
+{
+    "device_id": "potential_controler_001",
+    "event": "all_level_updated",
+    "status": {
+        "level_d5": "high",
+        "level_d6": "high",
+        "level_d7": "high",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
 # 状态上报间隔更新后
 {
-    "device_id": "SG_80_001",
+    "device_id": "potential_controler_001",
     "event": "status_interval_updated",
     "status": {
-        "level": "low",
+        "level_d5": "low",
+        "level_d6": "low",
+        "level_d7": "low",
         "statusReportInterval": 60
     },
     "timestamp": 1770731525,
