@@ -37,6 +37,8 @@ services:
       - MQTT_PASSWORD=${MQTT_PASSWORD:-}
     command: >
       sh -c "python manage.py migrate --noinput &&
+        python manage.py seed_platform_config &&
+        python manage.py cleanup_old_data &&
         python manage.py collectstatic --noinput &&
         gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
     env_file:
