@@ -417,7 +417,7 @@ const createRules = {
   name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
   script_id: [
     { required: true, message: '请输入脚本ID', trigger: 'blur' },
-    { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: '仅支持字母、数字和下划线，且以字母或下划线开头', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '仅支持字母、数字和下划线', trigger: 'blur' },
   ],
 }
 
