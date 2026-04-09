@@ -1,0 +1,44 @@
+{
+    "device_id": "relay_001",
+    "event": "relay_on" | "relay_off" | "relay_toggled" | "check_current_status" | "heartbeat" | "online" | "status_interval_updated",
+    "status": {
+        "state": "ON" | "OFF",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
+# 上线
+{
+    "device_id": "relay_001",
+    "event": "online",
+    "status": {
+        "state": "OFF",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 心跳（定期上报以证明在线）
+{
+    "device_id": "relay_001",
+    "event": "heartbeat",
+    "status": {
+        "state": "ON",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525
+}
+
+# 状态更新后
+{
+    "device_id": "relay_001",
+    "event": "relay_on",
+    "status": {
+        "state": "ON",
+        "statusReportInterval": 120
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
