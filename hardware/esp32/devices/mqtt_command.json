@@ -1,0 +1,27 @@
+{
+    "turn_on": {
+        "mqtt_message": {"command": "turn_on", "check_code": "123456"},
+        "description": "开启继电器",
+        "params": []
+    },
+    "turn_off": {
+        "mqtt_message": {"command": "turn_off", "check_code": "123456"},
+        "description": "关闭继电器",
+        "params": []
+    },
+    "toggle": {
+        "mqtt_message": {"command": "toggle", "check_code": "123456"},
+        "description": "切换继电器状态",
+        "params": []
+    },
+    "current_status": {
+        "mqtt_message": {"command": "current_status"},
+        "description": "获取当前状态",
+        "params": []
+    },
+    "set_status_interval": {
+        "mqtt_message": {"command": "set_status_interval", "interval": "{val}"},
+        "description": "设置状态上报间隔（心跳），10-600秒",
+        "params": ["val"]
+    }
+}
