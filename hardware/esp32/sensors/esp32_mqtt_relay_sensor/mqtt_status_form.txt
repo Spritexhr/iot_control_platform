@@ -1,0 +1,52 @@
+{
+    "sensor_id": "esp32_combo_001",
+    "event": "relay_on" | "relay_off" | "relay_toggled" | "check_current_status" | "heartbeat" | "online" | "status_interval_updated" | "data_interval_updated" | "sensor_enabled" | "sensor_disabled",
+    "status": {
+        "relay_state": "ON" | "OFF",
+        "is_enabled": true,
+        "samplingInterval": 5000,
+        "statusReportInterval": 10
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
+
+# 上线
+{
+    "sensor_id": "esp32_combo_001",
+    "event": "online",
+    "status": {
+        "relay_state": "OFF",
+        "is_enabled": true,
+        "samplingInterval": 5000,
+        "statusReportInterval": 10
+    },
+    "timestamp": 1770731525
+}
+
+# 心跳（定期上报以证明在线，及上报配置和继电器状态）
+{
+    "sensor_id": "esp32_combo_001",
+    "event": "heartbeat",
+    "status": {
+        "relay_state": "ON",
+        "is_enabled": true,
+        "samplingInterval": 5000,
+        "statusReportInterval": 10
+    },
+    "timestamp": 1770731525
+}
+
+# 继电器状态更新后
+{
+    "sensor_id": "esp32_combo_001",
+    "event": "relay_on",
+    "status": {
+        "relay_state": "ON",
+        "is_enabled": true,
+        "samplingInterval": 5000,
+        "statusReportInterval": 10
+    },
+    "timestamp": 1770731525,
+    "check_code": "123456"
+}
