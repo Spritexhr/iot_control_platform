@@ -10,20 +10,18 @@
         <Operation />
       </el-icon>
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item v-if="currentTitle">
-          {{ currentTitle }}
-        </el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/' }">{{ ls.t('header.home') }}</el-breadcrumb-item>
+        <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
       </el-breadcrumb>
     </div>
 
-    <!-- 右侧：MQTT 状态 + 主题切换 + 全屏 + 用户菜单 -->
+    <!-- 右侧工具栏 -->
     <div class="app-header__right">
       <!-- MQTT 状态 -->
       <div
         class="mqtt-status"
         :class="mqttConnected ? 'mqtt-status--online' : 'mqtt-status--offline'"
-        :title="mqttConnected ? 'MQTT 已连接' : 'MQTT 未连接'"
+        :title="mqttConnected ? ls.t('header.mqttConnected') : ls.t('header.mqttDisconnected')"
       >
         <span
           class="iot-status-dot"
@@ -32,18 +30,51 @@
         <span class="mqtt-label">MQTT</span>
       </div>
 
-      <!-- 主题切换 -->
-      <el-tooltip :content="isDark ? '切换亮色模式' : '切换暗色模式'" placement="bottom">
-        <button class="header-action-btn" @click="appStore.toggleTheme()">
-          <el-icon :size="18">
-            <Moon v-if="!isDark" />
-            <Sunny v-else />
-          </el-icon>
+      <!-- 外观主题选择 -->
+      <el-tooltip :content="ls.t('header.theme')" placement="bottom">
+        <el-dropdown trigger="click" @command="handleColorTheme">
+          <button class="header-action-btn">
+            <el-icon :size="18"><Brush /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <div class="theme-menu-title">{{ ls.t('header.theme') }}</div>
+              <el-dropdown-item
+                command="claude"
+                :class="{ 'is-active-item': appStore.colorTheme === 'claude' }"
+              >
+                <span class="theme-dot theme-dot--claude"></span>
+                {{ ls.t('header.themeClaude') }}
+                <el-icon v-if="appStore.colorTheme === 'claude'" class="check-icon"><Check /></el-icon>
+              </el-dropdown-item>
+              <el-dropdown-item
+                command="classic"
+                :class="{ 'is-active-item': appStore.colorTheme === 'classic' }"
+              >
+                <span class="theme-dot theme-dot--classic"></span>
+                {{ ls.t('header.themeClassic') }}
+                <el-icon v-if="appStore.colorTheme === 'classic'" class="check-icon"><Check /></el-icon>
+              </el-dropdown-item>
+              <el-divider style="margin: 6px 0;" />
+              <div class="theme-menu-title">{{ isDark ? ls.t('header.toLight') : ls.t('header.toDark') }}</div>
+              <el-dropdown-item command="toggle-dark">
+                <el-icon><Moon v-if="!isDark" /><Sunny v-else /></el-icon>
+                {{ isDark ? ls.t('header.toLight') : ls.t('header.toDark') }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </el-tooltip>
+
+      <!-- 语言切换 -->
+      <el-tooltip :content="ls.t('header.lang')" placement="bottom">
+        <button class="header-action-btn lang-btn" @click="ls.toggleLocale()">
+          <span class="lang-text">{{ ls.locale === 'zh' ? 'EN' : '中' }}</span>
         </button>
       </el-tooltip>
 
       <!-- 全屏切换 -->
-      <el-tooltip content="全屏" placement="bottom">
+      <el-tooltip :content="ls.t('header.fullscreen')" placement="bottom">
         <button class="header-action-btn" @click="toggleFullscreen">
           <el-icon :size="18"><FullScreen /></el-icon>
         </button>
@@ -52,10 +83,8 @@
       <!-- 用户下拉菜单 -->
       <el-dropdown trigger="click" @command="handleUserCommand">
         <button class="user-menu-btn">
-          <el-avatar :size="28" class="user-avatar">
-            {{ avatarText }}
-          </el-avatar>
-          <span class="user-name">{{ userStore.username || '用户' }}</span>
+          <el-avatar :size="28" class="user-avatar">{{ avatarText }}</el-avatar>
+          <span class="user-name">{{ userStore.username || ls.t('header.currentUser') }}</span>
           <el-icon :size="12"><ArrowDown /></el-icon>
         </button>
         <template #dropdown>
@@ -66,15 +95,15 @@
             </el-dropdown-item>
             <el-dropdown-item divided command="profile">
               <el-icon><Setting /></el-icon>
-              个人信息
+              {{ ls.t('header.profile') }}
             </el-dropdown-item>
             <el-dropdown-item command="password">
               <el-icon><Lock /></el-icon>
-              修改密码
+              {{ ls.t('header.changePassword') }}
             </el-dropdown-item>
             <el-dropdown-item divided command="logout">
               <el-icon><SwitchButton /></el-icon>
-              退出登录
+              {{ ls.t('header.logout') }}
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -82,46 +111,46 @@
     </div>
 
     <!-- 个人信息弹窗 -->
-    <el-dialog v-model="profileDialogVisible" title="个人信息" width="460px" destroy-on-close>
+    <el-dialog v-model="profileDialogVisible" :title="ls.t('header.profileTitle')" width="460px" destroy-on-close>
       <el-form :model="profileForm" label-width="80px" size="default">
-        <el-form-item label="用户名">
+        <el-form-item :label="ls.t('header.username')">
           <el-input :model-value="profileForm.username" disabled />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="profileForm.email" placeholder="请输入邮箱" />
+        <el-form-item :label="ls.t('header.email')">
+          <el-input v-model="profileForm.email" :placeholder="ls.t('header.email')" />
         </el-form-item>
-        <el-form-item label="姓">
-          <el-input v-model="profileForm.last_name" placeholder="请输入姓" />
+        <el-form-item :label="ls.t('header.lastName')">
+          <el-input v-model="profileForm.last_name" :placeholder="ls.t('header.lastName')" />
         </el-form-item>
-        <el-form-item label="名">
-          <el-input v-model="profileForm.first_name" placeholder="请输入名" />
+        <el-form-item :label="ls.t('header.firstName')">
+          <el-input v-model="profileForm.first_name" :placeholder="ls.t('header.firstName')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="profileDialogVisible = false">取消</el-button>
+        <el-button @click="profileDialogVisible = false">{{ ls.t('header.cancel') }}</el-button>
         <el-button type="primary" :loading="profileLoading" @click="handleUpdateProfile">
-          保存
+          {{ ls.t('header.save') }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 修改密码弹窗 -->
-    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="460px" destroy-on-close>
+    <el-dialog v-model="passwordDialogVisible" :title="ls.t('header.pwdTitle')" width="460px" destroy-on-close>
       <el-form ref="pwdFormRef" :model="passwordForm" :rules="passwordRules" label-width="100px" size="default">
-        <el-form-item label="当前密码" prop="old_password">
-          <el-input v-model="passwordForm.old_password" type="password" show-password placeholder="请输入当前密码" />
+        <el-form-item :label="ls.t('header.oldPwd')" prop="old_password">
+          <el-input v-model="passwordForm.old_password" type="password" show-password />
         </el-form-item>
-        <el-form-item label="新密码" prop="new_password">
-          <el-input v-model="passwordForm.new_password" type="password" show-password placeholder="请输入新密码（至少8位）" />
+        <el-form-item :label="ls.t('header.newPwd')" prop="new_password">
+          <el-input v-model="passwordForm.new_password" type="password" show-password />
         </el-form-item>
-        <el-form-item label="确认新密码" prop="new_password2">
-          <el-input v-model="passwordForm.new_password2" type="password" show-password placeholder="请再次输入新密码" />
+        <el-form-item :label="ls.t('header.confirmPwd')" prop="new_password2">
+          <el-input v-model="passwordForm.new_password2" type="password" show-password />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button @click="passwordDialogVisible = false">{{ ls.t('header.cancel') }}</el-button>
         <el-button type="primary" :loading="passwordLoading" @click="handleChangePassword">
-          确认修改
+          {{ ls.t('header.confirm') }}
         </el-button>
       </template>
     </el-dialog>
@@ -133,9 +162,10 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
 import {
   Operation, Moon, Sunny, FullScreen, ArrowDown,
-  User, Setting, Lock, SwitchButton,
+  User, Setting, Lock, SwitchButton, Brush, Check,
 } from '@element-plus/icons-vue'
 import { getMqttStatus } from '@/api/system'
 import { updateUserProfile, changePassword } from '@/api/auth'
@@ -147,6 +177,7 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const ls = useLocaleStore()
 
 const isDark = computed(() => appStore.theme === 'dark')
 const currentTitle = computed(() => route.meta.title || '')
@@ -183,26 +214,26 @@ function toggleFullscreen() {
   }
 }
 
+// ==================== 主题切换 ====================
+function handleColorTheme(cmd) {
+  if (cmd === 'toggle-dark') {
+    appStore.toggleTheme()
+  } else {
+    appStore.setColorTheme(cmd)
+  }
+}
+
 // ==================== 用户菜单命令 ====================
 function handleUserCommand(command) {
-  if (command === 'profile') {
-    openProfileDialog()
-  } else if (command === 'password') {
-    openPasswordDialog()
-  } else if (command === 'logout') {
-    handleLogout()
-  }
+  if (command === 'profile') openProfileDialog()
+  else if (command === 'password') openPasswordDialog()
+  else if (command === 'logout') handleLogout()
 }
 
 // ==================== 个人信息 ====================
 const profileDialogVisible = ref(false)
 const profileLoading = ref(false)
-const profileForm = reactive({
-  username: '',
-  email: '',
-  first_name: '',
-  last_name: '',
-})
+const profileForm = reactive({ username: '', email: '', first_name: '', last_name: '' })
 
 function openProfileDialog() {
   const info = userStore.userInfo
@@ -224,10 +255,10 @@ async function handleUpdateProfile() {
       last_name: profileForm.last_name,
     })
     await userStore.fetchUserInfo()
-    ElMessage.success('信息更新成功')
+    ElMessage.success(ls.locale === 'zh' ? '信息更新成功' : 'Profile updated')
     profileDialogVisible.value = false
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '更新失败')
+    ElMessage.error(error.response?.data?.detail || (ls.locale === 'zh' ? '更新失败' : 'Update failed'))
   } finally {
     profileLoading.value = false
   }
@@ -237,24 +268,20 @@ async function handleUpdateProfile() {
 const passwordDialogVisible = ref(false)
 const passwordLoading = ref(false)
 const pwdFormRef = ref(null)
-const passwordForm = reactive({
-  old_password: '',
-  new_password: '',
-  new_password2: '',
-})
+const passwordForm = reactive({ old_password: '', new_password: '', new_password2: '' })
 
 const passwordRules = {
-  old_password: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
+  old_password: [{ required: true, message: ls.locale === 'zh' ? '请输入当前密码' : 'Required', trigger: 'blur' }],
   new_password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码至少 8 个字符', trigger: 'blur' },
+    { required: true, message: ls.locale === 'zh' ? '请输入新密码' : 'Required', trigger: 'blur' },
+    { min: 8, message: ls.locale === 'zh' ? '密码至少 8 个字符' : 'Min 8 characters', trigger: 'blur' },
   ],
   new_password2: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { required: true, message: ls.locale === 'zh' ? '请确认新密码' : 'Required', trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value !== passwordForm.new_password) {
-          callback(new Error('两次输入的密码不一致'))
+          callback(new Error(ls.locale === 'zh' ? '两次输入的密码不一致' : 'Passwords do not match'))
         } else {
           callback()
         }
@@ -274,7 +301,6 @@ function openPasswordDialog() {
 async function handleChangePassword() {
   const valid = await pwdFormRef.value.validate().catch(() => false)
   if (!valid) return
-
   passwordLoading.value = true
   try {
     await changePassword({
@@ -282,12 +308,12 @@ async function handleChangePassword() {
       new_password: passwordForm.new_password,
       new_password2: passwordForm.new_password2,
     })
-    ElMessage.success('密码修改成功，请重新登录')
+    ElMessage.success(ls.locale === 'zh' ? '密码修改成功，请重新登录' : 'Password changed, please login again')
     passwordDialogVisible.value = false
     userStore.logout()
     router.push('/login')
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '修改失败')
+    ElMessage.error(error.response?.data?.detail || (ls.locale === 'zh' ? '修改失败' : 'Failed'))
   } finally {
     passwordLoading.value = false
   }
@@ -296,16 +322,20 @@ async function handleChangePassword() {
 // ==================== 退出登录 ====================
 async function handleLogout() {
   try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      ls.t('header.confirmLogout'),
+      ls.t('header.hint'),
+      {
+        confirmButtonText: ls.t('header.logoutOk'),
+        cancelButtonText: ls.t('header.logoutCancel'),
+        type: 'warning',
+      }
+    )
     userStore.logout()
     router.push('/login')
-    ElMessage.success('已退出登录')
+    ElMessage.success(ls.locale === 'zh' ? '已退出登录' : 'Logged out')
   } catch {
-    // 取消退出
+    // 取消
   }
 }
 </script>
@@ -348,7 +378,7 @@ async function handleLogout() {
 .app-header__right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 /* MQTT 状态 */
@@ -362,7 +392,7 @@ async function handleLogout() {
   border: 1px solid var(--iot-border-color-light);
   font-size: var(--iot-font-size-xs);
   cursor: default;
-  transition: background var(--iot-transition-fast);
+  margin-right: 4px;
 }
 
 .mqtt-label {
@@ -370,13 +400,8 @@ async function handleLogout() {
   transition: color var(--iot-transition-fast);
 }
 
-.mqtt-status--online .mqtt-label {
-  color: var(--iot-color-success);
-}
-
-.mqtt-status--offline .mqtt-label {
-  color: var(--iot-text-secondary);
-}
+.mqtt-status--online .mqtt-label { color: var(--iot-color-success); }
+.mqtt-status--offline .mqtt-label { color: var(--iot-text-secondary); }
 
 /* 操作按钮 */
 .header-action-btn {
@@ -398,6 +423,52 @@ async function handleLogout() {
   color: var(--iot-color-primary);
 }
 
+/* 语言切换按钮 */
+.lang-btn {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--iot-text-secondary);
+}
+
+.lang-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 主题菜单内部 */
+.theme-menu-title {
+  padding: 4px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--iot-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.theme-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.theme-dot--claude { background: linear-gradient(135deg, #F5F0EB, #D97757); border: 1px solid #DDD5C8; }
+.theme-dot--classic { background: linear-gradient(135deg, #E8F0FE, #1A73E8); border: 1px solid #C5D8FF; }
+
+.check-icon {
+  margin-left: auto;
+  color: var(--iot-color-primary);
+  font-size: 14px;
+}
+
+:deep(.is-active-item) {
+  color: var(--iot-color-primary) !important;
+  background-color: var(--iot-color-primary-bg) !important;
+}
+
 /* 用户菜单按钮 */
 .user-menu-btn {
   display: flex;
@@ -411,16 +482,16 @@ async function handleLogout() {
   color: var(--iot-text-regular);
   transition: all var(--iot-transition-fast);
   box-shadow: var(--iot-shadow-sm);
+  margin-left: 4px;
 }
 
 .user-menu-btn:hover {
   border-color: var(--iot-color-primary);
-  color: var(--iot-color-primary);
-  box-shadow: 0 2px 8px rgba(217, 119, 87, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, #D97757, #E8885A);
+  background: linear-gradient(135deg, var(--iot-color-primary), var(--iot-color-primary-light));
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -438,12 +509,8 @@ async function handleLogout() {
 
 /* 响应式：移动端 */
 @media (max-width: 767px) {
-  .mobile-menu-btn {
-    display: flex;
-  }
-
-  .user-name {
-    display: none;
-  }
+  .mobile-menu-btn { display: flex; }
+  .user-name { display: none; }
+  .mqtt-status { display: none; }
 }
 </style>

@@ -2,24 +2,24 @@
   <div class="devices-view">
     <div class="iot-page-header">
       <div>
-        <h1 class="iot-page-title">设备管理</h1>
-        <p class="iot-page-subtitle">查看和控制所有执行器设备</p>
+        <h1 class="iot-page-title">{{ ls.t('devices.title') }}</h1>
+        <p class="iot-page-subtitle">{{ ls.t('devices.subtitle') }}</p>
       </div>
     </div>
 
     <!-- ==================== 设备类型管理 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">设备类型管理</span>
+        <span class="section-title">{{ ls.t('devices.typeManagement') }}</span>
         <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openDeviceTypeDialog(null)">
-          新增类型
+          {{ ls.t('devices.addType') }}
         </el-button>
       </div>
       <div class="iot-card__body">
         <el-table :data="deviceTypes" v-loading="deviceTypesLoading" stripe>
-          <el-table-column prop="DeviceType_id" label="类型ID" width="160" />
-          <el-table-column prop="name" label="名称" width="180" />
-          <el-table-column label="状态字段" min-width="200">
+          <el-table-column prop="DeviceType_id" :label="ls.t('common.typeId')" width="160" />
+          <el-table-column prop="name" :label="ls.t('common.name')" width="180" />
+          <el-table-column :label="ls.t('devices.stateFields')" min-width="200">
             <template #default="{ row }">
               <el-tag
                 v-for="field in (row.state_fields || [])"
@@ -33,29 +33,29 @@
               <span v-if="!row.state_fields || row.state_fields.length === 0" class="iot-text-secondary">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="命令数" width="80" align="center">
+          <el-table-column :label="ls.t('common.cmdCount')" width="80" align="center">
             <template #default="{ row }">
               {{ row.commands ? Object.keys(row.commands).length : 0 }}
             </template>
           </el-table-column>
-          <el-table-column label="关联设备" width="100" align="center">
+          <el-table-column :label="ls.t('devices.relatedDevices')" width="100" align="center">
             <template #default="{ row }">
               <el-tag size="small" type="info">{{ row.device_count || 0 }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column v-if="isStaff" label="操作" width="160" align="center" fixed="right">
+          <el-table-column v-if="isStaff" :label="ls.t('common.operations')" width="160" align="center" fixed="right">
             <template #default="{ row }">
               <el-button text type="primary" size="small" @click="openDeviceTypeDialog(row)">
-                编辑
+                {{ ls.t('common.edit') }}
               </el-button>
               <el-popconfirm
-                title="确定删除此设备类型？"
-                confirm-button-text="删除"
-                cancel-button-text="取消"
+                :title="ls.t('devices.deleteTypeConfirm')"
+                :confirm-button-text="ls.t('common.delete')"
+                :cancel-button-text="ls.t('common.cancel')"
                 @confirm="handleDeleteDeviceType(row.id)"
               >
                 <template #reference>
-                  <el-button text type="danger" size="small">删除</el-button>
+                  <el-button text type="danger" size="small">{{ ls.t('common.delete') }}</el-button>
                 </template>
               </el-popconfirm>
             </template>
@@ -67,8 +67,8 @@
     <!-- 筛选栏 -->
     <div class="iot-card iot-mb-lg">
       <div class="filter-bar">
-        <el-select v-model="filterType" placeholder="设备类型" style="width: 200px" clearable @change="fetchDevices">
-          <el-option label="全部类型" value="" />
+        <el-select v-model="filterType" :placeholder="ls.t('devices.filterType')" style="width: 200px" clearable @change="fetchDevices">
+          <el-option :label="ls.t('common.allTypes')" value="" />
           <el-option
             v-for="t in deviceTypes"
             :key="t.id"
@@ -76,14 +76,14 @@
             :value="t.id"
           />
         </el-select>
-        <el-select v-model="filterOnline" placeholder="在线状态" style="width: 140px" clearable @change="fetchDevices">
-          <el-option label="全部" value="" />
-          <el-option label="在线" value="true" />
-          <el-option label="离线" value="false" />
+        <el-select v-model="filterOnline" :placeholder="ls.t('devices.filterStatus')" style="width: 140px" clearable @change="fetchDevices">
+          <el-option :label="ls.t('common.all')" value="" />
+          <el-option :label="ls.t('common.online')" value="true" />
+          <el-option :label="ls.t('common.offline')" value="false" />
         </el-select>
         <el-input
           v-model="searchText"
-          placeholder="搜索设备名称或ID"
+          :placeholder="ls.t('devices.searchPlaceholder')"
           style="width: 260px"
           clearable
           @clear="fetchDevices"
@@ -94,7 +94,7 @@
           </template>
         </el-input>
         <el-button :icon="Refresh" circle @click="fetchDevices" />
-        <el-button v-if="isStaff && devices.length" type="primary" :icon="Plus" @click="openAddDialog">添加设备</el-button>
+        <el-button v-if="isStaff && devices.length" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('devices.addDevice') }}</el-button>
       </div>
     </div>
 
@@ -110,8 +110,8 @@
         />
       </div>
       <div v-else class="iot-card empty-card">
-        <el-empty :description="loading ? '加载中...' : '暂无设备'">
-          <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">添加设备</el-button>
+        <el-empty :description="loading ? ls.t('common.loading') : ls.t('devices.noDevices')">
+          <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('devices.addDevice') }}</el-button>
         </el-empty>
       </div>
     </div>
@@ -119,56 +119,56 @@
     <!-- 设备类型编辑弹窗 -->
     <el-dialog
       v-model="deviceTypeDialogVisible"
-      :title="deviceTypeForm.id ? '编辑设备类型' : '新增设备类型'"
+      :title="deviceTypeForm.id ? ls.t('devices.editTypeTitle') : ls.t('devices.addTypeTitle')"
       width="600px"
       destroy-on-close
     >
       <el-form :model="deviceTypeForm" label-width="100px" :rules="deviceTypeRules" ref="deviceTypeFormRef">
-        <el-form-item label="类型 ID" prop="DeviceType_id">
-          <el-input v-model="deviceTypeForm.DeviceType_id" placeholder="如: LED-01" />
+        <el-form-item :label="ls.t('devices.typeIdLabel')" prop="DeviceType_id">
+          <el-input v-model="deviceTypeForm.DeviceType_id" :placeholder="ls.t('devices.typeIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="deviceTypeForm.name" placeholder="如: LED灯" />
+        <el-form-item :label="ls.t('common.name')" prop="name">
+          <el-input v-model="deviceTypeForm.name" :placeholder="ls.t('devices.namePlaceholder')" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="deviceTypeForm.description" type="textarea" :rows="2" placeholder="类型描述（选填）" />
+          <el-input v-model="deviceTypeForm.description" type="textarea" :rows="2" :placeholder="ls.t('devices.descPlaceholder')" />
         </el-form-item>
-        <el-form-item label="状态字段">
+        <el-form-item :label="ls.t('devices.stateFieldsLabel')">
           <el-select
             v-model="deviceTypeForm.state_fields"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入字段名后回车添加，如 power_state"
+            :placeholder="ls.t('devices.stateFieldsPlaceholder')"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="配置参数">
+        <el-form-item :label="ls.t('devices.configParamsLabel')">
           <el-select
             v-model="deviceTypeForm.config_parameters"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入参数名后回车添加，如 heartbeat_interval"
+            :placeholder="ls.t('devices.configParamsPlaceholder')"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="命令列表">
+        <el-form-item :label="ls.t('devices.commandsLabel')">
           <div class="commands-editor">
             <el-input
               v-model="deviceTypeForm.commands_json"
               type="textarea"
               :rows="6"
-              placeholder='JSON 格式，如: {"turn_on": {"mqtt_message": {"command": "power_on"}, "description": "打开设备", "params": []}}'
+              :placeholder="ls.t('devices.commandsPlaceholder')"
             />
             <div v-if="deviceTypeCmdError" class="cmd-error">{{ deviceTypeCmdError }}</div>
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="deviceTypeDialogVisible = false">取消</el-button>
+        <el-button @click="deviceTypeDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="deviceTypeSaving" @click="handleSaveDeviceType">
           保存
         </el-button>
@@ -176,13 +176,13 @@
     </el-dialog>
 
     <!-- 添加设备弹窗 -->
-    <el-dialog v-model="addDialogVisible" title="添加设备" width="500px" destroy-on-close>
+    <el-dialog v-model="addDialogVisible" :title="ls.t('devices.addDialogTitle')" width="500px" destroy-on-close>
       <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
-        <el-form-item label="设备 ID" prop="device_id">
-          <el-input v-model="addForm.device_id" placeholder="如: LED-WEMOS-001" />
+        <el-form-item :label="ls.t('devices.deviceIdLabel')" prop="device_id">
+          <el-input v-model="addForm.device_id" :placeholder="ls.t('devices.deviceIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="addForm.name" placeholder="如: LED灯-001" />
+        <el-form-item :label="ls.t('common.name')" prop="name">
+          <el-input v-model="addForm.name" :placeholder="ls.t('devices.deviceNamePlaceholder')" />
         </el-form-item>
         <el-form-item label="设备类型" prop="device_type">
           <el-select v-model="addForm.device_type" placeholder="选择类型" style="width: 100%">
@@ -195,14 +195,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="位置">
-          <el-input v-model="addForm.location" placeholder="如: 实验室A（选填）" />
+          <el-input v-model="addForm.location" :placeholder="ls.t('devices.locationPlaceholder')" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="addForm.description" type="textarea" :rows="2" placeholder="选填" />
+          <el-input v-model="addForm.description" type="textarea" :rows="2" :placeholder="ls.t('common.optional')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button @click="addDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="addSaving" @click="handleAddDevice">保存</el-button>
       </template>
     </el-dialog>
@@ -213,6 +213,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType } from '@/api/devices'
@@ -220,6 +221,7 @@ import DeviceCard from '@/components/devices/DeviceCard.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const ls = useLocaleStore()
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 
 // ==================== 筛选 ====================
@@ -243,7 +245,7 @@ async function fetchDevices() {
     const data = await getDevices(params)
     devices.value = data.results || data
   } catch {
-    ElMessage.error('获取设备列表失败')
+    ElMessage.error(ls.t('devices.fetchListFailed'))
   } finally {
     loading.value = false
   }
@@ -255,7 +257,7 @@ async function fetchDeviceTypeList() {
     const data = await getDeviceTypes()
     deviceTypes.value = data.results || data
   } catch {
-    ElMessage.error('获取设备类型列表失败')
+    ElMessage.error(ls.t('devices.fetchTypesFailed'))
   } finally {
     deviceTypesLoading.value = false
   }
@@ -267,10 +269,10 @@ const deviceTypeSaving = ref(false)
 const deviceTypeFormRef = ref(null)
 const deviceTypeCmdError = ref('')
 
-const deviceTypeRules = {
-  DeviceType_id: [{ required: true, message: '请输入类型 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-}
+const deviceTypeRules = computed(() => ({
+  DeviceType_id: [{ required: true, message: ls.t('devices.typeIdRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: ls.t('devices.nameRequired'), trigger: 'blur' }],
+}))
 
 const emptyDeviceTypeForm = () => ({
   id: null,
@@ -314,7 +316,7 @@ async function handleSaveDeviceType() {
     commands = JSON.parse(deviceTypeForm.value.commands_json)
     deviceTypeCmdError.value = ''
   } catch {
-    deviceTypeCmdError.value = 'JSON 格式不正确，请检查'
+    deviceTypeCmdError.value = ls.t('common.jsonError')
     return
   }
 
@@ -331,16 +333,16 @@ async function handleSaveDeviceType() {
   try {
     if (deviceTypeForm.value.id) {
       await updateDeviceType(deviceTypeForm.value.id, payload)
-      ElMessage.success('设备类型更新成功')
+      ElMessage.success(ls.t('devices.typeUpdated'))
     } else {
       await createDeviceType(payload)
-      ElMessage.success('设备类型创建成功')
+      ElMessage.success(ls.t('devices.typeCreated'))
     }
     deviceTypeDialogVisible.value = false
     fetchDeviceTypeList()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '保存失败'
+    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('common.saveFailed')
     ElMessage.error(msg)
   } finally {
     deviceTypeSaving.value = false
@@ -350,10 +352,10 @@ async function handleSaveDeviceType() {
 async function handleDeleteDeviceType(id) {
   try {
     await deleteDeviceType(id)
-    ElMessage.success('删除成功')
+    ElMessage.success(ls.t('common.deleteSuccess'))
     fetchDeviceTypeList()
   } catch {
-    ElMessage.error('删除失败，可能有关联的设备')
+    ElMessage.error(ls.t('devices.deleteTypeFailed'))
   }
 }
 
@@ -366,19 +368,19 @@ function goDetail(device) {
 async function handleDeleteDevice(device) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除设备「${device.name}」吗？相关数据也将被清除，此操作不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+      ls.t('devices.deleteConfirmMsg').replace('{name}', device.name),
+      ls.t('common.deleteConfirmTitle'),
+      { confirmButtonText: ls.t('common.deleteConfirmOk'), cancelButtonText: ls.t('common.cancel'), type: 'warning' }
     )
   } catch {
     return
   }
   try {
     await deleteDevice(device.device_id)
-    ElMessage.success('设备已删除')
+    ElMessage.success(ls.t('devices.deviceDeleted'))
     fetchDevices()
   } catch {
-    ElMessage.error('删除失败，请重试')
+    ElMessage.error(ls.t('common.deleteFailed'))
   }
 }
 
@@ -394,11 +396,11 @@ const addForm = ref({
   description: '',
 })
 
-const addRules = {
-  device_id: [{ required: true, message: '请输入设备 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  device_type: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
-}
+const addRules = computed(() => ({
+  device_id: [{ required: true, message: ls.t('devices.deviceIdRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: ls.t('devices.deviceNameRequired'), trigger: 'blur' }],
+  device_type: [{ required: true, message: ls.t('devices.deviceTypeRequired'), trigger: 'change' }],
+}))
 
 function openAddDialog() {
   addForm.value = { device_id: '', name: '', device_type: null, location: '', description: '' }
@@ -414,12 +416,12 @@ async function handleAddDevice() {
   addSaving.value = true
   try {
     await createDevice(addForm.value)
-    ElMessage.success('设备添加成功')
+    ElMessage.success(ls.t('devices.deviceAdded'))
     addDialogVisible.value = false
     fetchDevices()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '添加失败'
+    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('common.addFailed')
     ElMessage.error(msg)
   } finally {
     addSaving.value = false

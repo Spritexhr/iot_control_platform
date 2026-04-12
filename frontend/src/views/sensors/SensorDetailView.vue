@@ -3,7 +3,7 @@
     <!-- 顶部：返回 + 标题 -->
     <div class="iot-page-header">
       <div class="header-left">
-        <el-button text :icon="ArrowLeft" @click="router.push('/sensors')">返回列表</el-button>
+        <el-button text :icon="ArrowLeft" @click="router.push('/sensors')">{{ ls.t('common.backToList') }}</el-button>
         <div v-if="sensor" class="header-title-group">
           <span
             class="iot-status-dot iot-status-dot--lg"
@@ -20,7 +20,7 @@
           class="iot-status-tag"
           :class="sensor.is_online ? 'iot-status-tag--online' : 'iot-status-tag--offline'"
         >
-          {{ sensor.is_online ? '在线' : '离线' }}
+          {{ sensor.is_online ? ls.t('common.online') : ls.t('common.offline') }}
         </span>
       </div>
     </div>
@@ -31,40 +31,40 @@
         <!-- 基本信息卡片 -->
         <div class="iot-card detail-info-card">
           <div class="iot-card__header">
-            <span class="section-title">基本信息</span>
+            <span class="section-title">{{ ls.t('sensorDetail.basicInfo') }}</span>
           </div>
           <div class="iot-card__body">
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-item__label">传感器 ID</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.sensorId') }}</span>
                 <span class="info-item__value mono">{{ sensor.sensor_id }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">传感器类型</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.sensorType') }}</span>
                 <span class="info-item__value">{{ sensor.sensor_type_info?.name || '--' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">位置</span>
-                <span class="info-item__value">{{ sensor.location || '未设置' }}</span>
+                <span class="info-item__label">{{ ls.t('common.location') }}</span>
+                <span class="info-item__value">{{ sensor.location || ls.t('common.unset') }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">描述</span>
-                <span class="info-item__value">{{ sensor.description || '无' }}</span>
+                <span class="info-item__label">{{ ls.t('common.description') }}</span>
+                <span class="info-item__value">{{ sensor.description || ls.t('common.none') }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">MQTT 数据主题</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.mqttDataTopic') }}</span>
                 <span class="info-item__value mono">{{ sensor.mqtt_topic_data || '--' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">MQTT 控制主题</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.mqttControlTopic') }}</span>
                 <span class="info-item__value mono">{{ sensor.mqtt_topic_control || '--' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">最后上报时间</span>
-                <span class="info-item__value">{{ sensor.last_seen ? formatTime(sensor.last_seen) : '从未' }}</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.lastSeen') }}</span>
+                <span class="info-item__value">{{ sensor.last_seen ? formatTime(sensor.last_seen) : ls.t('common.never') }}</span>
               </div>
               <div class="info-item">
-                <span class="info-item__label">创建时间</span>
+                <span class="info-item__label">{{ ls.t('sensorDetail.createdAt') }}</span>
                 <span class="info-item__value">{{ formatTime(sensor.created_at) }}</span>
               </div>
             </div>
@@ -76,7 +76,7 @@
           <!-- 最新数据值 -->
           <div class="iot-card">
             <div class="iot-card__header">
-              <span class="section-title">最新数据</span>
+              <span class="section-title">{{ ls.t('sensorDetail.latestData') }}</span>
               <span v-if="sensor.latest_data" class="iot-text-secondary" style="font-size: 12px;">
                 {{ formatTime(sensor.latest_data.timestamp) }}
               </span>
@@ -88,14 +88,14 @@
                   <div class="iot-data-value">{{ latestValue(field) ?? '--' }}</div>
                 </div>
               </div>
-              <div v-else class="empty-hint">未定义数据字段</div>
+              <div v-else class="empty-hint">{{ ls.t('sensorDetail.noDataFields') }}</div>
             </div>
           </div>
 
           <!-- 命令控制（仅工作人员可见） -->
           <div v-if="isStaff" class="iot-card">
             <div class="iot-card__header">
-              <span class="section-title">命令控制</span>
+              <span class="section-title">{{ ls.t('sensorDetail.commandControl') }}</span>
             </div>
             <div class="iot-card__body">
               <CommandPanel
@@ -112,21 +112,21 @@
       <!-- ========== 第二行：数据记录表格 ========== -->
       <div class="iot-card iot-mt-lg">
         <div class="iot-card__header">
-          <span class="section-title">数据记录 (SensorData)</span>
+          <span class="section-title">{{ ls.t('sensorDetail.dataRecords') }} (SensorData)</span>
           <div class="toolbar">
             <el-radio-group v-model="dataHours" size="small" @change="fetchDataRecords">
-              <el-radio-button :value="1">1小时</el-radio-button>
-              <el-radio-button :value="6">6小时</el-radio-button>
-              <el-radio-button :value="24">24小时</el-radio-button>
-              <el-radio-button :value="168">7天</el-radio-button>
+              <el-radio-button :value="1">{{ ls.t('common.hour1') }}</el-radio-button>
+              <el-radio-button :value="6">{{ ls.t('common.hour6') }}</el-radio-button>
+              <el-radio-button :value="24">{{ ls.t('common.hour24') }}</el-radio-button>
+              <el-radio-button :value="168">{{ ls.t('common.day7') }}</el-radio-button>
             </el-radio-group>
-            <el-button :icon="Refresh" size="small" @click="fetchDataRecords">刷新</el-button>
+            <el-button :icon="Refresh" size="small" @click="fetchDataRecords">{{ ls.t('common.refresh') }}</el-button>
           </div>
         </div>
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="dataRecords" v-loading="dataLoading" size="small" stripe max-height="420">
             <el-table-column label="#" type="index" width="50" />
-            <el-table-column label="采集时间" width="180">
+            <el-table-column :label="ls.t('sensorDetail.collectTime')" width="180">
               <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
             </el-table-column>
             <el-table-column v-for="field in dataFields" :key="field" :label="field" min-width="110">
@@ -134,17 +134,17 @@
                 {{ formatField(row.data?.[field]) }}
               </template>
             </el-table-column>
-            <el-table-column label="原始 JSON" min-width="220">
+            <el-table-column :label="ls.t('sensorDetail.rawJson')" min-width="220">
               <template #default="{ row }">
                 <span class="raw-json">{{ JSON.stringify(row.data) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="接收时间" width="180">
+            <el-table-column :label="ls.t('sensorDetail.receivedAt')" width="180">
               <template #default="{ row }">{{ formatTime(row.received_at) }}</template>
             </el-table-column>
           </el-table>
           <div class="table-footer">
-            共 {{ dataRecords.length }} 条记录
+            {{ `${ls.t('common.total')} ${dataRecords.length} ${ls.t('common.records')}` }}
           </div>
         </div>
       </div>
@@ -152,33 +152,33 @@
       <!-- ========== 第三行：状态记录表格 ========== -->
       <div class="iot-card iot-mt-lg">
         <div class="iot-card__header">
-          <span class="section-title">状态记录 (SensorStatusCollection)</span>
-          <el-button :icon="Refresh" size="small" @click="fetchStatusRecords">刷新</el-button>
+          <span class="section-title">{{ `${ls.t('sensorDetail.statusRecords')} (SensorStatusCollection)` }}</span>
+          <el-button :icon="Refresh" size="small" @click="fetchStatusRecords">{{ ls.t('common.refresh') }}</el-button>
         </div>
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="statusRecords" v-loading="statusLoading" size="small" stripe max-height="350">
             <el-table-column label="#" type="index" width="50" />
-            <el-table-column label="事件" width="140">
+            <el-table-column :label="ls.t('sensorDetail.event')" width="140">
               <template #default="{ row }">
                 <el-tag size="small" :type="eventTagType(row.event_name)">
                   {{ row.event_name || '--' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="数据内容" min-width="280">
+            <el-table-column :label="ls.t('sensorDetail.dataContent')" min-width="280">
               <template #default="{ row }">
                 <span class="raw-json">{{ JSON.stringify(row.data) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column :label="ls.t('sensorDetail.time')" width="180">
               <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
             </el-table-column>
-            <el-table-column label="接收时间" width="180">
+            <el-table-column :label="ls.t('sensorDetail.receivedAt')" width="180">
               <template #default="{ row }">{{ formatTime(row.received_at) }}</template>
             </el-table-column>
           </el-table>
           <div class="table-footer">
-            共 {{ statusRecords.length }} 条记录
+            {{ `${ls.t('common.total')} ${statusRecords.length} ${ls.t('common.records')}` }}
           </div>
         </div>
       </div>
@@ -193,8 +193,10 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, Refresh } from '@element-plus/icons-vue'
 import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
 import { getSensor, getSensorData, getSensorStatus, sendSensorCommand } from '@/api/sensors'
 
+const ls = useLocaleStore()
 const route = useRoute()
 const userStore = useUserStore()
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
@@ -222,7 +224,7 @@ async function fetchSensorDetail() {
   try {
     sensor.value = await getSensor(deviceId)
   } catch {
-    ElMessage.error('获取传感器详情失败')
+    ElMessage.error(ls.t('sensorDetail.fetchFailed'))
     sensor.value = null
   } finally {
     pageLoading.value = false
@@ -275,7 +277,7 @@ function formatTime(str) {
 function formatField(val) {
   if (val === undefined || val === null) return '--'
   if (typeof val === 'number') return val.toFixed(2)
-  if (typeof val === 'boolean') return val ? '是' : '否'
+  if (typeof val === 'boolean') return val ? ls.t('common.yes') : ls.t('common.no')
   return String(val)
 }
 
@@ -287,7 +289,7 @@ function eventTagType(name) {
 }
 
 function onCommandSent() {
-  ElMessage.success('命令已发送')
+  ElMessage.success(ls.t('common.commandSent'))
   setTimeout(fetchSensorDetail, 1000)
 }
 

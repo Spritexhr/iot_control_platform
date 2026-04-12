@@ -2,24 +2,24 @@
   <div class="sensors-view">
     <div class="iot-page-header">
       <div>
-        <h1 class="iot-page-title">传感器管理</h1>
-        <p class="iot-page-subtitle">查看和管理所有传感器设备</p>
+        <h1 class="iot-page-title">{{ ls.t('sensors.title') }}</h1>
+        <p class="iot-page-subtitle">{{ ls.t('sensors.subtitle') }}</p>
       </div>
     </div>
 
     <!-- ==================== 传感器类型管理 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">传感器类型管理</span>
+        <span class="section-title">{{ ls.t('sensors.typeManagement') }}</span>
         <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openSensorTypeDialog(null)">
-          新增类型
+          {{ ls.t('sensors.addType') }}
         </el-button>
       </div>
       <div class="iot-card__body">
         <el-table :data="sensorTypes" v-loading="sensorTypesLoading" stripe>
-          <el-table-column prop="SensorType_id" label="类型ID" width="160" />
-          <el-table-column prop="name" label="名称" width="180" />
-          <el-table-column label="数据字段" min-width="200">
+          <el-table-column prop="SensorType_id" :label="ls.t('common.typeId')" width="160" />
+          <el-table-column prop="name" :label="ls.t('common.name')" width="180" />
+          <el-table-column :label="ls.t('sensors.dataFields')" min-width="200">
             <template #default="{ row }">
               <el-tag
                 v-for="field in (row.data_fields || [])"
@@ -32,29 +32,29 @@
               <span v-if="!row.data_fields || row.data_fields.length === 0" class="iot-text-secondary">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="命令数" width="80" align="center">
+          <el-table-column :label="ls.t('common.cmdCount')" width="80" align="center">
             <template #default="{ row }">
               {{ row.commands ? Object.keys(row.commands).length : 0 }}
             </template>
           </el-table-column>
-          <el-table-column label="关联传感器" width="100" align="center">
+          <el-table-column :label="ls.t('sensors.relatedSensors')" width="100" align="center">
             <template #default="{ row }">
               <el-tag size="small" type="info">{{ row.sensor_count || 0 }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column v-if="isStaff" label="操作" width="160" align="center" fixed="right">
+          <el-table-column v-if="isStaff" :label="ls.t('common.operations')" width="160" align="center" fixed="right">
             <template #default="{ row }">
               <el-button text type="primary" size="small" @click="openSensorTypeDialog(row)">
-                编辑
+                {{ ls.t('common.edit') }}
               </el-button>
               <el-popconfirm
-                title="确定删除此传感器类型？"
-                confirm-button-text="删除"
-                cancel-button-text="取消"
+                :title="ls.t('sensors.deleteTypeConfirm')"
+                :confirm-button-text="ls.t('common.delete')"
+                :cancel-button-text="ls.t('common.cancel')"
                 @confirm="handleDeleteSensorType(row.id)"
               >
                 <template #reference>
-                  <el-button text type="danger" size="small">删除</el-button>
+                  <el-button text type="danger" size="small">{{ ls.t('common.delete') }}</el-button>
                 </template>
               </el-popconfirm>
             </template>
@@ -66,8 +66,8 @@
     <!-- 筛选栏 -->
     <div class="iot-card iot-mb-lg">
       <div class="filter-bar">
-        <el-select v-model="filterType" placeholder="传感器类型" style="width: 200px" clearable @change="fetchSensors">
-          <el-option label="全部类型" value="" />
+        <el-select v-model="filterType" :placeholder="ls.t('sensors.filterType')" style="width: 200px" clearable @change="fetchSensors">
+          <el-option :label="ls.t('common.allTypes')" value="" />
           <el-option
             v-for="t in sensorTypes"
             :key="t.id"
@@ -75,14 +75,14 @@
             :value="t.id"
           />
         </el-select>
-        <el-select v-model="filterOnline" placeholder="在线状态" style="width: 140px" clearable @change="fetchSensors">
-          <el-option label="全部" value="" />
-          <el-option label="在线" value="true" />
-          <el-option label="离线" value="false" />
+        <el-select v-model="filterOnline" :placeholder="ls.t('sensors.filterStatus')" style="width: 140px" clearable @change="fetchSensors">
+          <el-option :label="ls.t('common.all')" value="" />
+          <el-option :label="ls.t('common.online')" value="true" />
+          <el-option :label="ls.t('common.offline')" value="false" />
         </el-select>
         <el-input
           v-model="searchText"
-          placeholder="搜索传感器名称或ID"
+          :placeholder="ls.t('sensors.searchPlaceholder')"
           style="width: 260px"
           clearable
           @clear="fetchSensors"
@@ -93,7 +93,7 @@
           </template>
         </el-input>
         <el-button :icon="Refresh" circle @click="fetchSensors" />
-        <el-button v-if="isStaff && sensors.length" type="primary" :icon="Plus" @click="openAddDialog">添加传感器</el-button>
+        <el-button v-if="isStaff && sensors.length" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('sensors.addSensor') }}</el-button>
       </div>
     </div>
 
@@ -109,8 +109,8 @@
         />
       </div>
       <div v-else class="iot-card empty-card">
-        <el-empty :description="loading ? '加载中...' : '暂无传感器'">
-          <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">添加传感器</el-button>
+        <el-empty :description="loading ? ls.t('common.loading') : ls.t('sensors.noSensors')">
+          <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('sensors.addSensor') }}</el-button>
         </el-empty>
       </div>
     </div>
@@ -118,56 +118,56 @@
     <!-- 传感器类型编辑弹窗 -->
     <el-dialog
       v-model="sensorTypeDialogVisible"
-      :title="sensorTypeForm.id ? '编辑传感器类型' : '新增传感器类型'"
+      :title="sensorTypeForm.id ? ls.t('sensors.editTypeTitle') : ls.t('sensors.addTypeTitle')"
       width="600px"
       destroy-on-close
     >
       <el-form :model="sensorTypeForm" label-width="100px" :rules="sensorTypeRules" ref="sensorTypeFormRef">
-        <el-form-item label="类型 ID" prop="SensorType_id">
-          <el-input v-model="sensorTypeForm.SensorType_id" placeholder="如: DHT11-01" />
+        <el-form-item :label="ls.t('sensors.typeIdLabel')" prop="SensorType_id">
+          <el-input v-model="sensorTypeForm.SensorType_id" :placeholder="ls.t('sensors.typeIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="sensorTypeForm.name" placeholder="如: DHT11 温湿度传感器" />
+        <el-form-item :label="ls.t('common.name')" prop="name">
+          <el-input v-model="sensorTypeForm.name" :placeholder="ls.t('sensors.namePlaceholder')" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="sensorTypeForm.description" type="textarea" :rows="2" placeholder="类型描述（选填）" />
+          <el-input v-model="sensorTypeForm.description" type="textarea" :rows="2" :placeholder="ls.t('sensors.descPlaceholder')" />
         </el-form-item>
-        <el-form-item label="数据字段">
+        <el-form-item :label="ls.t('sensors.dataFields')">
           <el-select
             v-model="sensorTypeForm.data_fields"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入字段名后回车添加，如 temperature"
+            :placeholder="ls.t('sensors.dataFieldsPlaceholder')"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="配置参数">
+        <el-form-item :label="ls.t('sensors.configParamsLabel')">
           <el-select
             v-model="sensorTypeForm.config_parameters"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入参数名后回车添加，如 samplingInterval"
+            :placeholder="ls.t('sensors.configParamsPlaceholder')"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="命令列表">
+        <el-form-item :label="ls.t('sensors.commandsLabel')">
           <div class="commands-editor">
             <el-input
               v-model="sensorTypeForm.commands_json"
               type="textarea"
               :rows="6"
-              placeholder='JSON 格式，如: {"turn_on": {"mqtt_message": {"command": "enable"}, "description": "启动", "params": []}}'
+              :placeholder="ls.t('sensors.commandsPlaceholder')"
             />
             <div v-if="sensorTypeCmdError" class="cmd-error">{{ sensorTypeCmdError }}</div>
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="sensorTypeDialogVisible = false">取消</el-button>
+        <el-button @click="sensorTypeDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="sensorTypeSaving" @click="handleSaveSensorType">
           保存
         </el-button>
@@ -175,13 +175,13 @@
     </el-dialog>
 
     <!-- 添加传感器弹窗 -->
-    <el-dialog v-model="addDialogVisible" title="添加传感器" width="500px" destroy-on-close>
+    <el-dialog v-model="addDialogVisible" :title="ls.t('sensors.addDialogTitle')" width="500px" destroy-on-close>
       <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
-        <el-form-item label="传感器 ID" prop="sensor_id">
-          <el-input v-model="addForm.sensor_id" placeholder="如: DHT11-WEMOS-001" />
+        <el-form-item :label="ls.t('sensors.sensorIdLabel')" prop="sensor_id">
+          <el-input v-model="addForm.sensor_id" :placeholder="ls.t('sensors.sensorIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="addForm.name" placeholder="如: 温湿度传感器-001" />
+        <el-form-item :label="ls.t('common.name')" prop="name">
+          <el-input v-model="addForm.name" :placeholder="ls.t('sensors.sensorNamePlaceholder')" />
         </el-form-item>
         <el-form-item label="传感器类型" prop="sensor_type">
           <el-select v-model="addForm.sensor_type" placeholder="选择类型" style="width: 100%">
@@ -194,14 +194,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="位置">
-          <el-input v-model="addForm.location" placeholder="如: 实验室A（选填）" />
+          <el-input v-model="addForm.location" :placeholder="ls.t('sensors.locationPlaceholder')" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="addForm.description" type="textarea" :rows="2" placeholder="选填" />
+          <el-input v-model="addForm.description" type="textarea" :rows="2" :placeholder="ls.t('common.optional')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button @click="addDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="addSaving" @click="handleAddSensor">保存</el-button>
       </template>
     </el-dialog>
@@ -212,6 +212,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { getSensors, createSensor, deleteSensor, getSensorTypes, createSensorType, updateSensorType, deleteSensorType } from '@/api/sensors'
@@ -219,6 +220,7 @@ import SensorCard from '@/components/sensors/SensorCard.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const ls = useLocaleStore()
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 
 // ==================== 筛选 ====================
@@ -242,7 +244,7 @@ async function fetchSensors() {
     const data = await getSensors(params)
     sensors.value = data.results || data
   } catch {
-    ElMessage.error('获取传感器列表失败')
+    ElMessage.error(ls.t('sensors.fetchListFailed'))
   } finally {
     loading.value = false
   }
@@ -254,7 +256,7 @@ async function fetchSensorTypeList() {
     const data = await getSensorTypes()
     sensorTypes.value = data.results || data
   } catch {
-    ElMessage.error('获取传感器类型列表失败')
+    ElMessage.error(ls.t('sensors.fetchTypesFailed'))
   } finally {
     sensorTypesLoading.value = false
   }
@@ -266,10 +268,10 @@ const sensorTypeSaving = ref(false)
 const sensorTypeFormRef = ref(null)
 const sensorTypeCmdError = ref('')
 
-const sensorTypeRules = {
-  SensorType_id: [{ required: true, message: '请输入类型 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-}
+const sensorTypeRules = computed(() => ({
+  SensorType_id: [{ required: true, message: ls.t('sensors.typeIdRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: ls.t('sensors.nameRequired'), trigger: 'blur' }],
+}))
 
 const emptySensorTypeForm = () => ({
   id: null,
@@ -313,7 +315,7 @@ async function handleSaveSensorType() {
     commands = JSON.parse(sensorTypeForm.value.commands_json)
     sensorTypeCmdError.value = ''
   } catch {
-    sensorTypeCmdError.value = 'JSON 格式不正确，请检查'
+    sensorTypeCmdError.value = ls.t('common.jsonError')
     return
   }
 
@@ -330,16 +332,16 @@ async function handleSaveSensorType() {
   try {
     if (sensorTypeForm.value.id) {
       await updateSensorType(sensorTypeForm.value.id, payload)
-      ElMessage.success('传感器类型更新成功')
+      ElMessage.success(ls.t('sensors.typeUpdated'))
     } else {
       await createSensorType(payload)
-      ElMessage.success('传感器类型创建成功')
+      ElMessage.success(ls.t('sensors.typeCreated'))
     }
     sensorTypeDialogVisible.value = false
     fetchSensorTypeList()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '保存失败'
+    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('common.saveFailed')
     ElMessage.error(msg)
   } finally {
     sensorTypeSaving.value = false
@@ -349,10 +351,10 @@ async function handleSaveSensorType() {
 async function handleDeleteSensorType(id) {
   try {
     await deleteSensorType(id)
-    ElMessage.success('删除成功')
+    ElMessage.success(ls.t('common.deleteSuccess'))
     fetchSensorTypeList()
   } catch {
-    ElMessage.error('删除失败，可能有关联的传感器')
+    ElMessage.error(ls.t('sensors.deleteTypeFailed'))
   }
 }
 
@@ -365,19 +367,19 @@ function goDetail(sensor) {
 async function handleDeleteSensor(sensor) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除传感器「${sensor.name}」吗？相关数据也将被清除，此操作不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+      ls.t('sensors.deleteConfirmMsg').replace('{name}', sensor.name),
+      ls.t('common.deleteConfirmTitle'),
+      { confirmButtonText: ls.t('common.deleteConfirmOk'), cancelButtonText: ls.t('common.cancel'), type: 'warning' }
     )
   } catch {
     return
   }
   try {
     await deleteSensor(sensor.sensor_id)
-    ElMessage.success('传感器已删除')
+    ElMessage.success(ls.t('sensors.sensorDeleted'))
     fetchSensors()
   } catch {
-    ElMessage.error('删除失败，请重试')
+    ElMessage.error(ls.t('common.deleteFailed'))
   }
 }
 
@@ -393,11 +395,11 @@ const addForm = ref({
   description: '',
 })
 
-const addRules = {
-  sensor_id: [{ required: true, message: '请输入传感器 ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  sensor_type: [{ required: true, message: '请选择传感器类型', trigger: 'change' }],
-}
+const addRules = computed(() => ({
+  sensor_id: [{ required: true, message: ls.t('sensors.sensorIdRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: ls.t('sensors.sensorNameRequired'), trigger: 'blur' }],
+  sensor_type: [{ required: true, message: ls.t('sensors.sensorTypeRequired'), trigger: 'change' }],
+}))
 
 function openAddDialog() {
   addForm.value = { sensor_id: '', name: '', sensor_type: null, location: '', description: '' }
@@ -413,12 +415,12 @@ async function handleAddSensor() {
   addSaving.value = true
   try {
     await createSensor(addForm.value)
-    ElMessage.success('传感器添加成功')
+    ElMessage.success(ls.t('sensors.sensorAdded'))
     addDialogVisible.value = false
     fetchSensors()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '添加失败'
+    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('common.addFailed')
     ElMessage.error(msg)
   } finally {
     addSaving.value = false

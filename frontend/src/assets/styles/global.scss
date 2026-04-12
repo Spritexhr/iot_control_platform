@@ -318,13 +318,24 @@ a {
   letter-spacing: 0.01em !important;
 }
 
-.el-button--primary {
+/* 只覆盖实体主色按钮，不影响 text / link 类型 */
+.el-button--primary:not(.is-text):not(.is-link) {
   background-color: var(--iot-color-primary) !important;
   border-color: var(--iot-color-primary) !important;
 
   &:hover {
     background-color: var(--iot-color-primary-light) !important;
     border-color: var(--iot-color-primary-light) !important;
+  }
+}
+
+/* text 类型主色按钮 */
+.el-button--primary.is-text {
+  color: var(--iot-color-primary) !important;
+  background: transparent !important;
+
+  &:hover {
+    background-color: var(--iot-color-primary-bg) !important;
   }
 }
 

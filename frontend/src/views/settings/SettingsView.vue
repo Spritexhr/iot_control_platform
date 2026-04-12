@@ -2,26 +2,26 @@
   <div class="settings-view">
     <div class="iot-page-header">
       <div>
-        <h1 class="iot-page-title">系统设置</h1>
-        <p class="iot-page-subtitle">平台配置与状态监控</p>
+        <h1 class="iot-page-title">{{ ls.t('settings.title') }}</h1>
+        <p class="iot-page-subtitle">{{ ls.t('settings.subtitle') }}</p>
       </div>
     </div>
 
     <!-- ==================== MQTT 连接状态 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">MQTT 连接状态</span>
+        <span class="section-title">{{ ls.t('settings.mqttStatus') }}</span>
         <el-button text :icon="Refresh" :loading="mqttLoading" @click="fetchMqttStatus">
-          刷新
+          {{ ls.t('common.refresh') }}
         </el-button>
       </div>
       <div class="iot-card__body">
         <div class="setting-item">
-          <span class="setting-label">Broker 地址</span>
+          <span class="setting-label">{{ ls.t('settings.brokerAddr') }}</span>
           <span class="setting-value">{{ mqttInfo.broker || '--' }}:{{ mqttInfo.port || '--' }}</span>
         </div>
         <div class="setting-item">
-          <span class="setting-label">连接状态</span>
+          <span class="setting-label">{{ ls.t('settings.connStatus') }}</span>
           <span
             class="iot-status-tag"
             :class="mqttInfo.is_connected ? 'iot-status-tag--online' : 'iot-status-tag--offline'"
@@ -30,7 +30,7 @@
               class="iot-status-dot"
               :class="mqttInfo.is_connected ? 'iot-status-dot--online' : 'iot-status-dot--offline'"
             ></span>
-            {{ mqttInfo.is_connected ? '已连接' : '未连接' }}
+            {{ mqttInfo.is_connected ? ls.t('settings.connected') : ls.t('settings.disconnected') }}
           </span>
         </div>
       </div>
@@ -39,13 +39,13 @@
     <!-- ==================== 可用命令 ==================== -->
     <div v-if="isSuperuser" class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">可用命令</span>
+        <span class="section-title">{{ ls.t('settings.commands') }}</span>
       </div>
       <div class="iot-card__body">
         <div class="command-item">
           <div class="command-item__info">
-            <span class="command-item__name">清理过期数据</span>
-            <span class="command-item__desc">按配置的留存天数清理传感器/设备历史数据</span>
+            <span class="command-item__name">{{ ls.t('settings.cleanupData') }}</span>
+            <span class="command-item__desc">{{ ls.t('settings.cleanupDesc') }}</span>
           </div>
           <el-button
             type="primary"
@@ -53,7 +53,7 @@
             :loading="cleanupLoading"
             @click="handleCleanupOldData"
           >
-            执行
+            {{ ls.t('settings.execute') }}
           </el-button>
         </div>
       </div>
@@ -62,7 +62,7 @@
     <!-- ==================== 平台配置 ==================== -->
     <div class="iot-card iot-mb-lg">
       <div class="iot-card__header">
-        <span class="section-title">平台配置</span>
+        <span class="section-title">{{ ls.t('settings.platformConfig') }}</span>
         <div class="header-actions">
           <el-button
             v-if="isSuperuser"
@@ -71,7 +71,7 @@
             :loading="reloadLoading"
             @click="handleReloadConfig"
           >
-            使配置生效
+            {{ ls.t('settings.applyConfig') }}
           </el-button>
           <el-button
             v-if="isSuperuser"
@@ -80,34 +80,34 @@
             size="small"
             @click="openConfigDialog(null)"
           >
-            新增配置
+            {{ ls.t('settings.addConfig') }}
           </el-button>
         </div>
       </div>
       <div class="iot-card__body">
         <el-table :data="platformConfigs" v-loading="configsLoading" stripe>
-          <el-table-column prop="key" label="配置键" width="200" />
-          <el-table-column prop="category" label="分类" width="100" />
-          <el-table-column label="配置值" min-width="200">
+          <el-table-column prop="key" :label="ls.t('settings.configKey')" width="200" />
+          <el-table-column prop="category" :label="ls.t('settings.category')" width="100" />
+          <el-table-column :label="ls.t('settings.configValue')" min-width="200">
             <template #default="{ row }">
               <span class="config-value">{{ formatValue(row.value) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="description" label="说明" min-width="120" show-overflow-tooltip />
-          <el-table-column v-if="isSuperuser" label="操作" width="140" align="center" fixed="right">
+          <el-table-column prop="description" :label="ls.t('settings.configDesc')" min-width="120" show-overflow-tooltip />
+          <el-table-column v-if="isSuperuser" :label="ls.t('common.edit')" width="140" align="center" fixed="right">
             <template #default="{ row }">
               <div class="config-actions">
                 <el-button plain type="primary" size="small" @click="openConfigDialog(row)">
-                  编辑
+                  {{ ls.t('common.edit') }}
                 </el-button>
                 <el-popconfirm
-                  title="确定删除此配置？"
-                  confirm-button-text="删除"
-                  cancel-button-text="取消"
+                  :title="ls.t('settings.deleteConfigConfirm')"
+                  :confirm-button-text="ls.t('common.delete')"
+                  :cancel-button-text="ls.t('common.cancel')"
                   @confirm="handleDeleteConfig(row.key)"
                 >
                   <template #reference>
-                    <el-button plain type="danger" size="small">删除</el-button>
+                    <el-button plain type="danger" size="small">{{ ls.t('common.delete') }}</el-button>
                   </template>
                 </el-popconfirm>
               </div>
@@ -115,7 +115,7 @@
           </el-table-column>
         </el-table>
         <div v-if="!configsLoading && platformConfigs.length === 0" class="empty-hint">
-          <el-empty description="暂无配置，可运行 seed_platform_config 命令从 .env 初始化" />
+          <el-empty :description="ls.t('settings.noConfig')" />
         </div>
       </div>
     </div>
@@ -123,41 +123,41 @@
     <!-- 配置编辑弹窗 -->
     <el-dialog
       v-model="configDialogVisible"
-      :title="configForm.id ? '编辑配置' : '新增配置'"
+      :title="configForm.id ? ls.t('settings.editConfigTitle') : ls.t('settings.addConfigTitle')"
       width="600px"
       destroy-on-close
     >
       <el-form :model="configForm" label-width="100px" :rules="configRules" ref="configFormRef">
-        <el-form-item label="配置键" prop="key">
+        <el-form-item :label="ls.t('settings.configKey')" prop="key">
           <el-input
             v-model="configForm.key"
-            placeholder="如 mqtt_broker、sensor_data_retention_days"
+            :placeholder="ls.t('settings.configKeyPlaceholder')"
             :disabled="!!configForm.id"
           />
         </el-form-item>
-        <el-form-item label="分类" prop="category">
-          <el-select v-model="configForm.category" placeholder="选择或输入分类" filterable allow-create style="width: 100%">
+        <el-form-item :label="ls.t('settings.category')" prop="category">
+          <el-select v-model="configForm.category" :placeholder="ls.t('settings.selectCategory')" filterable allow-create style="width: 100%">
             <el-option label="mqtt" value="mqtt" />
             <el-option label="devices" value="devices" />
             <el-option label="data_retention" value="data_retention" />
             <el-option label="general" value="general" />
           </el-select>
         </el-form-item>
-        <el-form-item label="配置值" prop="value">
+        <el-form-item :label="ls.t('settings.configValue')" prop="value">
           <el-input
             v-model="configForm.valueJson"
             type="textarea"
             :rows="4"
-            placeholder='JSON 格式，如 "127.0.0.1"、1883、["id1","id2"]、{"a":1}'
+            :placeholder="ls.t('settings.configValuePlaceholder')"
           />
         </el-form-item>
-        <el-form-item label="说明">
-          <el-input v-model="configForm.description" placeholder="选填" />
+        <el-form-item :label="ls.t('settings.configDesc')">
+          <el-input v-model="configForm.description" :placeholder="ls.t('common.optional')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="configDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="configSaving" @click="handleSaveConfig">保存</el-button>
+        <el-button @click="configDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="configSaving" @click="handleSaveConfig">{{ ls.t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -177,6 +177,9 @@ import {
   runCleanupOldData,
 } from '@/api/platformConfig'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
+
+const ls = useLocaleStore()
 
 // ==================== 权限 ====================
 const userStore = useUserStore()
@@ -207,9 +210,9 @@ const configFormRef = ref(null)
 const reloadLoading = ref(false)
 const cleanupLoading = ref(false)
 
-const configRules = {
-  key: [{ required: true, message: '请输入配置键', trigger: 'blur' }],
-}
+const configRules = computed(() => ({
+  key: [{ required: true, message: ls.t('settings.configKeyRequired'), trigger: 'blur' }],
+}))
 
 const configForm = ref({
   id: null,
@@ -232,7 +235,7 @@ async function fetchPlatformConfigs() {
     const data = await getPlatformConfigs()
     platformConfigs.value = data.results || data
   } catch {
-    ElMessage.error('获取平台配置失败')
+    ElMessage.error(ls.t('settings.fetchFailed'))
   } finally {
     configsLoading.value = false
   }
@@ -276,7 +279,7 @@ async function handleSaveConfig() {
     try {
       value = JSON.parse(raw)
     } catch {
-      ElMessage.error('配置值必须是合法 JSON 格式')
+      ElMessage.error(ls.t('settings.jsonError'))
       return
     }
   }
@@ -292,16 +295,16 @@ async function handleSaveConfig() {
   try {
     if (configForm.value.id) {
       await updatePlatformConfig(configForm.value.key, payload)
-      ElMessage.success('配置更新成功')
+      ElMessage.success(ls.t('settings.configUpdated'))
     } else {
       await createPlatformConfig(payload)
-      ElMessage.success('配置创建成功')
+      ElMessage.success(ls.t('settings.configCreated'))
     }
     configDialogVisible.value = false
     fetchPlatformConfigs()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? (detail.detail || Object.values(detail).flat().join('；')) : '保存失败'
+    const msg = typeof detail === 'object' ? (detail.detail || Object.values(detail).flat().join('；')) : ls.t('settings.saveFailed')
     ElMessage.error(msg)
   } finally {
     configSaving.value = false
@@ -311,10 +314,10 @@ async function handleSaveConfig() {
 async function handleDeleteConfig(key) {
   try {
     await deletePlatformConfig(key)
-    ElMessage.success('删除成功')
+    ElMessage.success(ls.t('settings.deleteSuccess'))
     fetchPlatformConfigs()
   } catch {
-    ElMessage.error('删除失败')
+    ElMessage.error(ls.t('settings.deleteFailed'))
   }
 }
 
@@ -323,10 +326,10 @@ async function handleCleanupOldData() {
   try {
     const res = await runCleanupOldData()
     const output = res?.output || ''
-    ElMessage.success(output || '过期数据清理完成')
+    ElMessage.success(output || ls.t('settings.cleanupSuccess'))
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? (detail.detail || '清理失败') : '清理失败'
+    const msg = typeof detail === 'object' ? (detail.detail || ls.t('settings.cleanupFailed')) : ls.t('settings.cleanupFailed')
     ElMessage.error(msg)
   } finally {
     cleanupLoading.value = false
@@ -340,17 +343,17 @@ async function handleReloadConfig() {
     const results = res?.results || {}
     const mqtt = results.mqtt
     if (mqtt === 'reconnected') {
-      ElMessage.success('配置已生效，MQTT 已重连')
+      ElMessage.success(ls.t('settings.mqttReconnected'))
     } else if (mqtt === 'not_running') {
-      ElMessage.success('配置已保存，MQTT 未运行')
+      ElMessage.success(ls.t('settings.mqttNotRunning'))
     } else if (mqtt === 'reconnect_failed') {
-      ElMessage.warning('MQTT 重连失败，请检查配置')
+      ElMessage.warning(ls.t('settings.mqttReconnectFailed'))
     } else {
-      ElMessage.success('配置已生效')
+      ElMessage.success(ls.t('settings.configApplied'))
     }
     fetchMqttStatus()
   } catch {
-    ElMessage.error('使配置生效失败')
+    ElMessage.error(ls.t('settings.applyFailed'))
   } finally {
     reloadLoading.value = false
   }

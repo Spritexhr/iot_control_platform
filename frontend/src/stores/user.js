@@ -36,9 +36,15 @@ export const useUserStore = defineStore('user', () => {
     try {
       const data = await getUserProfile()
       userInfo.value = data
-    } catch {
-      // Token 无效则清除登录状态
-      logout()
+    } catch (err) {
+      // 仅在明确是 401 身份验证失败时才清除登录状态
+      // 这里的 401 已由 axios 拦截器处理跳转，但为了严谨这里手动处理下
+      if (err.response?.status === 401) {
+        logout()
+      }
+      // 其他错误（如 429 频率限制、500 服务端错误）暂时保留 Token
+      console.error('[UserStore] 获取用户信息失败:', err)
+      throw err
     }
   }
 

@@ -27,27 +27,27 @@
     >
       <el-menu-item index="/">
         <el-icon><Odometer /></el-icon>
-        <template #title>仪表盘</template>
+        <template #title>{{ ls.t('nav.dashboard') }}</template>
       </el-menu-item>
 
       <el-menu-item index="/sensors">
         <el-icon><Cpu /></el-icon>
-        <template #title>传感器管理</template>
+        <template #title>{{ ls.t('nav.sensors') }}</template>
       </el-menu-item>
 
       <el-menu-item index="/devices">
         <el-icon><Monitor /></el-icon>
-        <template #title>设备管理</template>
+        <template #title>{{ ls.t('nav.devices') }}</template>
       </el-menu-item>
 
       <el-menu-item index="/automation">
         <el-icon><SetUp /></el-icon>
-        <template #title>自动化规则</template>
+        <template #title>{{ ls.t('nav.automation') }}</template>
       </el-menu-item>
 
       <el-menu-item index="/settings">
         <el-icon><Setting /></el-icon>
-        <template #title>系统设置</template>
+        <template #title>{{ ls.t('nav.settings') }}</template>
       </el-menu-item>
     </el-menu>
 
@@ -59,7 +59,7 @@
           <Expand v-else />
         </el-icon>
         <transition name="fade">
-          <span v-show="!collapsed" class="collapse-text">收起菜单</span>
+          <span v-show="!collapsed" class="collapse-text">{{ ls.t('nav.collapse') }}</span>
         </transition>
       </div>
     </div>
@@ -69,6 +69,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useLocaleStore } from '@/stores/locale'
 import {
   Odometer,
   Cpu,
@@ -78,6 +79,8 @@ import {
   Fold,
   Expand,
 } from '@element-plus/icons-vue'
+
+const ls = useLocaleStore()
 
 defineProps({
   collapsed: {
@@ -133,9 +136,9 @@ const activeMenu = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #D97757;
+  color: var(--iot-color-primary);
   flex-shrink: 0;
-  background: rgba(217, 119, 87, 0.15);
+  background: var(--iot-color-primary-bg);
   border-radius: var(--iot-radius-base);
 }
 
@@ -175,17 +178,17 @@ const activeMenu = computed(() => {
 
 .app-sidebar__menu :deep(.el-menu-item:hover) {
   background: var(--iot-sidebar-item-hover);
-  color: #C8BCB0;
+  color: var(--iot-sidebar-text-active);
 }
 
 .app-sidebar__menu :deep(.el-menu-item.is-active) {
   background: var(--iot-sidebar-item-active);
-  color: #F5F0EB;
+  color: var(--iot-sidebar-text-active);
   font-weight: 500;
 }
 
 .app-sidebar__menu :deep(.el-menu-item.is-active .el-icon) {
-  color: #D97757;
+  color: var(--iot-color-primary);
 }
 
 .app-sidebar__menu :deep(.el-menu-item .el-icon) {
@@ -224,7 +227,7 @@ const activeMenu = computed(() => {
 
 .collapse-btn:hover {
   background: var(--iot-sidebar-item-hover);
-  color: #C8BCB0;
+  color: var(--iot-sidebar-text-active);
 }
 
 .collapse-text {

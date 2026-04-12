@@ -2,10 +2,12 @@
   <div class="dashboard-view" v-loading="loading">
     <div class="iot-page-header">
       <div>
-        <h1 class="iot-page-title">仪表盘</h1>
-        <p class="iot-page-subtitle">平台运行状态一览</p>
+        <h1 class="iot-page-title">{{ ls.t('dashboard.title') }}</h1>
+        <p class="iot-page-subtitle">{{ ls.t('dashboard.subtitle') }}</p>
       </div>
-      <el-button :icon="Refresh" @click="fetchStats" :loading="loading">刷新</el-button>
+      <el-button :icon="Refresh" @click="fetchStats" :loading="loading">
+        {{ ls.t('dashboard.refresh') }}
+      </el-button>
     </div>
 
     <!-- ========== 统计卡片 ========== -->
@@ -16,52 +18,55 @@
             <el-icon :size="24"><Cpu /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="iot-data-label">传感器</div>
+            <div class="iot-data-label">{{ ls.t('dashboard.sensors') }}</div>
             <div class="iot-data-value">{{ stats.sensor_total }}</div>
             <div class="stat-card__sub">
-              <span class="stat-online">{{ stats.sensor_online }} 在线</span>
+              <span class="stat-online">{{ stats.sensor_online }} {{ ls.t('dashboard.online') }}</span>
             </div>
           </div>
         </div>
       </div>
+
       <div class="stat-card iot-card" @click="router.push('/devices')">
         <div class="stat-card__body">
           <div class="stat-card__icon stat-card__icon--success">
             <el-icon :size="24"><Monitor /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="iot-data-label">设备</div>
+            <div class="iot-data-label">{{ ls.t('dashboard.devices') }}</div>
             <div class="iot-data-value">{{ stats.device_total }}</div>
             <div class="stat-card__sub">
-              <span class="stat-online">{{ stats.device_online }} 在线</span>
+              <span class="stat-online">{{ stats.device_online }} {{ ls.t('dashboard.online') }}</span>
             </div>
           </div>
         </div>
       </div>
+
       <div class="stat-card iot-card" @click="router.push('/automation')">
         <div class="stat-card__body">
           <div class="stat-card__icon stat-card__icon--warning">
             <el-icon :size="24"><SetUp /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="iot-data-label">自动化规则</div>
+            <div class="iot-data-label">{{ ls.t('dashboard.automation') }}</div>
             <div class="iot-data-value">{{ stats.rule_total }}</div>
             <div class="stat-card__sub">
-              <span class="stat-online">共 {{ stats.rule_total }} 条</span>
+              <span class="stat-online">{{ ls.t('dashboard.totalRules') }} {{ stats.rule_total }} {{ ls.t('dashboard.rulesUnit') }}</span>
             </div>
           </div>
         </div>
       </div>
+
       <div class="stat-card iot-card">
         <div class="stat-card__body">
           <div class="stat-card__icon stat-card__icon--info">
             <el-icon :size="24"><DataLine /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="iot-data-label">24h 数据量</div>
+            <div class="iot-data-label">{{ ls.t('dashboard.data24h') }}</div>
             <div class="iot-data-value">{{ stats.sensor_data_24h + stats.device_data_24h }}</div>
             <div class="stat-card__sub">
-              传感器 {{ stats.sensor_data_24h }} + 设备 {{ stats.device_data_24h }}
+              {{ ls.t('dashboard.sensors') }} {{ stats.sensor_data_24h }} + {{ ls.t('dashboard.devices') }} {{ stats.device_data_24h }}
             </div>
           </div>
         </div>
@@ -73,12 +78,14 @@
       <!-- 传感器最新数据 -->
       <div class="iot-card">
         <div class="iot-card__header">
-          <span class="section-title">传感器最新数据</span>
-          <el-button text size="small" type="primary" @click="router.push('/sensors')">查看全部 →</el-button>
+          <span class="section-title">{{ ls.t('dashboard.recentSensors') }}</span>
+          <el-button text size="small" type="primary" @click="router.push('/sensors')">
+            {{ ls.t('dashboard.viewAll') }}
+          </el-button>
         </div>
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="stats.recent_sensors" size="small" stripe max-height="380">
-            <el-table-column label="状态" width="60" align="center">
+            <el-table-column :label="ls.t('dashboard.status')" width="60" align="center">
               <template #default="{ row }">
                 <span
                   class="iot-status-dot"
@@ -86,15 +93,13 @@
                 ></span>
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="名称" min-width="130">
+            <el-table-column prop="name" :label="ls.t('dashboard.name')" min-width="130">
               <template #default="{ row }">
-                <span class="clickable-name" @click="router.push(`/sensors/${row.sensor_id}`)">
-                  {{ row.name }}
-                </span>
+                <span class="clickable-name" @click="router.push(`/sensors/${row.sensor_id}`)">{{ row.name }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="type_name" label="类型" width="130" />
-            <el-table-column label="最新数据" min-width="200">
+            <el-table-column prop="type_name" :label="ls.t('dashboard.type')" width="130" />
+            <el-table-column :label="ls.t('dashboard.latestData')" min-width="200">
               <template #default="{ row }">
                 <span v-if="row.latest_data" class="data-inline">
                   <span v-for="(val, key) in row.latest_data" :key="key" class="data-kv">
@@ -105,7 +110,7 @@
                 <span v-else class="iot-text-secondary">--</span>
               </template>
             </el-table-column>
-            <el-table-column label="更新时间" width="160">
+            <el-table-column :label="ls.t('dashboard.updatedAt')" width="160">
               <template #default="{ row }">
                 <span :class="{ 'time-fresh': isFresh(row.latest_time) }">
                   {{ row.latest_time ? timeAgo(row.latest_time) : '--' }}
@@ -119,12 +124,14 @@
       <!-- 设备状态 -->
       <div class="iot-card">
         <div class="iot-card__header">
-          <span class="section-title">设备状态</span>
-          <el-button text size="small" type="primary" @click="router.push('/devices')">查看全部 →</el-button>
+          <span class="section-title">{{ ls.t('dashboard.deviceStatus') }}</span>
+          <el-button text size="small" type="primary" @click="router.push('/devices')">
+            {{ ls.t('dashboard.viewAll') }}
+          </el-button>
         </div>
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="stats.recent_devices" size="small" stripe max-height="380">
-            <el-table-column label="状态" width="60" align="center">
+            <el-table-column :label="ls.t('dashboard.status')" width="60" align="center">
               <template #default="{ row }">
                 <span
                   class="iot-status-dot"
@@ -132,15 +139,13 @@
                 ></span>
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="名称" min-width="130">
+            <el-table-column prop="name" :label="ls.t('dashboard.name')" min-width="130">
               <template #default="{ row }">
-                <span class="clickable-name" @click="router.push(`/devices/${row.device_id}`)">
-                  {{ row.name }}
-                </span>
+                <span class="clickable-name" @click="router.push(`/devices/${row.device_id}`)">{{ row.name }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="type_name" label="类型" width="130" />
-            <el-table-column label="最新状态" min-width="200">
+            <el-table-column prop="type_name" :label="ls.t('dashboard.type')" width="130" />
+            <el-table-column :label="ls.t('dashboard.latestStatus')" min-width="200">
               <template #default="{ row }">
                 <span v-if="row.latest_data" class="data-inline">
                   <span v-for="(val, key) in row.latest_data" :key="key" class="data-kv">
@@ -151,7 +156,7 @@
                 <span v-else class="iot-text-secondary">--</span>
               </template>
             </el-table-column>
-            <el-table-column label="更新时间" width="160">
+            <el-table-column :label="ls.t('dashboard.updatedAt')" width="160">
               <template #default="{ row }">
                 <span :class="{ 'time-fresh': isFresh(row.latest_time) }">
                   {{ row.latest_time ? timeAgo(row.latest_time) : '--' }}
@@ -166,30 +171,32 @@
     <!-- ========== 自动化规则 ========== -->
     <div class="iot-card">
       <div class="iot-card__header">
-        <span class="section-title">自动化规则</span>
-        <el-button text size="small" type="primary" @click="router.push('/automation')">管理规则 →</el-button>
+        <span class="section-title">{{ ls.t('dashboard.automationRules') }}</span>
+        <el-button text size="small" type="primary" @click="router.push('/automation')">
+          {{ ls.t('dashboard.manageRules') }}
+        </el-button>
       </div>
       <div class="iot-card__body" style="padding-top: 0;">
         <el-table v-if="stats.recent_rules && stats.recent_rules.length" :data="stats.recent_rules" size="small" stripe>
-          <el-table-column prop="name" label="规则名称" min-width="200">
+          <el-table-column prop="name" :label="ls.t('dashboard.ruleName')" min-width="200">
             <template #default="{ row }">
-              <span class="clickable-name" @click="router.push(`/automation/${row.id}`)">
-                {{ row.name }}
-              </span>
+              <span class="clickable-name" @click="router.push(`/automation/${row.id}`)">{{ row.name }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="script_id" label="脚本 ID" width="180">
+          <el-table-column prop="script_id" :label="ls.t('dashboard.scriptId')" width="180">
             <template #default="{ row }">
               <code v-if="row.script_id" class="script-id-tag">{{ row.script_id }}</code>
               <span v-else class="iot-text-secondary">--</span>
             </template>
           </el-table-column>
-          <el-table-column label="更新时间" width="170">
+          <el-table-column :label="ls.t('dashboard.updatedAt')" width="170">
             <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
           </el-table-column>
         </el-table>
-        <el-empty v-else description="暂无自动化规则" :image-size="80">
-          <el-button type="primary" size="small" @click="router.push('/automation')">创建规则</el-button>
+        <el-empty v-else :description="ls.t('dashboard.noRules')" :image-size="80">
+          <el-button type="primary" size="small" @click="router.push('/automation')">
+            {{ ls.t('dashboard.createRule') }}
+          </el-button>
         </el-empty>
       </div>
     </div>
@@ -202,8 +209,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Cpu, Monitor, SetUp, DataLine, Refresh } from '@element-plus/icons-vue'
 import { getDashboardStats } from '@/api/system'
+import { useLocaleStore } from '@/stores/locale'
 
 const router = useRouter()
+const ls = useLocaleStore()
 const loading = ref(false)
 
 const stats = reactive({
@@ -225,7 +234,7 @@ async function fetchStats() {
     const data = await getDashboardStats()
     Object.assign(stats, data)
   } catch {
-    ElMessage.error('获取仪表盘数据失败')
+    ElMessage.error(ls.t('dashboard.fetchError'))
   } finally {
     loading.value = false
   }
@@ -233,7 +242,7 @@ async function fetchStats() {
 
 function formatVal(val) {
   if (val === null || val === undefined) return '--'
-  if (typeof val === 'boolean') return val ? '开' : '关'
+  if (typeof val === 'boolean') return val ? ls.t('dashboard.on') : ls.t('dashboard.off')
   if (typeof val === 'number') return Number(val.toFixed(2))
   return String(val)
 }
@@ -243,11 +252,11 @@ function timeAgo(dateStr) {
   const now = new Date()
   const past = new Date(dateStr)
   const diff = Math.floor((now - past) / 1000)
-  if (diff < 5) return '刚刚'
-  if (diff < 60) return `${diff}秒前`
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
-  return `${Math.floor(diff / 86400)}天前`
+  if (diff < 5) return ls.t('dashboard.justNow')
+  if (diff < 60) return `${diff}${ls.t('dashboard.secondsAgo')}`
+  if (diff < 3600) return `${Math.floor(diff / 60)}${ls.t('dashboard.minutesAgo')}`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${ls.t('dashboard.hoursAgo')}`
+  return `${Math.floor(diff / 86400)}${ls.t('dashboard.daysAgo')}`
 }
 
 function isFresh(dateStr) {
@@ -262,9 +271,7 @@ function formatTime(str) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-onMounted(() => {
-  fetchStats()
-})
+onMounted(() => { fetchStats() })
 </script>
 
 <style scoped>
@@ -297,10 +304,23 @@ onMounted(() => {
   color: #fff;
 }
 
-.stat-card__icon--primary { background: linear-gradient(135deg, #1A73E8, #4A90E2); }
-.stat-card__icon--success { background: linear-gradient(135deg, #00BFA5, #33CCBB); }
-.stat-card__icon--warning { background: linear-gradient(135deg, #FF9800, #FFB74D); }
-.stat-card__icon--info    { background: linear-gradient(135deg, #607D8B, #90A4AE); }
+/* 图标颜色使用 CSS 变量，随主题切换 */
+.stat-card__icon--primary {
+  background: linear-gradient(135deg, var(--iot-color-primary), var(--iot-color-primary-light));
+}
+.stat-card__icon--success {
+  background: linear-gradient(135deg, var(--iot-color-success), var(--iot-color-success-light));
+}
+.stat-card__icon--warning {
+  background: linear-gradient(135deg, var(--iot-color-warning), var(--iot-color-warning-light));
+}
+.stat-card__icon--info {
+  background: linear-gradient(135deg, #8B7B6B, #A09080);
+}
+
+html.theme-classic .stat-card__icon--info {
+  background: linear-gradient(135deg, #607D8B, #90A4AE);
+}
 
 .stat-card__sub {
   font-size: var(--iot-font-size-xs);
@@ -369,14 +389,13 @@ onMounted(() => {
   font-size: 11px;
   background: var(--iot-bg-page);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--iot-color-primary);
+  border: 1px solid var(--iot-border-color-light);
 }
 
 @media (max-width: 1024px) {
-  .dashboard-content {
-    grid-template-columns: 1fr;
-  }
+  .dashboard-content { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -386,35 +405,20 @@ onMounted(() => {
     gap: var(--iot-spacing-sm);
   }
 
-  .iot-page-subtitle {
-    display: none;
-  }
+  .iot-page-subtitle { display: none; }
 
-  .stat-card__body {
-    padding: var(--iot-spacing-md);
-  }
+  .stat-card__body { padding: var(--iot-spacing-md); }
 
   .stat-card__icon {
     width: 40px;
     height: 40px;
   }
 
-  .iot-data-value {
-    font-size: var(--iot-font-size-lg);
-  }
+  .iot-data-value { font-size: var(--iot-font-size-lg); }
 }
 
 @media (max-width: 480px) {
-  .stat-card__content {
-    min-width: 0;
-  }
-
-  .stat-card__sub {
-    font-size: 10px;
-  }
-
-  .section-title {
-    font-size: var(--iot-font-size-sm);
-  }
+  .stat-card__sub { font-size: 10px; }
+  .section-title { font-size: var(--iot-font-size-sm); }
 }
 </style>

@@ -2,10 +2,10 @@
   <div class="automation-view">
     <div class="iot-page-header">
       <div>
-        <h1 class="iot-page-title">自动化规则</h1>
-        <p class="iot-page-subtitle">管理设备自动化控制脚本</p>
+        <h1 class="iot-page-title">{{ ls.t('automation.title') }}</h1>
+        <p class="iot-page-subtitle">{{ ls.t('automation.subtitle') }}</p>
       </div>
-      <el-button v-if="isSuperuser" type="primary" :icon="Plus" @click="openCreateDialog">新建规则</el-button>
+      <el-button v-if="isSuperuser" type="primary" :icon="Plus" @click="openCreateDialog">{{ ls.t('automation.newRule') }}</el-button>
     </div>
 
     <!-- 筛选栏 -->
@@ -13,7 +13,7 @@
       <div class="filter-bar">
         <el-input
           v-model="searchText"
-          placeholder="搜索规则名称、脚本ID或描述"
+          :placeholder="ls.t('automation.searchPlaceholder')"
           style="width: 300px"
           clearable
           @clear="fetchRules"
@@ -51,7 +51,7 @@
             </div>
             <div v-if="isStaff || isSuperuser" class="rule-card__actions">
               <template v-if="isStaff && rule.is_launched && rule.process_status === 'running'">
-                <span class="poll-interval-label">后台运行中 (间隔 {{ rule.poll_interval || 30 }}s)</span>
+                <span class="poll-interval-label">{{ ls.t('automation.runningLabel').replace('{s}', rule.poll_interval || 30) }}</span>
                 <el-button
                   type="danger"
                   size="small"
@@ -59,7 +59,7 @@
                   :loading="launchLoading[rule.id]"
                   @click="handleStop(rule)"
                 >
-                  停止轮询
+                  {{ ls.t('automation.stopPoll') }}
                 </el-button>
               </template>
               <template v-else-if="isStaff">
@@ -72,7 +72,7 @@
                   controls-position="right"
                   class="poll-interval-input"
                 />
-                <span class="poll-interval-unit">秒</span>
+                <span class="poll-interval-unit">{{ ls.t('automation.seconds') }}</span>
                 <el-button
                   type="warning"
                   size="small"
@@ -80,7 +80,7 @@
                   :loading="launchLoading[rule.id]"
                   @click="handleLaunch(rule)"
                 >
-                  启动轮询
+                  {{ ls.t('automation.startPoll') }}
                 </el-button>
               </template>
               <el-button
@@ -92,7 +92,7 @@
                 :loading="execLoading[rule.id]"
                 @click="handleExecute(rule)"
               >
-                执行
+                {{ ls.t('automation.execute') }}
               </el-button>
               <el-button
                 v-if="isSuperuser"
@@ -110,7 +110,7 @@
           <!-- 错误信息 -->
           <div v-if="rule.process_status === 'error_stopped' && rule.error_message" class="rule-card__error">
             <el-alert type="error" :closable="false" show-icon>
-              <template #title>报错终止</template>
+              <template #title>{{ ls.t('automation.errorStopped') }}</template>
               <span>{{ rule.error_message }}</span>
             </el-alert>
           </div>
@@ -119,7 +119,7 @@
             <div class="rule-card__meta">
               <span class="meta-item">
                 <el-icon><Connection /></el-icon>
-                {{ rule.device_count }} 个关联设备
+                {{ rule.device_count }} {{ ls.t('automation.relatedDevices') }}
               </span>
               <span class="meta-item">
                 <el-icon><Clock /></el-icon>
@@ -127,14 +127,14 @@
               </span>
             </div>
             <el-button text size="small" type="primary" @click="goDetail(rule)">
-              查看详情 →
+              {{ ls.t('automation.viewDetail') }} →
             </el-button>
           </div>
 
           <!-- 执行结果 -->
           <div v-if="execResult[rule.id]" class="rule-card__result">
             <el-alert
-              :title="execResult[rule.id].success ? '执行成功' : '执行失败'"
+              :title="execResult[rule.id].success ? ls.t('automation.execSuccess') : ls.t('automation.execFailed')"
               :type="execResult[rule.id].success ? 'success' : 'error'"
               :closable="true"
               show-icon
@@ -147,26 +147,26 @@
         </div>
       </div>
       <div v-else class="iot-card empty-card">
-        <el-empty :description="loading ? '加载中...' : '暂无自动化规则'" />
+        <el-empty :description="loading ? '加载中...' : ls.t('automation.noRules')" />
       </div>
     </div>
 
     <!-- 新建规则弹窗 -->
-    <el-dialog v-model="createDialogVisible" title="新建自动化规则" width="600px" destroy-on-close>
+    <el-dialog v-model="createDialogVisible" :title="ls.t('automation.createDialogTitle')" width="600px" destroy-on-close>
       <el-form :model="createForm" label-width="100px" :rules="createRules" ref="createFormRef">
-        <el-form-item label="规则名称" prop="name">
-          <el-input v-model="createForm.name" placeholder="如: 温度超标自动报警" />
+        <el-form-item :label="ls.t('automation.ruleName')" prop="name">
+          <el-input v-model="createForm.name" :placeholder="ls.t('automation.ruleNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="脚本 ID" prop="script_id">
-          <el-input v-model="createForm.script_id" placeholder="唯一标识，如: temp_alert" />
+        <el-form-item :label="ls.t('automation.scriptId')" prop="script_id">
+          <el-input v-model="createForm.script_id" :placeholder="ls.t('automation.scriptIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="createForm.description" type="textarea" :rows="2" placeholder="规则的功能说明（选填）" />
+        <el-form-item :label="ls.t('common.description')">
+          <el-input v-model="createForm.description" type="textarea" :rows="2" :placeholder="ls.t('automation.descPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="createSaving" @click="handleCreate">创建</el-button>
+        <el-button @click="createDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="createSaving" @click="handleCreate">{{ ls.t('automation.create') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -176,6 +176,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, VideoPlay, VideoPause, Delete, Connection, Clock, RefreshRight } from '@element-plus/icons-vue'
 import {
@@ -187,6 +188,7 @@ import {
   stopAutomationRule,
 } from '@/api/automation'
 
+const ls = useLocaleStore()
 const router = useRouter()
 const userStore = useUserStore()
 const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
@@ -207,7 +209,7 @@ async function fetchRules() {
     const data = await getAutomationRules(params)
     rules.value = data.results || data
   } catch {
-    ElMessage.error('获取规则列表失败')
+    ElMessage.error(ls.t('automation.fetchFailed'))
   } finally {
     loading.value = false
   }
@@ -217,12 +219,12 @@ async function fetchRules() {
 
 function getStatusText(rule) {
   const statusMap = {
-    idle: '未启动',
-    running: '正在运行',
-    stopped_by_user: '由用户停止',
-    error_stopped: '报错终止',
+    idle: ls.t('automation.statusIdle'),
+    running: ls.t('automation.statusRunning'),
+    stopped_by_user: ls.t('automation.statusStopped'),
+    error_stopped: ls.t('automation.statusError'),
   }
-  return statusMap[rule.process_status] || '未启动'
+  return statusMap[rule.process_status] || ls.t('automation.statusIdle')
 }
 
 function getStatusTagType(rule) {
@@ -246,9 +248,9 @@ async function handleLaunch(rule) {
     rule.process_status = res.process_status
     rule.poll_interval = res.poll_interval
     rule.error_message = ''
-    ElMessage.success(`规则「${rule.name}」后台轮询已启动`)
+    ElMessage.success(`${rule.name} - ${ls.t('automation.launchSuccess')}`)
   } catch {
-    ElMessage.error('启动轮询失败')
+    ElMessage.error(ls.t('automation.launchFailed'))
   } finally {
     launchLoading.value[rule.id] = false
   }
@@ -261,9 +263,9 @@ async function handleStop(rule) {
     rule.is_launched = res.is_launched
     rule.process_status = res.process_status
     rule.error_message = ''
-    ElMessage.success(`规则「${rule.name}」已停止轮询`)
+    ElMessage.success(`${rule.name} - ${ls.t('automation.stopSuccess')}`)
   } catch {
-    ElMessage.error('停止轮询失败')
+    ElMessage.error(ls.t('automation.stopFailed'))
   } finally {
     launchLoading.value[rule.id] = false
   }
@@ -317,7 +319,7 @@ async function handleExecute(rule) {
   } catch (err) {
     execResult.value[rule.id] = {
       success: false,
-      error: err.response?.data?.error || '执行异常',
+      error: err.response?.data?.error || 'execution error',
       output: err.response?.data?.output || '',
     }
   } finally {
@@ -329,19 +331,19 @@ async function handleExecute(rule) {
 async function handleDelete(rule) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除规则「${rule.name}」吗？此操作不可恢复。`,
-      '确认删除',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      ls.t('automation.deleteConfirmMsg').replace('{name}', rule.name),
+      ls.t('automation.deleteConfirmTitle'),
+      { type: 'warning', confirmButtonText: ls.t('common.deleteConfirmOk'), cancelButtonText: ls.t('common.cancel') }
     )
   } catch {
     return
   }
   try {
     await deleteAutomationRule(rule.id)
-    ElMessage.success('已删除')
+    ElMessage.success(ls.t('automation.deleted'))
     fetchRules()
   } catch {
-    ElMessage.error('删除失败')
+    ElMessage.error(ls.t('automation.deleteFailed'))
   }
 }
 
@@ -360,13 +362,13 @@ const createForm = ref({
   description: '',
 })
 
-const createRules = {
-  name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
+const createRules = computed(() => ({
+  name: [{ required: true, message: ls.t('automation.ruleNameRequired'), trigger: 'blur' }],
   script_id: [
-    { required: true, message: '请输入脚本ID', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]+$/, message: '仅支持字母、数字和下划线', trigger: 'blur' },
+    { required: true, message: ls.t('automation.scriptIdRequired'), trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: ls.t('automation.scriptIdPattern'), trigger: 'blur' },
   ],
-}
+}))
 
 function openCreateDialog() {
   createForm.value = { name: '', script_id: '', description: '' }
@@ -387,11 +389,11 @@ async function handleCreate() {
       device_list: [],
     })
     createDialogVisible.value = false
-    ElMessage.success('规则已创建')
+    ElMessage.success(ls.t('automation.ruleCreated'))
     fetchRules()
   } catch (err) {
     const detail = err.response?.data
-    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : '创建失败'
+    const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('automation.createFailed')
     ElMessage.error(msg)
   } finally {
     createSaving.value = false
