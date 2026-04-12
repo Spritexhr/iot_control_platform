@@ -116,7 +116,7 @@ dev = Device.objects.create(
     location='客厅',
     device_type=dt
 )
-# save 时自动写入 mqtt_topic_data / mqtt_topic_control
+# save 时自动写入 mqtt_topic_data / mqtt_topic_control（字段为 None 时自动生成，空字符串视为主动清空）
 ```
 
 **访问关联**

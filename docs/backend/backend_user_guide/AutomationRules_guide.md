@@ -41,6 +41,8 @@ from engine import sensors, devices  # engine 由引擎注入
 
 **注意**：不要写 `import engine`，必须用 `from engine import sensors, devices`。
 
+**安全沙箱限制**：脚本在受限命名空间中执行，仅允许导入 `engine` 和 `automation.head_files` 下的模块，禁用 `open`、`eval`、`exec`、`compile`、`__import__`、`globals`、`locals`、`breakpoint`、`input` 等危险内置函数。
+
 ### 2.2 sensors.get(device_id)
 
 获取传感器包装对象，**device_id 需在 device_list 中配置为 device_type: "Sensor"**。

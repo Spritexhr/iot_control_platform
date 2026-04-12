@@ -2,6 +2,7 @@
 按 platform_settings 配置的数据留存天数清理过期数据
 从 platform_config 读取 sensor_data_retention_days、device_data_retention_days
 可配合 cron 定时执行，或通过 API 触发
+采用分批删除避免大表锁表或内存溢出
 """
 import logging
 from datetime import timedelta
@@ -13,6 +14,9 @@ from config.platform_config import get_config
 
 logger = logging.getLogger("platform_settings")
 
+# 每批删除的记录数
+BATCH_SIZE = 1000
+
 
 class Command(BaseCommand):
     help = "按 platform_settings 配置清理过期的传感器/设备数据"
@@ -23,9 +27,16 @@ class Command(BaseCommand):
             action="store_true",
             help="仅统计将删除的数量，不实际删除",
         )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=BATCH_SIZE,
+            help=f"每批删除的记录数（默认 {BATCH_SIZE}）",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        batch_size = options["batch_size"]
         if dry_run:
             msg = "【试运行模式】不会实际删除数据"
             logger.info(msg)
@@ -52,15 +63,35 @@ class Command(BaseCommand):
         self.stdout.write(f"设备数据保留 {device_days} 天，将清理 {device_count} 条")
 
         if not dry_run:
+            total_deleted = 0
             if sensor_count > 0:
-                sensor_qs.delete()
-                logger.info(f"  已删除 {sensor_count} 条传感器数据")
-                self.stdout.write(self.style.SUCCESS(f"  已删除 {sensor_count} 条传感器数据"))
+                deleted = self._batch_delete(sensor_qs, "传感器", batch_size)
+                total_deleted += deleted
             if device_count > 0:
-                device_qs.delete()
-                logger.info(f"  已删除 {device_count} 条设备数据")
-                self.stdout.write(self.style.SUCCESS(f"  已删除 {device_count} 条设备数据"))
+                deleted = self._batch_delete(device_qs, "设备", batch_size)
+                total_deleted += deleted
             if sensor_count == 0 and device_count == 0:
                 msg = "  无过期数据需要清理"
                 logger.info(msg)
                 self.stdout.write(msg)
+            else:
+                logger.info(f"清理完成，共删除 {total_deleted} 条记录")
+                self.stdout.write(self.style.SUCCESS(f"清理完成，共删除 {total_deleted} 条记录"))
+
+    def _batch_delete(self, queryset, label: str, batch_size: int) -> int:
+        """分批删除，避免一次性删除大量记录导致锁表或内存溢出"""
+        total_deleted = 0
+        while True:
+            # 每次取一批 ID 删除，避免 queryset 缓存问题
+            ids = list(queryset.values_list('id', flat=True)[:batch_size])
+            if not ids:
+                break
+            deleted_count, _ = queryset.model.objects.filter(id__in=ids).delete()
+            # 从关联删除的统计中提取当前模型的删除数
+            model_label = f"{queryset.model._meta.app_label}.{queryset.model._meta.model_name}"
+            actual_deleted = deleted_count if isinstance(deleted_count, int) else deleted_count.get(model_label, 0)
+            total_deleted += actual_deleted
+            logger.info(f"  {label}数据：本批删除 {actual_deleted} 条，累计 {total_deleted} 条")
+            self.stdout.write(f"  {label}数据：本批删除 {actual_deleted} 条，累计 {total_deleted} 条")
+        self.stdout.write(self.style.SUCCESS(f"  {label}数据删除完成，共 {total_deleted} 条"))
+        return total_deleted

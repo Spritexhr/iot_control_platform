@@ -214,3 +214,82 @@ platform_settings/
 3. **延迟加载**：settings 使用 SimpleLazyObject，避免启动时 DB 未就绪
 4. **seed 幂等**：默认仅创建不存在的 key，`--force` 可覆盖已有配置
 5. **权限隔离**：仅超级用户可增删改平台配置，普通用户只读
+
+---
+
+## 九、settings.py 安全配置
+
+### 9.1 SECRET_KEY 管理策略
+
+| 环境 | 行为 |
+|-----|------|
+| `SECRET_KEY` 环境变量已设置 | 使用环境变量值 |
+| `DEBUG=True` 且未设置 `SECRET_KEY` | 使用开发默认值 `django-insecure-dev-only-key-do-not-use-in-production` |
+| `DEBUG=False` 且未设置 `SECRET_KEY` | 抛出 `ImproperlyConfigured`，阻止启动 |
+
+**原因**：防止生产环境使用不安全的默认 SECRET_KEY。
+
+### 9.2 生产环境安全头
+
+当 `DEBUG=False` 时自动启用：
+
+| 配置 | 默认值 | 说明 |
+|-----|--------|------|
+| `SECURE_BROWSER_XSS_FILTER` | True | 浏览器 XSS 过滤 |
+| `SECURE_CONTENT_TYPE_NOSNIFF` | True | 阻止 MIME 类型嗅探 |
+| `X_FRAME_OPTIONS` | DENY | 防止点击劫持 |
+| `SESSION_COOKIE_SECURE` | 环境变量 | 仅 HTTPS 下传输 Session Cookie |
+| `CSRF_COOKIE_SECURE` | 环境变量 | 仅 HTTPS 下传输 CSRF Cookie |
+
+### 9.3 CORS 扩展
+
+除 `CORS_ALLOWED_ORIGINS` 硬编码列表外，支持通过环境变量 `EXTRA_CORS_ORIGINS` 追加额外源（逗号分隔）：
+
+```bash
+EXTRA_CORS_ORIGINS=https://iot.example.com,https://admin.example.com
+```
+
+### 9.4 API 节流
+
+| 节流类别 | 速率 | 说明 |
+|---------|------|------|
+| `anon` | 30/hour | 匿名请求（未认证） |
+| `user` | 100/hour | 已认证用户 |
+
+---
+
+## 十、cleanup_old_data 分批删除
+
+### 10.1 设计目标
+
+数据清理命令 `cleanup_old_data` 采用分批删除策略，避免一次性删除大量记录导致大表锁表或内存溢出。
+
+### 10.2 命令参数
+
+| 参数 | 默认值 | 说明 |
+|-----|--------|------|
+| `--dry-run` | false | 仅统计数量，不实际删除 |
+| `--batch-size` | 1000 | 每批删除的记录数 |
+
+### 10.3 执行流程
+
+```
+1. 读取 sensor_data_retention_days 和 device_data_retention_days
+2. 计算截止时间
+3. 统计将删除的记录数
+4. 分批删除（每批取 batch_size 个 ID → 批量删除 → 循环直到清空）
+5. 输出统计结果
+```
+
+### 10.4 使用示例
+
+```bash
+# 默认分批大小（1000 条/批）
+python manage.py cleanup_old_data
+
+# 自定义分批大小
+python manage.py cleanup_old_data --batch-size 500
+
+# 试运行
+python manage.py cleanup_old_data --dry-run
+```

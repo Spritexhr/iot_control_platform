@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .api_views import mqtt_status, dashboard_stats
+from .api_views import mqtt_status, dashboard_stats, health_check
 from .auth_views import register, user_profile, change_password
 
 urlpatterns = [
@@ -23,4 +23,5 @@ urlpatterns = [
     path("api/", include("platform_settings.urls")),
     path("api/mqtt/status/", mqtt_status, name="mqtt-status"),
     path("api/dashboard/stats/", dashboard_stats, name="dashboard-stats"),
+    path("health/", health_check, name="health-check"),
 ]

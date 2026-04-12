@@ -149,8 +149,9 @@
 | 文档 | 说明 |
 |------|------|
 | [Django 模型设计](backend/backend_design/djange_models_design.md) | DeviceType、Device、SensorType、Sensor、AutomationRule |
-| [MQTT 服务设计](backend/backend_design/mqtt_service_design.md) | mqtt_service、send_service、handler 架构 |
-| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、脚本执行流程 |
+| [MQTT 服务设计](backend/backend_design/mqtt_service_design.md) | mqtt_service、BaseCommandSendService 基类、handler 架构、自动重连 |
+| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、安全沙箱、脚本执行流程 |
+| [平台配置设计](backend/backend_design/platform_settings_design.md) | PlatformConfig、安全配置、分批清理 |
 | [日志系统设计](backend/backend_design/logsystem_design.md) | 日志配置、按模块分离 |
 
 ### 使用指南
@@ -158,9 +159,18 @@
 | 文档 | 说明 |
 |------|------|
 | [Django 模型使用](backend/backend_user_guide/django_models_guide.md) | Shell 中 CRUD、关联查询 |
-| [MQTT 服务使用](backend/backend_user_guide/mqtt_service_guide.md) | 命令发送、手动初始化 |
+| [MQTT 服务使用](backend/backend_user_guide/mqtt_service_guide.md) | 命令发送、手动初始化、自动重连 |
 | [自动化规则脚本](backend/backend_user_guide/AutomationRules_guide.md) | 编写符合规范的自动化脚本 |
+| [平台配置使用](backend/backend_user_guide/platform_settings_guide.md) | 配置管理、健康检查、数据清理 |
 | [日志系统使用](backend/backend_user_guide/logsystem_guide.md) | 查看日志、级别、排查 |
+
+### 更新日志
+
+| 版本 | 说明 |
+|------|------|
+| [0.4](update_notes/0.4_update_notes.md) | BaseCommandSendService 重构、MQTT 自动重连、安全配置、健康检查 |
+| [0.3](update_notes/0.3_update_notes.md) | 后台调度器、自动化规则轮询执行 |
+| [0.2](update_notes/0.2_update_notes.md) | MQTT 服务架构等 |
 
 ### 部署与硬件
 
@@ -173,4 +183,4 @@
 | [嵌入式编写指南](hardware_code/hardware_guide.md) | 符合后端规范的固件编写 |
 
 ---
-*文档更新日期：2026年2月*
+*文档更新日期：2026年4月*

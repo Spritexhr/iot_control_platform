@@ -120,8 +120,11 @@
    engine.devices = devices
    ```
 
-3. **自定义 __import__**
+3. **自定义 __import__ 与安全沙箱**
    - 脚本中 `from engine import sensors, devices` 时，返回注入的 engine，从而获取 sensors、devices
+   - **白名单 import**：仅允许导入 `engine` 和 `automation.head_files` 下的模块，其余一律拒绝
+   - **禁用危险内置函数**：`open`, `eval`, `exec`, `compile`, `__import__`(原始), `globals`, `locals`, `breakpoint`, `input`
+   - 脚本在受限命名空间中执行，无法进行文件/进程/动态代码操作
 
 4. **执行脚本**
    ```python
@@ -145,7 +148,27 @@
 |-----|------|
 | `from engine import sensors, devices` | 核心依赖，由引擎注入 |
 | `from typing import Optional` | 已注入到 namespace |
+| `from automation.head_files import ...` | 白名单允许的辅助模块 |
 | 其他标准库 | 正常 `import time` 等均可使用 |
+
+### 3.4 安全沙箱
+
+脚本执行在受限命名空间中，具备以下安全策略：
+
+| 策略 | 说明 |
+|-----|------|
+| 白名单 import | 仅允许 `engine` 和 `automation.head_files` 前缀匹配的模块 |
+| 禁用危险内置 | `open`, `eval`, `exec`, `compile`, `__import__`, `globals`, `locals`, `breakpoint`, `input` |
+| 受限命名空间 | 脚本只能访问注入的 `__builtins__`（已移除危险函数） |
+| 异常捕获 | `ImportError` 单独捕获并记录，其他异常也会记录但不会崩溃 |
+
+```
+脚本中的 import 请求
+    → _custom_import(name)
+    → name == 'engine' ? 返回注入的 engine 模块
+    → name 在白名单前缀中 ? 调用 real_import
+    → 否则抛出 ImportError
+```
 
 ---
 

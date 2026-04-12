@@ -10,9 +10,10 @@
 
 | 组件 | 职责 |
 |-----|------|
-| `mqtt_service` | MQTT 连接、订阅、发布、消息路由 |
-| `sensor_command_send_service` | 向传感器发送控制命令 |
-| `device_command_send_service` | 向设备（执行器）发送控制命令 |
+| `mqtt_service` | MQTT 连接、订阅、发布、消息路由、自动重连 |
+| `BaseCommandSendService` | 命令下发基类，封装公共的命令构造、发送、校验码确认逻辑 |
+| `sensor_command_send_service` | 向传感器发送控制命令（继承 BaseCommandSendService） |
+| `device_command_send_service` | 向设备（执行器）发送控制命令（继承 BaseCommandSendService） |
 | handlers | 接收 MQTT 消息并写入数据库（由 mqtt_service 自动调用） |
 
 ### 1.2 前置条件
@@ -168,12 +169,12 @@ success = sensor_command_send_service.send_custom_command_with_make_sure(
 ### 4.3 设备
 
 ```python
-# 注意：设备使用 time 参数（非 time_out），默认 3 秒
+# 注意：传感器和设备现已统一使用 time_out 参数（基类统一）
 success = device_command_send_service.send_custom_command_with_make_sure(
     device_id='SG_80_01',
     command_name='set_brightness',
     params={'val': 80},
-    time=3
+    time_out=3
 )
 ```
 
@@ -404,7 +405,21 @@ print(f"发送结果: {success}")
 | `sensor_command_send_service.send_custom_command_with_make_sure(sensor_id, command_name, params?, time_out=3)` | 发送并等待确认 |
 | `sensor_command_send_service.show_sensor_control_commands(sensor)` | 查看传感器可用命令 |
 | `device_command_send_service.send_custom_command(device_id, command_name, params?)` | 发送设备命令 |
-| `device_command_send_service.send_custom_command_with_make_sure(device_id, command_name, params?, time=3)` | 发送并等待确认 |
+| `device_command_send_service.send_custom_command_with_make_sure(device_id, command_name, params?, time_out=3)` | 发送并等待确认 |
 | `device_command_send_service.show_device_control_commands(device)` | 查看设备可用命令 |
 | `mqtt_service.publish(topic, payload, qos=1)` | 直接发布消息 |
 | `mqtt_service.subscribe(topic, qos=1)` | 订阅主题 |
+
+---
+
+## 十、自动重连
+
+mqtt_service 启用了 paho-mqtt 内置自动重连机制（指数退避）：
+
+- **断线后自动重连**，无需手动干预
+- 重连延迟从 1 秒开始指数增长（1→2→4→8→...），上限 120 秒
+- 连接成功后自动重置延迟为最小值
+- 断线时 `is_connected` 变为 `False`，重连成功后恢复为 `True`
+- 调用 `stop()` 可完全停止客户端和自动重连
+
+如需手动重连（如修改配置后），可调用 `mqtt_service.reconnect(timeout=5)` 或先 `stop()` 再 `connect()`。

@@ -24,8 +24,8 @@ def handle_mqtt_device_status_message(topic: str, payload: Dict) -> bool:
         device_id = payload['device_id']
         check_code = (str(payload.get('check_code') or '')).strip() or None
         if check_code:
-            from .device_command_send_service import verify_device_status_check_code
-            verify_device_status_check_code(device_id, check_code)
+            from .device_command_send_service import device_command_send_service
+            device_command_send_service.verify_check_code(device_id, check_code)
 
         device = _get_device(device_id)
         if not device:

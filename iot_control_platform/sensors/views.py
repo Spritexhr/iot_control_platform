@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count, Subquery, OuterRef
 from django.utils import timezone
 from datetime import timedelta
 from .models import SensorType, Sensor, SensorData, SensorStatusCollection
@@ -18,7 +18,7 @@ from .serializers import (
 
 class SensorTypeViewSet(viewsets.ModelViewSet):
     """传感器类型 CRUD API，创建/修改/删除仅限工作人员（is_staff）"""
-    queryset = SensorType.objects.all()
+    queryset = SensorType.objects.annotate(_sensor_count=Count('sensors')).all()
     serializer_class = SensorTypeSerializer
 
     def get_permissions(self):
@@ -33,7 +33,9 @@ class SensorViewSet(viewsets.ModelViewSet):
     支持按 sensor_id 查找、筛选、搜索
     创建/修改/删除/发送命令仅限工作人员，非工作人员仅可查看
     """
-    queryset = Sensor.objects.select_related('sensor_type').all()
+    queryset = Sensor.objects.select_related('sensor_type').prefetch_related(
+        'data_records'
+    ).all()
     lookup_field = 'sensor_id'
 
     def get_permissions(self):

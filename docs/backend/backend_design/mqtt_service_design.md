@@ -1,6 +1,6 @@
 # MQTT 服务设计文档
 
-本文档描述物联网控制平台的 MQTT 服务架构，涵盖 `mqtt_service`、各 `send_service`（命令下发）与 `handler`（消息接收处理）之间的关系与协作方式。
+本文档描述物联网控制平台的 MQTT 服务架构，涵盖 `mqtt_service`、`BaseCommandSendService` 基类、各 `send_service`（命令下发）与 `handler`（消息接收处理）之间的关系与协作方式。
 
 ---
 
@@ -8,9 +8,9 @@
 
 | 层级 | 组件 | 职责 |
 |-----|------|------|
-| **传输核心** | `mqtt_service` | MQTT 连接管理、主题订阅、消息收发、消息路由 |
+| **传输核心** | `mqtt_service` | MQTT 连接管理、主题订阅、消息收发、消息路由、自动重连 |
 | **上行（接收）** | `*_handlers` | 解析 MQTT 消息、写入数据库、可选校验 check_code |
-| **下行（发送）** | `*_command_send_service` | 按模型定义构造并下发控制命令，可选等待确认 |
+| **下行（发送）** | `BaseCommandSendService` → `*_command_send_service` | 按模型定义构造并下发控制命令，可选等待确认 |
 
 ```
                     ┌─────────────────────────────────────────────────────────────┐
@@ -25,8 +25,10 @@
 │                      │ publish  │                      │ handler │                      │
 │ - SensorCommandSend  │         │ - 主题匹配与分发       │         │ - sensor_upload_data  │
 │ - DeviceCommandSend  │         │ - handlers 注册表      │         │ - sensor_upload_status│
-└──────────────────────┘         └──────────────────────┘         │ - device_upload_status │
-         │                                    │                    └──────────────────────┘
+│ (继承 BaseCommand    │         │ - 自动重连（指数退避）   │         │ - device_upload_status │
+│  SendService)        │         │                      │         │                      │
+└──────────────────────┘         └──────────────────────┘         └──────────────────────┘
+         │                                    │
          │ 可选：等待确认                      │ 校验 check_code 时
          │ send_xxx_with_make_sure            │ 回调 verify_xxx_check_code
          └────────────────────────────────────┘
@@ -42,6 +44,7 @@
 - **主题订阅**：支持通配符 `+`、`#`，连接前订阅请求缓存至 `pending_subscriptions`，连接成功后自动执行
 - **消息发布**：`publish(topic, payload, qos)`，payload 自动序列化为 JSON
 - **消息路由**：收到消息后根据主题模式匹配 `handlers` 中的处理器并调用
+- **自动重连**：断线后由 paho-mqtt 内置自动重连机制恢复，采用指数退避策略
 
 ### 2.2 处理器注册机制
 
@@ -68,6 +71,31 @@ _on_message(topic, payload)
     → JSON 解析
     → _find_handler(topic)  # 按通配符匹配
     → handler(topic, payload)
+```
+
+### 2.5 自动重连机制
+
+MQTT 服务支持断线自动重连，采用指数退避策略：
+
+| 配置 | 默认值 | 说明 |
+|-----|--------|------|
+| `RECONNECT_MIN_DELAY` | 1 秒 | 最小重连延迟 |
+| `RECONNECT_MAX_DELAY` | 120 秒 | 最大重连延迟 |
+
+**机制说明**：
+
+- 连接时通过 `client.reconnect_delay_set()` 启用 paho-mqtt 内置自动重连
+- 断线后自动重连，延迟从 1 秒开始指数增长（1→2→4→8→...），上限 120 秒
+- 连接成功后重置延迟为最小值
+- `_on_disconnect` 回调仅负责更新状态和记录日志，不主动触发重连
+- 调用 `stop()` 可完全停止客户端和自动重连
+
+**状态变化**：
+
+```
+连接成功 → is_connected=True, 重置 _reconnect_delay=1
+意外断开 → is_connected=False, 记录日志, paho-mqtt 自动重连
+重连成功 → is_connected=True, 重置 _reconnect_delay=1
 ```
 
 ---
@@ -113,27 +141,92 @@ _on_message(topic, payload)
 
 ### 4.1 设计理念
 
+- 命令下发服务通过继承 `BaseCommandSendService` 基类实现，消除传感器/设备之间的重复代码
 - Send Service 持有 `mqtt_service` 引用，通过 `publish` 下发命令
 - 命令内容来自 `SensorType.commands` / `DeviceType.commands` 中的 `mqtt_message` 模板
 - 支持占位符替换（如 `{val}`）和可选 `check_code` 确认流程
 
-### 4.2 SensorCommandSendService / DeviceCommandSendService
+### 4.2 BaseCommandSendService 基类
+
+所有命令下发服务的公共基类，封装了通用的命令构造、发送、校验码确认逻辑。
+
+**类属性**（子类必须定义）：
+
+| 属性 | 说明 | 传感器子类 | 设备子类 |
+|-----|------|-----------|---------|
+| `model_class` | Django 模型类 | `Sensor` | `Device` |
+| `id_field_name` | 模型 ID 字段名 | `'sensor_id'` | `'device_id'` |
+| `type_field_name` | 类型字段名 | `'sensor_type'` | `'device_type'` |
+
+**核心方法**：
 
 | 方法 | 说明 |
 |-----|------|
-| `send_command(id, payload)` | 直接发布原始 payload 到控制主题 |
+| `set_mqtt_service(mqtt_service)` | 注入 MQTT 服务实例 |
+| `send_command(id, command_payload)` | 直接发布原始 payload 到控制主题 |
 | `send_custom_command(id, command_name, params)` | 按类型定义构造 mqtt_message 并发送 |
-| `send_custom_command_with_make_sure(...)` | 注入 check_code，发送后等待对应 status handler 回传确认 |
+| `send_custom_command_with_make_sure(id, command_name, params, time_out=3)` | 注入 check_code，发送后等待确认 |
+| `_get_commands(entity)` | 获取实体的可用命令（从 type 字段读取） |
+| `_apply_params_to_message(msg, params)` | 将 mqtt_message 中的占位符替换为实际参数 |
+| `_inject_check_code(msg)` | 注入 6 位随机校验码 |
+| `_verify_check_code(id, check_code)` | 校验回传的 check_code 是否匹配 |
 
-### 4.3 依赖关系
+**check_code 确认流程**：
+
+```
+send_custom_command_with_make_sure()
+    → _inject_check_code()  # 注入 6 位随机码
+    → send_command()        # 发布到 MQTT
+    → threading.Event.wait(time_out)  # 等待确认
+        ↓ 超时或收到确认
+    ← 返回 True/False
+
+handler 收到 status 消息含 check_code
+    → verify_xxx_check_code()  # 调用对应子模块的校验函数
+    → _verify_check_code()     # 基类校验逻辑
+    → Event.set()              # 唤醒等待
+```
+
+**check_code 过期清理**：
+
+- 过期时间：120 秒（`_CHECK_CODE_TTL`）
+- 每次 `_verify_check_code` 调用时自动清理过期记录
+
+### 4.3 SensorCommandSendService
+
+继承 `BaseCommandSendService`，传感器专用命令下发服务。
+
+```python
+class SensorCommandSendService(BaseCommandSendService):
+    model_class = Sensor
+    id_field_name = 'sensor_id'
+    type_field_name = 'sensor_type'
+```
+
+额外方法：`show_sensor_control_commands(sensor)` — 获取传感器可用命令
+
+### 4.4 DeviceCommandSendService
+
+继承 `BaseCommandSendService`，设备专用命令下发服务。
+
+```python
+class DeviceCommandSendService(BaseCommandSendService):
+    model_class = Device
+    id_field_name = 'device_id'
+    type_field_name = 'device_type'
+```
+
+额外方法：`show_device_control_commands(device)` — 获取设备可用命令
+
+### 4.5 依赖关系
 
 ```
 send_service 构造 mqtt_message
     → mqtt_service.publish(topic_control, payload)
     → 设备/传感器执行后上报 status（含 check_code）
     → mqtt_service 路由到 status handler
-    → handler 调用 verify_xxx_check_code
-    → send_service 中 Event.set()，wait 返回
+    → handler 调用 verify_xxx_check_code → BaseCommandSendService._verify_check_code
+    → Event.set()，wait 返回
 ```
 
 **前提**：使用 `send_custom_command_with_make_sure` 前需已调用 `mqtt_service.setup_sensor_status_handler()` 或 `mqtt_service.setup_device_status_handler()`。
@@ -156,9 +249,11 @@ handler ───────► send_service       (status handler 调用 verif
 
 | 组件 | 是否持有 mqtt_service | 是否连接 MQTT | 职责边界 |
 |-----|----------------------|--------------|---------|
-| mqtt_service | - | ✓ | 连接、订阅、发布、路由 |
+| mqtt_service | - | ✓ | 连接、订阅、发布、路由、自动重连 |
 | handler | ✗ | ✗ | 解析 payload、写库、校验 check_code |
-| send_service | ✓ | ✗ | 查模型、构造命令、调用 publish、等待确认 |
+| BaseCommandSendService | ✓ | ✗ | 查模型、构造命令、调用 publish、等待确认 |
+| SensorCommandSendService | 继承基类 | ✗ | 传感器特有配置 |
+| DeviceCommandSendService | 继承基类 | ✗ | 设备特有配置 |
 
 ### 5.3 数据流
 
@@ -168,7 +263,7 @@ handler ───────► send_service       (status handler 调用 verif
 MQTT Broker → mqtt_service._on_message
     → _find_handler → handler(topic, payload)
     → 验证 → 查 Model → 入库（SensorData / SensorStatusCollection / DeviceData）
-    → [可选] verify_xxx_check_code → 唤醒 send_service 的 Event
+    → [可选] verify_xxx_check_code → BaseCommandSendService._verify_check_code → 唤醒 Event
 ```
 
 **上行（发送）**
@@ -240,8 +335,8 @@ SensorsConfig.ready()
 ### 7.3 初始化步骤（_start_mqtt_service）
 
 | 步骤 | 调用 | 说明 |
-|-----|------|------|
-| 1 | `mqtt_service.connect(timeout=5)` | 连接 MQTT Broker |
+|-----|-----|------|
+| 1 | `mqtt_service.connect(timeout=5)` | 连接 MQTT Broker（含自动重连配置） |
 | 2 | `sensor_command_send_service.set_mqtt_service(mqtt_service)` | 绑定传感器命令服务 |
 | 3 | `device_command_send_service.set_mqtt_service(mqtt_service)` | 绑定设备命令服务 |
 | 4 | `mqtt_service.setup_sensor_data_handler()` | 注册并订阅 `iot/sensors/+/data` |
@@ -262,12 +357,13 @@ sensors/
 └── apps.py                         # SensorsConfig，负责 MQTT 自启动
 
 services/
-├── mqtt_service.py                    # MQTT 传输核心
+├── mqtt_service.py                    # MQTT 传输核心（含自动重连）
+├── base_command_send_service.py       # 命令下发基类（公共逻辑）
 ├── sensors_service/
 │   ├── sensor_upload_data_handlers.py  # 传感器数据 handler
 │   ├── sensor_upload_status_handlers.py# 传感器状态 handler
-│   └── sensor_command_send_service.py  # 传感器命令下发
+│   └── sensor_command_send_service.py  # 传感器命令下发（继承基类）
 └── devices_service/
     ├── device_upload_status_handlers.py# 设备状态 handler
-    └── device_command_send_service.py # 设备命令下发
+    └── device_command_send_service.py # 设备命令下发（继承基类）
 ```

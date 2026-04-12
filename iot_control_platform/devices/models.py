@@ -190,9 +190,10 @@ class Device(models.Model):
 
     def save(self, *args, **kwargs):
         """保存时自动设置 MQTT 主题，与 Arduino 固件保持一致"""
-        if not self.mqtt_topic_data:
+        # 仅在字段为 None（未设置）时自动生成，空字符串视为用户主动清空
+        if self.mqtt_topic_data is None:
             self.mqtt_topic_data = f"iot/devices/{self.device_id}/status"
-        if not self.mqtt_topic_control:
+        if self.mqtt_topic_control is None:
             self.mqtt_topic_control = f"iot/devices/{self.device_id}/control"
 
         super().save(*args, **kwargs)

@@ -2,11 +2,13 @@
 MQTT服务模块
 负责MQTT连接管理、主题订阅、消息接收和发送
 连接参数从 platform_config 读取，支持 reload 后重连以应用新配置
+支持断线自动重连（指数退避）
 """
 import json
 import logging
 import os
 import re
+import time
 from typing import Callable, Dict, Optional
 import paho.mqtt.client as mqtt
 
@@ -22,7 +24,12 @@ class MQTTService:
     """
     MQTT服务类
     管理MQTT客户端连接、消息路由和发送
+    支持自动重连（指数退避策略）
     """
+
+    # 自动重连配置
+    RECONNECT_MIN_DELAY = 1      # 最小重连延迟（秒）
+    RECONNECT_MAX_DELAY = 120    # 最大重连延迟（秒）
 
     def __init__(self):
         """初始化MQTT服务"""
@@ -30,6 +37,8 @@ class MQTTService:
         self.is_connected = False
         self.handlers: Dict[str, Callable] = {}  # 主题模式 -> 处理器函数
         self.pending_subscriptions = []  # 待订阅的主题列表
+        self._reconnect_delay = self.RECONNECT_MIN_DELAY
+        self._reconnect_scheduled = False
 
     def connect(self, timeout: int = 5) -> bool:
         """
@@ -59,6 +68,13 @@ class MQTTService:
             self.client.on_connect = self._on_connect
             self.client.on_disconnect = self._on_disconnect
             self.client.on_message = self._on_message
+
+            # 启用 paho-mqtt 内置自动重连（指数退避）
+            self.client.reconnect_delay_set(
+                min_delay=self.RECONNECT_MIN_DELAY,
+                max_delay=self.RECONNECT_MAX_DELAY,
+            )
+
             logger.info(f"正在连接MQTT服务器: {broker}:{port}")
             self.client.connect(broker, port, keepalive)
 
@@ -66,7 +82,6 @@ class MQTTService:
             self.client.loop_start()
 
             # 等待连接建立
-            import time
             start_time = time.time()
             while not self.is_connected and (time.time() - start_time) < timeout:
                 time.sleep(0.1)  # 每100ms检查一次
@@ -90,7 +105,6 @@ class MQTTService:
         if self.client:
             logger.info("MQTT服务启动，开始监听消息...")
             try:
-                import time
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
@@ -105,6 +119,7 @@ class MQTTService:
             self.client.disconnect()
             self.client = None
             self.is_connected = False
+            self._reconnect_delay = self.RECONNECT_MIN_DELAY
             logger.info("MQTT服务已停止")
 
     def reconnect(self, timeout: int = 5) -> bool:
@@ -134,9 +149,9 @@ class MQTTService:
         try:
             result, mid = self.client.subscribe(topic, qos=qos)
             if result == mqtt.MQTT_ERR_SUCCESS:
-                logger.info(f"✓ 已订阅主题: {topic} (QoS={qos})")
+                logger.info(f"已订阅主题: {topic} (QoS={qos})")
             else:
-                logger.error(f"✗ 订阅主题失败: {topic}, 错误码: {result}")
+                logger.error(f"订阅主题失败: {topic}, 错误码: {result}")
         except Exception as e:
             logger.error(f"订阅主题异常: {topic}, {e}", exc_info=True)
 
@@ -161,11 +176,11 @@ class MQTTService:
             result = self.client.publish(topic, message, qos=qos)
 
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                logger.info(f"✓ 消息发布成功 - 主题: {topic}")
+                logger.info(f"消息发布成功 - 主题: {topic}")
                 logger.debug(f"  消息内容: {message}")
                 return True
             else:
-                logger.error(f"✗ 消息发布失败 - 主题: {topic}, 错误码: {result.rc}")
+                logger.error(f"消息发布失败 - 主题: {topic}, 错误码: {result.rc}")
                 return False
 
         except Exception as e:
@@ -181,7 +196,7 @@ class MQTTService:
             handler: 处理函数，签名为 handler(topic, payload)
         """
         self.handlers[topic_pattern] = handler
-        logger.info(f"✓ 已注册处理器: {topic_pattern} -> {handler.__name__}")
+        logger.info(f"已注册处理器: {topic_pattern} -> {handler.__name__}")
 
     def setup_sensor_data_handler(self):
         """
@@ -190,7 +205,7 @@ class MQTTService:
         """
         self.register_handler('iot/sensors/+/data', handle_mqtt_data_message)
         self.subscribe('iot/sensors/+/data', qos=1)
-        logger.info("✓ 传感器数据处理器设置完成")
+        logger.info("传感器数据处理器设置完成")
 
     def setup_sensor_status_handler(self):
         """
@@ -199,7 +214,7 @@ class MQTTService:
         """
         self.register_handler('iot/sensors/+/status', handle_mqtt_status_message)
         self.subscribe('iot/sensors/+/status', qos=1)
-        logger.info("✓ 传感器状态处理器设置完成")
+        logger.info("传感器状态处理器设置完成")
 
     def setup_device_status_handler(self):
         """
@@ -208,13 +223,15 @@ class MQTTService:
         """
         self.register_handler('iot/devices/+/status', handle_mqtt_device_status_message)
         self.subscribe('iot/devices/+/status', qos=1)
-        logger.info("✓ 设备状态处理器设置完成")
+        logger.info("设备状态处理器设置完成")
 
     def _on_connect(self, client, userdata, flags, rc):
         """MQTT连接成功回调"""
         if rc == 0:
             self.is_connected = True
-            logger.info("✓ MQTT连接成功")
+            # 连接成功，重置重连延迟
+            self._reconnect_delay = self.RECONNECT_MIN_DELAY
+            logger.info("MQTT连接成功")
 
             if self.pending_subscriptions:
                 logger.info(f"开始订阅 {len(self.pending_subscriptions)} 个主题...")
@@ -222,9 +239,9 @@ class MQTTService:
                     try:
                         result, mid = self.client.subscribe(topic, qos=qos)
                         if result == mqtt.MQTT_ERR_SUCCESS:
-                            logger.info(f"✓ 已订阅主题: {topic} (QoS={qos})")
+                            logger.info(f"已订阅主题: {topic} (QoS={qos})")
                         else:
-                            logger.error(f"✗ 订阅主题失败: {topic}, 错误码: {result}")
+                            logger.error(f"订阅主题失败: {topic}, 错误码: {result}")
                     except Exception as e:
                         logger.error(f"订阅主题异常: {topic}, {e}", exc_info=True)
         else:
@@ -237,14 +254,24 @@ class MQTTService:
                 5: "未授权"
             }
             error_msg = error_messages.get(rc, f"未知错误(rc={rc})")
-            logger.error(f"✗ MQTT连接失败: {error_msg}")
+            logger.error(f"MQTT连接失败: {error_msg}")
 
     def _on_disconnect(self, client, userdata, rc):
-        """MQTT断开连接回调。rc=7 表示连接丢失，常见于 client_id 冲突或网络波动。"""
+        """
+        MQTT断开连接回调。
+        rc=7 表示连接丢失，常见于 client_id 冲突或网络波动。
+        paho-mqtt 的 reconnect_delay_set 已启用内置自动重连，
+        此处仅记录日志和更新状态。
+        """
         self.is_connected = False
         if rc != 0:
             hint = "（连接丢失，多为 client_id 冲突或网络问题）" if rc == 7 else ""
-            logger.warning(f"⚠ MQTT意外断开，错误码: {rc}{hint}")
+            logger.warning(
+                f"MQTT意外断开，错误码: {rc}{hint}，"
+                f"paho-mqtt 内置自动重连将在 {self._reconnect_delay}s 后尝试..."
+            )
+            # 指数退避：下次重连延迟加倍（上限由 paho-mqtt 管理）
+            self._reconnect_delay = min(self._reconnect_delay * 2, self.RECONNECT_MAX_DELAY)
         else:
             logger.info("MQTT正常断开")
 
@@ -271,14 +298,14 @@ class MQTTService:
                 extracted_id = self._extract_id_from_topic(topic, 'iot/sensors/+/')
                 payload_id = payload.get('sensor_id', '') if isinstance(payload, dict) else ''
                 id_display = payload_id or extracted_id or '未知'
-                logger.info(f"📨 收到消息 - 主题: {topic} [传感器ID: {id_display}]")
+                logger.info(f"收到消息 - 主题: {topic} [传感器ID: {id_display}]")
             elif '/devices/' in topic:
                 extracted_id = self._extract_id_from_topic(topic, 'iot/devices/+/')
                 payload_id = payload.get('device_id', '') if isinstance(payload, dict) else ''
                 id_display = payload_id or extracted_id or '未知'
-                logger.info(f"📨 收到消息 - 主题: {topic} [设备ID: {id_display}]")
+                logger.info(f"收到消息 - 主题: {topic} [设备ID: {id_display}]")
             else:
-                logger.info(f"📨 收到消息 - 主题: {topic}")
+                logger.info(f"收到消息 - 主题: {topic}")
             logger.debug(f"  消息内容: {payload}")
 
             handler = self._find_handler(topic)
@@ -293,7 +320,7 @@ class MQTTService:
             else:
                 id_hint = self._extract_id_from_topic(topic, '') or ''
                 extra = f" [ID: {id_hint}]" if id_hint else ""
-                logger.warning(f"⚠ 未找到匹配的处理器: {topic}{extra}")
+                logger.warning(f"未找到匹配的处理器: {topic}{extra}")
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON解析失败: {topic}, {e}")

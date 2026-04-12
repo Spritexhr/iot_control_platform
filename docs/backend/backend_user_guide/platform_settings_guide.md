@@ -244,7 +244,7 @@ curl -X POST -H "Authorization: Bearer <access_token>" \
 
 ### 5.1 按配置清理过期数据
 
-根据 `sensor_data_retention_days`、`device_data_retention_days` 清理超期数据：
+根据 `sensor_data_retention_days`、`device_data_retention_days` 清理超期数据。采用分批删除策略，避免大表锁表或内存溢出：
 
 ```bash
 python manage.py cleanup_old_data
@@ -256,7 +256,15 @@ python manage.py cleanup_old_data
 python manage.py cleanup_old_data --dry-run
 ```
 
-### 5.3 定时执行（cron 示例）
+### 5.3 自定义分批大小
+
+默认每批删除 1000 条，可根据数据量调整：
+
+```bash
+python manage.py cleanup_old_data --batch-size 500
+```
+
+### 5.4 定时执行（cron 示例）
 
 ```cron
 0 2 * * * cd /path/to/project && python manage.py cleanup_old_data
@@ -308,6 +316,55 @@ python manage.py cleanup_old_data --dry-run
 | device_reconnect_interval | DEVICE_RECONNECT_INTERVAL | 10 | int | 重连间隔（秒） |
 | sensor_data_retention_days | - | 30 | int | 传感器数据保留天数 |
 | device_data_retention_days | - | 30 | int | 设备数据保留天数 |
+
+---
+
+## 八点五、健康检查端点
+
+### 端点
+
+`GET /health/` — 无需认证，供监控系统和负载均衡器使用。
+
+### 响应示例（正常）
+
+```json
+{
+  "status": "ok",
+  "checks": {
+    "database": "ok",
+    "mqtt": "connected"
+  },
+  "timestamp": "2026-04-12T10:30:00+08:00"
+}
+```
+
+### 响应示例（异常）
+
+```json
+{
+  "status": "degraded",
+  "checks": {
+    "database": "ok",
+    "mqtt": "disconnected"
+  },
+  "timestamp": "2026-04-12T10:30:00+08:00"
+}
+```
+
+- `status` 为 `ok` 时返回 HTTP 200，`degraded` 时返回 HTTP 503
+- `checks.database`：`ok` 或 `error: ...`
+- `checks.mqtt`：`connected` 或 `disconnected` 或 `error: ...`
+
+---
+
+## 八点六、API 节流配置
+
+| 类别 | 速率 | 适用 |
+|-----|------|------|
+| 匿名用户 | 30 次/小时 | 未认证请求 |
+| 认证用户 | 100 次/小时 | 已认证请求 |
+
+节流配置在 `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']` 中设置，超限后返回 HTTP 429。
 
 ---
 

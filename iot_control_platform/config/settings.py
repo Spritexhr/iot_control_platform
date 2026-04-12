@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,8 +22,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# 支持从环境变量读取，Docker 部署时通过 .env 传入
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-*$z*rtci)tdzme*dmgp5v(sm^-iscz3i-1p)b5z&p3^bf4vab&")
+# 生产环境必须通过环境变量 SECRET_KEY 传入，开发环境使用固定值
+_env_secret = os.environ.get("SECRET_KEY", "")
+if _env_secret:
+    SECRET_KEY = _env_secret
+else:
+    # 仅在 DEBUG=True 时允许使用开发默认值
+    _dev_debug = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+    if _dev_debug:
+        SECRET_KEY = "django-insecure-dev-only-key-do-not-use-in-production"
+    else:
+        raise ImproperlyConfigured(
+            "生产环境必须设置 SECRET_KEY 环境变量！"
+            "请运行: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+        )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
@@ -165,7 +178,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8081",
 ]
 
+# 支持通过环境变量追加额外的 CORS 源（逗号分隔）
+_extra_cors = os.environ.get("EXTRA_CORS_ORIGINS", "")
+if _extra_cors:
+    CORS_ALLOWED_ORIGINS.extend(o.strip() for o in _extra_cors.split(",") if o.strip())
+
 CORS_ALLOW_CREDENTIALS = True
+
+# 生产环境安全配置
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in ("true", "1")
+    CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() in ("true", "1")
 
 # CSRF 可信来源（与 CORS 配合，用于跨域 POST 等请求）
 CSRF_TRUSTED_ORIGINS = [
@@ -220,6 +246,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/hour',
+        'user': '100/hour',
+    },
 }
 
 # SimpleJWT 配置

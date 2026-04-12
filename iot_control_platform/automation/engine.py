@@ -1,22 +1,61 @@
 """
 自动化规则引擎
 根据 sample_file 设计：脚本通过 from engine import sensors, devices 获取依赖
-支持类形式控制器（__init__ 相当于 setup，loop() 相当于 Arduino loop）
+支持类形式控制器（__init__ 相当于 setup，loop() 相当于 Arduino loop()）
+
+安全策略：
+- 白名单 import：仅允许导入 engine / automation.head_files 下的模块
+- 禁用危险内置函数（open, eval, exec, compile, __import__ 原始版, globals, locals 等）
+- 脚本在受限命名空间中执行
 """
 import logging
 import types
 from typing import Optional
 
+import builtins as _bi
+
 logger = logging.getLogger(__name__)
 
-# 使用标准 builtins，仅需在执行时覆盖 __import__
-import builtins as _bi
+# 允许脚本 import 的模块白名单（前缀匹配）
+_IMPORT_WHITELIST = ('engine', 'automation.head_files')
+
+# 禁用的内置函数：禁止文件/进程/动态代码操作
+_BLOCKED_BUILTINS = frozenset({
+    'open', 'eval', 'exec', 'compile',
+    '__import__', 'globals', 'locals',
+    'breakpoint', 'input',
+})
+
+
+def _make_safe_builtins(custom_import):
+    """构建安全内置函数字典，移除危险函数，替换 __import__"""
+    safe = dict(vars(_bi))
+    for name in _BLOCKED_BUILTINS:
+        safe.pop(name, None)
+    safe['__import__'] = custom_import
+    return safe
+
+
+def _make_custom_import(engine_module, real_import):
+    """创建自定义 import：仅白名单模块可以通过，其余一律拒绝"""
+    def _custom_import(name, *args, **kwargs):
+        if name == 'engine':
+            return engine_module
+        # 白名单前缀匹配
+        if any(name == prefix or name.startswith(prefix + '.') for prefix in _IMPORT_WHITELIST):
+            return real_import(name, *args, **kwargs)
+        raise ImportError(
+            f"自动化脚本不允许导入模块 '{name}'，"
+            f"仅允许: {', '.join(_IMPORT_WHITELIST)}"
+        )
+    return _custom_import
 
 
 def execute_rule(rule) -> bool:
     """
     执行单条自动化规则。
     注入 engine 模块（含 sensors、devices），查找带 loop() 的控制器类并执行一次 loop()。
+    在受限沙箱中运行，禁用文件/进程/动态代码操作。
     """
     if not rule.script:
         return False
@@ -32,22 +71,13 @@ def execute_rule(rule) -> bool:
     engine.sensors = sensors
     engine.devices = devices
 
-    # 自定义 __import__：from engine import 时返回我们的 engine 模块
     _real_import = _bi.__import__
-
-    def _custom_import(name, *args, **kwargs):
-        if name == 'engine':
-            return engine
-        return _real_import(name, *args, **kwargs)
-
-    _builtins = dict(vars(_bi))
-    _builtins['__import__'] = _custom_import
+    custom_import = _make_custom_import(engine, _real_import)
+    safe_builtins = _make_safe_builtins(custom_import)
 
     namespace = {
-        '__builtins__': _builtins,
+        '__builtins__': safe_builtins,
         'engine': engine,
-        # 'sensors': sensors,
-        # 'devices': devices,
         'Optional': Optional,
     }
 
@@ -65,6 +95,9 @@ def execute_rule(rule) -> bool:
         ret = controller.loop()
         return bool(ret) if ret is not None else False
 
+    except ImportError as e:
+        logger.error("自动化规则 [%s] 尝试导入受限模块: %s", rule.name, e)
+        return False
     except Exception as e:
         logger.exception("自动化规则执行异常 [%s]: %s", rule.name, e)
         return False

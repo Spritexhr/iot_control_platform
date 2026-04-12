@@ -24,8 +24,8 @@ def handle_mqtt_status_message(topic: str, payload: Dict) -> bool:
         sensor_id = payload['sensor_id']
         check_code = (str(payload.get('check_code') or '')).strip() or None
         if check_code:
-            from .sensor_command_send_service import verify_sensor_status_check_code
-            verify_sensor_status_check_code(sensor_id, check_code)
+            from .sensor_command_send_service import sensor_command_send_service
+            sensor_command_send_service.verify_check_code(sensor_id, check_code)
 
         sensor = _get_sensor(sensor_id)
         if not sensor:

@@ -16,6 +16,9 @@ class SensorTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'sensor_count']
 
     def get_sensor_count(self, obj):
+        # 优先使用 annotate 预计算的值，避免额外查询
+        if hasattr(obj, '_sensor_count'):
+            return obj._sensor_count
         return obj.sensors.count()
 
 
@@ -52,6 +55,16 @@ class SensorListSerializer(serializers.ModelSerializer):
         return (timezone.now() - obj.last_seen) < timeout
 
     def get_latest_data(self, obj):
+        # 优先使用 prefetch 预取的数据，避免 N+1 查询
+        if hasattr(obj, '_prefetched_objects_cache') and 'data_records' in obj._prefetched_objects_cache:
+            records = obj._prefetched_objects_cache['data_records']
+            if records:
+                return {
+                    'data': records[0].data,
+                    'timestamp': records[0].timestamp,
+                }
+            return None
+        # 回退到查询
         record = obj.data_records.order_by('-timestamp').first()
         if record:
             return {
@@ -69,6 +82,9 @@ class SensorDetailSerializer(SensorListSerializer):
         fields = SensorListSerializer.Meta.fields + ['data_count_24h']
 
     def get_data_count_24h(self, obj):
+        # 优先使用 annotate 预计算的值
+        if hasattr(obj, '_data_count_24h'):
+            return obj._data_count_24h
         from django.utils import timezone
         from datetime import timedelta
         start = timezone.now() - timedelta(hours=24)

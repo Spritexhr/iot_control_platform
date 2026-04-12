@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils import timezone
 from datetime import timedelta
 from .models import DeviceType, Device, DeviceData
@@ -17,7 +17,7 @@ from .serializers import (
 
 class DeviceTypeViewSet(viewsets.ModelViewSet):
     """设备类型 CRUD API，创建/修改/删除仅限工作人员（is_staff）"""
-    queryset = DeviceType.objects.all()
+    queryset = DeviceType.objects.annotate(_device_count=Count('devices')).all()
     serializer_class = DeviceTypeSerializer
 
     def get_permissions(self):
@@ -32,7 +32,9 @@ class DeviceViewSet(viewsets.ModelViewSet):
     支持按 device_id 查找、筛选、搜索
     创建/修改/删除/发送命令仅限工作人员，非工作人员仅可查看
     """
-    queryset = Device.objects.select_related('device_type').all()
+    queryset = Device.objects.select_related('device_type').prefetch_related(
+        'data_records'
+    ).all()
     lookup_field = 'device_id'
 
     def get_permissions(self):

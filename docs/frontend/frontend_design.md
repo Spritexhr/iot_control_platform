@@ -306,6 +306,7 @@ frontend/
 - **devices**：getDevices, getDevice, sendDeviceCommand, device-types CRUD
 - **automation**：getRules, create/update/delete, execute
 - **system**：getMqttStatus, getDashboardStats
+- **health**：`GET /health/`（无需认证，供监控系统调用）
 
 ---
 
@@ -361,4 +362,4 @@ npm run preview  # 本地预览构建结果
 
 ---
 
-*文档更新日期：2026 年 2 月*
+*文档更新日期：2026 年 4 月*

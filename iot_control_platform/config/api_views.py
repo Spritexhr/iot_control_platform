@@ -1,12 +1,48 @@
 """
 全局 API 视图（不属于特定 app 的接口）
 """
-from rest_framework.decorators import api_view
+from django.db import connection
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
 
 from config.platform_config import get_config
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    健康检查端点
+    返回服务状态、MQTT 连接状态和数据库连接状态
+    无需认证，供监控系统和负载均衡器使用
+    """
+    checks = {}
+
+    # 数据库检查
+    try:
+        connection.ensure_connection()
+        checks['database'] = 'ok'
+    except Exception as e:
+        checks['database'] = f'error: {e}'
+
+    # MQTT 检查
+    try:
+        from services.mqtt_service import mqtt_service
+        checks['mqtt'] = 'connected' if mqtt_service.is_connected else 'disconnected'
+    except Exception as e:
+        checks['mqtt'] = f'error: {e}'
+
+    overall = 'ok' if all(v in ('ok', 'connected') for v in checks.values()) else 'degraded'
+    status_code = 200 if overall == 'ok' else 503
+
+    return Response({
+        'status': overall,
+        'checks': checks,
+        'timestamp': timezone.now().isoformat(),
+    }, status=status_code)
 
 
 @api_view(['GET'])

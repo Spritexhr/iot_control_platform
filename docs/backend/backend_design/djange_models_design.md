@@ -54,13 +54,15 @@
 | `name` | CharField(100) | - | 设备名称 |
 | `description` | TextField | blank | 设备描述 |
 | `location` | CharField(200) | blank | 设备位置 |
-| `mqtt_topic_data` | CharField(200) | blank | 状态主题，默认 `iot/devices/{device_id}/status` |
-| `mqtt_topic_control` | CharField(200) | blank | 控制主题，默认 `iot/devices/{device_id}/control` |
+| `mqtt_topic_data` | CharField(200) | blank, null | 状态主题，默认 `iot/devices/{device_id}/status` |
+| `mqtt_topic_control` | CharField(200) | blank, null | 控制主题，默认 `iot/devices/{device_id}/control` |
 | `is_online` | BooleanField | default=False, db_index | 是否在线 |
 | `last_seen` | DateTimeField | null, blank | 最后上报时间 |
 | `created_at` | DateTimeField | auto_now_add | 创建时间 |
 | `updated_at` | DateTimeField | auto_now | 更新时间 |
 | `device_type` | ForeignKey | DeviceType, PROTECT | 设备类型 |
+
+**MQTT 主题自动生成规则：** `save()` 时仅在字段为 `None`（未设置）时自动生成默认主题，空字符串视为用户主动清空，不会覆盖。
 
 **常用方法：**
 - `check_online_status()`：基于心跳间隔 3 倍超时判断离线
@@ -114,8 +116,8 @@
 | `name` | CharField(100) | - | 传感器名称 |
 | `description` | TextField | blank | 传感器描述 |
 | `location` | CharField(200) | blank | 传感器位置 |
-| `mqtt_topic_data` | CharField(200) | blank | 数据主题，默认 `iot/sensors/{sensor_id}/data` |
-| `mqtt_topic_control` | CharField(200) | blank | 控制主题，默认 `iot/sensors/{sensor_id}/control` |
+| `mqtt_topic_data` | CharField(200) | blank, null | 数据主题，默认 `iot/sensors/{sensor_id}/data` |
+| `mqtt_topic_control` | CharField(200) | blank, null | 控制主题，默认 `iot/sensors/{sensor_id}/control` |
 | `is_online` | BooleanField | default=False, db_index | 是否在线 |
 | `last_seen` | DateTimeField | null, blank | 最后上报时间 |
 | `created_at` | DateTimeField | auto_now_add | 创建时间 |
@@ -253,7 +255,7 @@
 ## 六、设计要点
 
 1. **类型-实例分层**：`DeviceType`/`SensorType` 定义类型，`Device`/`Sensor` 为实例，类型删除用 `PROTECT` 防止误删。
-2. **MQTT 主题约定**：设备 `iot/devices/{device_id}/*`，传感器 `iot/sensors/{sensor_id}/*`。
+2. **MQTT 主题约定**：设备 `iot/devices/{device_id}/*`，传感器 `iot/sensors/{sensor_id}/*`。`save()` 时仅在字段为 `None` 时自动生成主题，空字符串视为用户主动清空不会覆盖。
 3. **在线判定**：基于 `last_seen`，设备按心跳 3 倍超时，传感器按 3 分钟内有过上报。
 4. **JSON 存储**：`data`、`commands`、`device_list` 等使用 JSONField，便于扩展字段。
 5. **自动化与设备解耦**：`AutomationRule` 通过 `device_list` 中的 `device_id` 与 `Device`/`Sensor` 关联，无外键，方便跨模块引用。
