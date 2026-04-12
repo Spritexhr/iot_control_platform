@@ -124,6 +124,17 @@ function timeAgo(dateStr) {
   opacity: 1;
 }
 
+/* 移动端：始终显示删除按钮 */
+@media (max-width: 767px) {
+  .sensor-card__delete {
+    opacity: 0.7;
+  }
+
+  .sensor-card:hover .sensor-card__delete {
+    opacity: 1;
+  }
+}
+
 .sensor-card__delete:hover {
   color: var(--el-color-danger);
 }

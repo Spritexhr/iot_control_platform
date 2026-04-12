@@ -390,3 +390,136 @@ html.dark {
 .fade-leave-to {
   opacity: 0;
 }
+
+/* ============================================
+   响应式适配
+   ============================================ */
+
+/* 平板端 (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  html {
+    font-size: 13px;
+  }
+
+  .iot-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--iot-spacing-sm);
+  }
+
+  .iot-grid--cards {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+/* 移动端 (320px - 767px) */
+@media screen and (max-width: 767px) {
+  html {
+    font-size: 12px;
+  }
+
+  body {
+    line-height: 1.5;
+  }
+
+  /* 隐藏非必要元素 */
+  .iot-page-subtitle {
+    display: none;
+  }
+
+  /* 表格响应式 */
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table .el-table__cell {
+    padding: 8px 4px;
+  }
+
+  /* 卡片网格单列 */
+  .iot-grid--cards {
+    grid-template-columns: 1fr;
+  }
+
+  /* 统计卡片 */
+  .iot-grid--stats {
+    grid-template-columns: 1fr;
+  }
+
+  /* 表单在移动端全宽 */
+  .el-form-item__label {
+    width: 80px !important;
+    font-size: 12px;
+  }
+
+  .el-form-item__content {
+    margin-left: 80px !important;
+  }
+
+  /* 按钮组 */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar .el-select,
+  .filter-bar .el-input {
+    width: 100% !important;
+  }
+
+  /* 弹窗全屏显示 */
+  .el-dialog {
+    width: 95% !important;
+    margin: 10px auto !important;
+  }
+
+  /* 操作按钮 */
+  .header-action-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .user-menu-btn {
+    padding: 4px 8px 4px 2px;
+  }
+
+  /* 侧边栏 */
+  .app-sidebar {
+    width: 200px !important;
+  }
+}
+
+/* 超小屏幕 (< 375px) */
+@media screen and (max-width: 375px) {
+  .iot-card {
+    border-radius: var(--iot-radius-base);
+  }
+
+  .iot-card__header,
+  .iot-card__body {
+    padding: var(--iot-spacing-sm) var(--iot-spacing-md);
+  }
+
+  .el-button--small {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .app-header,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .iot-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

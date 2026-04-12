@@ -60,6 +60,7 @@
 | 文档 | 说明 |
 |------|------|
 | [前端设计说明](frontend/frontend_design.md) | 技术栈、布局、页面设计、组件、API、实现差异 |
+| [前端优化记录](frontend/frontend_optimization.md) | 响应式适配、移动端交互、空状态、登录页面优化 |
 
 ---
 
@@ -106,7 +107,8 @@ docs/
 │   ├── hardware_code_design.md
 │   └── hardware_guide.md
 ├── frontend/                    # 前端设计
-│   └── frontend_design.md
+│   ├── frontend_design.md
+│   └── frontend_optimization.md
 ├── design/                      # 设计
 │   └── logging.md
 └── archive/                     # 归档

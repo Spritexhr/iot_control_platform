@@ -117,6 +117,40 @@ async function handleLogin() {
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: var(--iot-spacing-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装饰 - 浮动的圆圈 */
+.auth-page::before,
+.auth-page::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.15;
+}
+
+.auth-page::before {
+  width: 400px;
+  height: 400px;
+  background: #fff;
+  top: -100px;
+  right: -100px;
+  animation: float 20s ease-in-out infinite;
+}
+
+.auth-page::after {
+  width: 300px;
+  height: 300px;
+  background: #fff;
+  bottom: -50px;
+  left: -50px;
+  animation: float 15s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, 30px); }
 }
 
 .auth-card {
@@ -126,6 +160,20 @@ async function handleLogin() {
   border-radius: var(--iot-radius-xl);
   padding: 40px 36px;
   box-shadow: var(--iot-shadow-lg);
+  position: relative;
+  z-index: 1;
+  animation: slide-up 0.4s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-header {
@@ -158,6 +206,12 @@ async function handleLogin() {
   font-size: var(--iot-font-size-md);
   border-radius: var(--iot-radius-base);
   margin-top: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
 }
 
 .auth-footer {
@@ -181,5 +235,42 @@ async function handleLogin() {
 /* 暗色主题适配 */
 :global(html.dark) .auth-page {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+:global(html.dark) .auth-page::before,
+:global(html.dark) .auth-page::after {
+  background: #409EFF;
+  opacity: 0.08;
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .auth-page {
+    padding: var(--iot-spacing-md);
+    align-items: center;
+  }
+
+  .auth-card {
+    padding: 28px 24px;
+    border-radius: var(--iot-radius-lg);
+  }
+
+  .auth-logo svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .auth-title {
+    font-size: var(--iot-font-size-lg);
+  }
+
+  .auth-subtitle {
+    font-size: var(--iot-font-size-sm);
+  }
+
+  .auth-page::before,
+  .auth-page::after {
+    display: none;
+  }
 }
 </style>

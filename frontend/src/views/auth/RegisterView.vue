@@ -223,4 +223,30 @@ async function handleRegister() {
 :global(html.dark) .auth-page {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
 }
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .auth-page {
+    padding: var(--iot-spacing-md);
+    align-items: center;
+  }
+
+  .auth-card {
+    padding: 24px 20px;
+    border-radius: var(--iot-radius-lg);
+  }
+
+  .auth-logo svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .auth-title {
+    font-size: var(--iot-font-size-lg);
+  }
+
+  .auth-subtitle {
+    font-size: var(--iot-font-size-sm);
+  }
+}
 </style>

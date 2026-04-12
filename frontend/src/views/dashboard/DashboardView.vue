@@ -170,7 +170,7 @@
         <el-button text size="small" type="primary" @click="router.push('/automation')">管理规则 →</el-button>
       </div>
       <div class="iot-card__body" style="padding-top: 0;">
-        <el-table :data="stats.recent_rules" size="small" stripe>
+        <el-table v-if="stats.recent_rules && stats.recent_rules.length" :data="stats.recent_rules" size="small" stripe>
           <el-table-column prop="name" label="规则名称" min-width="200">
             <template #default="{ row }">
               <span class="clickable-name" @click="router.push(`/automation/${row.id}`)">
@@ -188,6 +188,9 @@
             <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
           </el-table-column>
         </el-table>
+        <el-empty v-else description="暂无自动化规则" :image-size="80">
+          <el-button type="primary" size="small" @click="router.push('/automation')">创建规则</el-button>
+        </el-empty>
       </div>
     </div>
   </div>
@@ -373,6 +376,45 @@ onMounted(() => {
 @media (max-width: 1024px) {
   .dashboard-content {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .iot-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--iot-spacing-sm);
+  }
+
+  .iot-page-subtitle {
+    display: none;
+  }
+
+  .stat-card__body {
+    padding: var(--iot-spacing-md);
+  }
+
+  .stat-card__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .iot-data-value {
+    font-size: var(--iot-font-size-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card__content {
+    min-width: 0;
+  }
+
+  .stat-card__sub {
+    font-size: 10px;
+  }
+
+  .section-title {
+    font-size: var(--iot-font-size-sm);
   }
 }
 </style>

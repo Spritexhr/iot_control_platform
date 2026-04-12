@@ -126,8 +126,20 @@ function timeAgo(dateStr) {
   transition: opacity 0.2s, color 0.2s;
 }
 
-.device-card:hover .device-card__delete {
+.device-card:hover .device-card__delete,
+.device-card--touch .device-card__delete {
   opacity: 1;
+}
+
+/* 移动端：始终显示删除按钮 */
+@media (max-width: 767px) {
+  .device-card__delete {
+    opacity: 0.7;
+  }
+
+  .device-card:hover .device-card__delete {
+    opacity: 1;
+  }
 }
 
 .device-card__delete:hover {
