@@ -43,7 +43,8 @@ iot_control_platform/
 | `services.mqtt_service` | MQTT 服务 | console, file_mqtt, file_app, file_error | DEBUG |
 | `services.sensors_service` | 传感器数据/状态/命令 | console, file_sensors, file_app, file_error | DEBUG |
 | `services.devices_service` | 设备状态/命令 | console, file_devices, file_app, file_error | DEBUG |
-| `automation` | 自动化引擎、规则、视图 | console, file_automation, file_app, file_error | DEBUG |
+| `automation` | 自动化引擎、规则、视图 | console, file_automation, file_app, file_error | INFO |
+| `automation.scheduler` | 自动化后台守护轮询器 | console, file_automation, file_app, file_error | INFO |
 | `sensors` / `sensors.apps` | MQTT 自启动 | console, file_mqtt, file_app, file_error | DEBUG |
 | `platform_settings` | seed、cleanup、reload | console, file_platform_settings, file_app, file_error | INFO |
 | root | 未明确指定的模块 | console, file_app, file_error | INFO |
@@ -58,7 +59,7 @@ iot_control_platform/
 | file_mqtt | mqtt.log | DEBUG | MQTT 专用 |
 | file_sensors | sensors.log | DEBUG | 传感器专用 |
 | file_devices | devices.log | DEBUG | 设备专用 |
-| file_automation | automation.log | DEBUG | 自动化专用 |
+| file_automation | automation.log | INFO | 自动化专用（包括引擎、API和后台调度器），设为 INFO 避免轮询每秒刷屏 |
 | file_platform_settings | platform_settings.log | INFO | 平台配置（seed、cleanup、reload） |
 | file_error | error.log | ERROR | 错误汇总 |
 
@@ -132,6 +133,7 @@ ERROR 2025-02-21 14:35:10 [services.devices_service.device_command_send_service]
 | sensor_upload_data_handlers | 同上 | `logger.error("✗ 传感器不存在")` |
 | device_command_send_service | 同上 | `logger.warning("⚠ check_code 校验失败")` |
 | automation.engine | 同上 | `logger.exception("自动化规则执行异常")` |
+| automation.scheduler | 同上 | `logger.info("调度器执行规则: XXX")` |
 | platform_settings（seed、cleanup、views） | `logger = logging.getLogger("platform_settings")` | `logger.info("已加载 10 项默认配置")` |
 | sensors.apps | 同上 | `logger.info("✓ MQTT服务启动成功")` |
 

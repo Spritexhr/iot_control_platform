@@ -8,18 +8,28 @@
 
 | 组件 | 路径 | 职责 |
 |-----|------|------|
-| AutomationRule | `automation.models` | 存储规则、脚本、device_list、轮询状态 |
+| AutomationRule | `automation.models` | 存储规则、脚本、device_list、轮询状态及最后执行时间 |
 | engine | `automation.engine` | 注入 sensors/devices，执行脚本，查找并调用控制器类的 loop() |
+| scheduler | `automation.scheduler` | 后台守护线程，负责定期扫描并触发执行处于轮询状态的规则 |
 | head_files.sensors | `automation.head_files.sensors` | 构建 sensors 代理，提供 `sensors.get(device_id)` 获取传感器包装对象 |
 | head_files.devices | `automation.head_files.devices` | 构建 devices 代理，提供 `devices.get(device_id)` 获取设备包装对象及 send_command |
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         AutomationRule                                       │
-│  script, device_list                                                         │
+│  script, device_list, poll_interval, last_run_time                           │
 └─────────────────────────────────────┬───────────────────────────────────────┘
-                                       │
-                                       ▼
+                                      ▲ (检查与更新状态)
+                                      │
+┌─────────────────────────────────────┴───────────────────────────────────────┐
+│                        scheduler (后台守护线程)                              │
+│  1. 每秒扫描 `is_launched=True` 且 `process_status='running'` 的规则           │
+│  2. 检查 `当前时间 - last_run_time >= poll_interval`                          │
+│  3. 满足条件则更新 `last_run_time` 并调用 `engine.execute_rule(rule)`           │
+│  4. 若执行抛出异常，更新状态为 `error_stopped` 并记录 `error_message`           │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │ (触发执行)
+                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  engine.execute_rule(rule)                                                   │
 │    1. build_sensors(device_list) / build_devices(device_list)                │
@@ -67,6 +77,7 @@
 | poll_interval | PositiveIntegerField | 轮询间隔（秒），默认 30 |
 | process_status | CharField | idle / running / stopped_by_user / error_stopped |
 | error_message | TextField | 错误详情（error_stopped 时） |
+| last_run_time | DateTimeField | 最后执行时间（供调度器计算下次执行时间） |
 
 ### 2.2 device_list 格式
 
@@ -200,9 +211,17 @@ AutomationRule.execute_by_script_id_with_timed_polling('humidity_alert', interva
 # 每 30 秒执行一次 loop()，Ctrl+C 停止
 ```
 
-### 5.3 通过 API / 管理后台
+### 5.3 后台守护轮询 (Scheduler)
 
-规则可由 views、admin 或定时任务触发执行，具体见 automation 应用的路由与视图实现。
+自动化规则的轮询通过 `automation.scheduler` 模块中的后台线程实现：
+- 线程在 Django 启动时（`apps.py` 的 `ready()` 方法）自动启动。
+- 每秒钟扫描一次 `AutomationRule` 表，查找所有标记为运行状态 (`is_launched=True` 且 `process_status='running'`) 的规则。
+- 对比 `last_run_time` 与当前时间，如果超过 `poll_interval`，则调用 `execute_rule`，并更新 `last_run_time`。
+- 如果执行中发生严重异常，调度器将自动把 `process_status` 置为 `error_stopped`，记录错误并停止该规则的轮询，保护系统稳定。
+
+### 5.4 通过 API / 管理后台
+
+规则可由 views (`/api/automation-rules/{id}/launch/`) 触发状态更新。前端只负责修改状态并定期查询结果，由后台调度器接管实际的执行循环。
 
 ---
 
@@ -212,6 +231,8 @@ AutomationRule.execute_by_script_id_with_timed_polling('humidity_alert', interva
 automation/
 ├── models.py              # AutomationRule 模型
 ├── engine.py              # execute_rule、_find_controller_class
+├── scheduler.py           # 后台守护线程轮询器
+├── apps.py                # 注册启动 scheduler
 ├── head_files/
 │   ├── __init__.py
 │   ├── sensors.py         # build_sensors、SensorWrapper

@@ -81,8 +81,9 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
         rule.is_launched = True
         rule.process_status = 'running'
         rule.error_message = ''
+        rule.last_run_time = None  # 重新启动时清空上次执行时间
         rule.save(update_fields=['is_launched', 'process_status', 'error_message',
-                                 'poll_interval', 'updated_at'])
+                                 'poll_interval', 'last_run_time', 'updated_at'])
         return Response({
             'id': rule.id,
             'is_launched': rule.is_launched,

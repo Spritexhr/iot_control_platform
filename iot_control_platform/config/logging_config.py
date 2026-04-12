@@ -26,7 +26,10 @@ LOG_DIR.mkdir(exist_ok=True)
 LOG_RETENTION_DAYS = 1  # backupCount，当前日 + 1 备份 = 2 天
 
 # Django autoreload 父进程不写文件日志，避免与子进程争用（Windows PermissionError）
-_IS_RELOADER_PARENT = os.environ.get("RUN_MAIN") != "true"
+# 只有在 runserver 模式下才需要区分，如果是 gunicorn 等其他方式启动，则正常写日志
+_IS_RELOADER_PARENT = False
+if "runserver" in sys.argv and os.environ.get("RUN_MAIN") != "true":
+    _IS_RELOADER_PARENT = True
 
 
 class WindowsTimedRotatingFileHandler(TimedRotatingFileHandler):
@@ -109,7 +112,7 @@ def get_logging_config() -> dict:
             },
             # 自动化
             "file_automation": {
-                "level": "DEBUG",
+                "level": "INFO",  # 将自动化日志级别改为 INFO，避免每秒扫描记录太多 DEBUG 日志
                 "class": "config.logging_config.WindowsTimedRotatingFileHandler",
                 "filename": str(LOG_DIR / "automation.log"),
                 "when": "midnight",
@@ -180,7 +183,8 @@ def get_logging_config() -> dict:
             "services.mqtt_service": {"handlers": _mqtt, "level": "DEBUG", "propagate": False},
             "services.sensors_service": {"handlers": _sensors_h, "level": "DEBUG", "propagate": False},
             "services.devices_service": {"handlers": _devices_h, "level": "DEBUG", "propagate": False},
-            "automation": {"handlers": _auto_h, "level": "DEBUG", "propagate": False},
+            "automation": {"handlers": _auto_h, "level": "INFO", "propagate": False},
+            "automation.scheduler": {"handlers": _auto_h, "level": "INFO", "propagate": False},
             "sensors": {"handlers": _mqtt, "level": "DEBUG", "propagate": False},
             "sensors.apps": {"handlers": _mqtt, "level": "DEBUG", "propagate": False},
             "platform_settings": {"handlers": _plat_h, "level": "INFO", "propagate": False},

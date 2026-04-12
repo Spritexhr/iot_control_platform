@@ -83,6 +83,12 @@ class AutomationRule(models.Model):
         verbose_name="错误信息",
         help_text="当 process_status 为 error_stopped 时的错误详情"
     )
+    last_run_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="最后执行时间",
+        help_text="后台轮询调度器记录的最后一次执行时间"
+    )
 
     # ========== 时间戳 ==========
     created_at = models.DateTimeField(auto_now_add=True)

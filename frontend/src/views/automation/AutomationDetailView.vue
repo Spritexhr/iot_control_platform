@@ -187,7 +187,7 @@ class MyController:
               :icon="VideoPause"
               @click="stopPolling"
             >
-              停止轮询 ({{ pollCountdown }}s)
+              停止轮询
             </el-button>
 
             <el-divider direction="vertical" />
@@ -205,15 +205,12 @@ class MyController:
                 :class="polling ? 'iot-status-dot--online' : 'iot-status-dot--offline'"
               ></span>
               <span v-if="polling" class="terminal-status-text terminal-status-text--active">
-                轮询运行中 · 已执行 {{ pollTotalRuns }} 次 · 成功 {{ pollSuccessCount }} 次
+                后台轮询服务已接管 (运行中)
               </span>
               <span v-else class="terminal-status-text">
                 {{ terminalLines.length ? `共 ${terminalLines.length} 条日志` : '等待执行...' }}
               </span>
             </div>
-            <span v-if="pollTotalRuns > 0" class="terminal-status-right">
-              成功率 {{ pollTotalRuns > 0 ? Math.round(pollSuccessCount / pollTotalRuns * 100) : 0 }}%
-            </span>
           </div>
           <!-- 终端输出 -->
           <div ref="terminalRef" class="terminal">
@@ -302,9 +299,6 @@ async function fetchRule() {
   try {
     rule.value = await getAutomationRule(id)
     if (!rule.value.device_list) rule.value.device_list = []
-    if (rule.value.is_launched && rule.value.process_status === 'running') {
-      resumePolling()
-    }
   } catch {
     ElMessage.error('获取规则详情失败')
     rule.value = null
@@ -369,8 +363,6 @@ function logLevelToType(level) {
 
 function clearTerminal() {
   terminalLines.value = []
-  pollTotalRuns.value = 0
-  pollSuccessCount.value = 0
 }
 
 // ==================== 单次执行 ====================
@@ -411,24 +403,11 @@ async function handleExecute() {
 }
 
 // ==================== 轮询执行（后端状态驱动） ====================
-const polling = ref(false)
+const polling = computed(() => rule.value?.is_launched && rule.value?.process_status === 'running')
 const pollInterval = computed({
   get: () => rule.value?.poll_interval || 30,
   set: (val) => { if (rule.value) rule.value.poll_interval = val },
 })
-const pollCountdown = ref(0)
-const pollTotalRuns = ref(0)
-const pollSuccessCount = ref(0)
-let pollTimer = null
-let countdownTimer = null
-
-function resumePolling() {
-  if (polling.value) return
-  polling.value = true
-  pollCountdown.value = 0
-  appendTerminal('info', `▶ 轮询已恢复（后端状态为运行中），间隔 ${pollInterval.value} 秒`)
-  runPollCycle()
-}
 
 async function startPolling() {
   if (polling.value) return
@@ -437,71 +416,52 @@ async function startPolling() {
     rule.value.is_launched = res.is_launched
     rule.value.process_status = res.process_status
     rule.value.poll_interval = res.poll_interval
+    appendTerminal('info', `▶ 后台轮询已启动，间隔 ${pollInterval.value} 秒`)
   } catch {
     ElMessage.error('启动轮询失败')
-    return
   }
-  polling.value = true
-  pollCountdown.value = 0
-  appendTerminal('info', `▶ 轮询已启动，间隔 ${pollInterval.value} 秒`)
-  runPollCycle()
 }
 
 async function stopPolling() {
-  polling.value = false
-  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
   try {
     const res = await stopAutomationRule(rule.value.id, 'user')
     rule.value.is_launched = res.is_launched
     rule.value.process_status = res.process_status
-  } catch { /* ignore */ }
-  appendTerminal('info', '⏹ 轮询已停止')
-}
-
-async function runPollCycle() {
-  if (!polling.value) return
-  pollTotalRuns.value++
-  const runNo = pollTotalRuns.value
-  appendTerminal('info', `── 第 ${runNo} 次执行 ──`)
-  const result = await handleExecute()
-  if (result.success) pollSuccessCount.value++
-  if (result.fatalError) {
-    polling.value = false
-    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
-    const errorMsg = '执行异常导致轮询终止'
-    try {
-      const res = await stopAutomationRule(rule.value.id, 'error', errorMsg)
-      rule.value.is_launched = res.is_launched
-      rule.value.process_status = res.process_status
-      rule.value.error_message = res.error_message
-    } catch { /* ignore */ }
-    appendTerminal('error', '轮询已终止（执行异常）')
-    return
+    appendTerminal('info', '⏹ 后台轮询已停止')
+  } catch {
+    ElMessage.error('停止轮询失败')
   }
-
-  if (!polling.value) return
-
-  pollCountdown.value = pollInterval.value
-  if (countdownTimer) clearInterval(countdownTimer)
-  countdownTimer = setInterval(() => {
-    pollCountdown.value--
-    if (pollCountdown.value <= 0) {
-      clearInterval(countdownTimer)
-      countdownTimer = null
-    }
-  }, 1000)
-
-  pollTimer = setTimeout(() => {
-    runPollCycle()
-  }, pollInterval.value * 1000)
 }
 
-onUnmounted(() => {
-  if (pollTimer) clearTimeout(pollTimer)
-  if (countdownTimer) clearInterval(countdownTimer)
-})
+// 定时刷新后端状态
+let statusRefreshTimer = null
+
+function startStatusRefresh() {
+  if (statusRefreshTimer) clearInterval(statusRefreshTimer)
+  statusRefreshTimer = setInterval(async () => {
+    if (!rule.value) return
+    try {
+      const data = await getAutomationRule(rule.value.id)
+      // 如果后端状态变成了 error_stopped，且之前是 running，说明发生了后台异常
+      if (data.process_status === 'error_stopped' && rule.value.process_status === 'running') {
+        appendTerminal('error', `后台轮询异常停止: ${data.error_message || '未知错误'}`)
+      }
+      rule.value.is_launched = data.is_launched
+      rule.value.process_status = data.process_status
+      rule.value.error_message = data.error_message
+      rule.value.poll_interval = data.poll_interval
+    } catch {
+      // 忽略刷新错误
+    }
+  }, 5000)
+}
+
+function stopStatusRefresh() {
+  if (statusRefreshTimer) {
+    clearInterval(statusRefreshTimer)
+    statusRefreshTimer = null
+  }
+}
 
 // ==================== 设备列表 ====================
 function addDeviceRow() {
@@ -557,6 +517,11 @@ function handleTabKey(e) {
 // ==================== 初始化 ====================
 onMounted(() => {
   fetchRule()
+  startStatusRefresh()
+})
+
+onUnmounted(() => {
+  stopStatusRefresh()
 })
 </script>
 

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 - `services.mqtt_service` → 输出到 mqtt.log、app.log、error.log
 - `services.sensors_service.xxx` → 输出到 sensors.log、app.log、error.log
 - `automation.engine` → 输出到 automation.log、app.log、error.log
+- `automation.scheduler` → 输出到 automation.log、app.log、error.log（强制 INFO 级别防止刷屏）
 
 ### 1.2 常用级别
 
@@ -107,7 +108,7 @@ grep "ERROR" iot_control_platform/logs/error.log
 | mqtt.log | services.mqtt_service、sensors.apps |
 | sensors.log | services.sensors_service（数据、状态、命令） |
 | devices.log | services.devices_service（状态、命令） |
-| automation.log | automation（engine、views） |
+| automation.log | automation（engine、views、scheduler） |
 | error.log | 所有 WARNING/ERROR 及以上 |
 
 ---

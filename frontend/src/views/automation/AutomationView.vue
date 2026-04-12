@@ -50,8 +50,8 @@
               </el-tag>
             </div>
             <div v-if="isStaff || isSuperuser" class="rule-card__actions">
-              <template v-if="isStaff && rule.is_launched && localTimers[rule.id]">
-                <span class="poll-interval-label">间隔 {{ rule.poll_interval || 30 }}s</span>
+              <template v-if="isStaff && rule.is_launched && rule.process_status === 'running'">
+                <span class="poll-interval-label">后台运行中 (间隔 {{ rule.poll_interval || 30 }}s)</span>
                 <el-button
                   type="danger"
                   size="small"
@@ -59,7 +59,7 @@
                   :loading="launchLoading[rule.id]"
                   @click="handleStop(rule)"
                 >
-                  停止轮询 ({{ countdowns[rule.id] ?? 0 }}s)
+                  停止轮询
                 </el-button>
               </template>
               <template v-else-if="isStaff">
@@ -206,7 +206,6 @@ async function fetchRules() {
     if (searchText.value) params.search = searchText.value
     const data = await getAutomationRules(params)
     rules.value = data.results || data
-    resumeLaunchedRules()
   } catch {
     ElMessage.error('获取规则列表失败')
   } finally {
@@ -236,19 +235,8 @@ function getStatusTagType(rule) {
   return typeMap[rule.process_status] || 'info'
 }
 
-// ==================== 轮询控制（后端状态 + 本地定时器） ====================
-const localTimers = reactive({})
-const countdowns = reactive({})
+// ==================== 轮询控制（后端状态） ====================
 const launchLoading = ref({})
-let countdownIntervals = {}
-
-function resumeLaunchedRules() {
-  rules.value.forEach((rule) => {
-    if (rule.is_launched && rule.process_status === 'running' && !localTimers[rule.id]) {
-      startLocalTimer(rule)
-    }
-  })
-}
 
 async function handleLaunch(rule) {
   launchLoading.value[rule.id] = true
@@ -258,7 +246,7 @@ async function handleLaunch(rule) {
     rule.process_status = res.process_status
     rule.poll_interval = res.poll_interval
     rule.error_message = ''
-    startLocalTimer(rule)
+    ElMessage.success(`规则「${rule.name}」后台轮询已启动`)
   } catch {
     ElMessage.error('启动轮询失败')
   } finally {
@@ -267,13 +255,13 @@ async function handleLaunch(rule) {
 }
 
 async function handleStop(rule) {
-  clearLocalTimer(rule.id)
   launchLoading.value[rule.id] = true
   try {
     const res = await stopAutomationRule(rule.id, 'user')
     rule.is_launched = res.is_launched
     rule.process_status = res.process_status
     rule.error_message = ''
+    ElMessage.success(`规则「${rule.name}」已停止轮询`)
   } catch {
     ElMessage.error('停止轮询失败')
   } finally {
@@ -281,79 +269,39 @@ async function handleStop(rule) {
   }
 }
 
-function startLocalTimer(rule) {
-  if (localTimers[rule.id]) return
-  countdowns[rule.id] = 0
-  runPollCycle(rule)
-}
-
-async function runPollCycle(rule) {
-  if (!localTimers[rule.id] && countdowns[rule.id] !== 0) return
-  if (!rule.is_launched) return
-
-  execLoading.value[rule.id] = true
-  execResult.value[rule.id] = null
-  try {
-    const res = await executeAutomationRule(rule.id)
-    execResult.value[rule.id] = res
-  } catch (err) {
-    const errorMsg = err.response?.data?.error || err.message || '执行异常'
-    execResult.value[rule.id] = {
-      success: false,
-      error: errorMsg,
-      output: err.response?.data?.output || '',
-    }
-    clearLocalTimer(rule.id)
+// ==================== 定期刷新状态 ====================
+let statusRefreshTimer = null
+function startStatusRefresh() {
+  if (statusRefreshTimer) clearInterval(statusRefreshTimer)
+  statusRefreshTimer = setInterval(async () => {
     try {
-      const res = await stopAutomationRule(rule.id, 'error', errorMsg)
-      rule.is_launched = res.is_launched
-      rule.process_status = res.process_status
-      rule.error_message = res.error_message
-    } catch { /* ignore */ }
-    ElMessage.error(`规则「${rule.name}」执行异常，轮询已终止`)
-    return
-  } finally {
-    execLoading.value[rule.id] = false
-  }
-
-  if (!rule.is_launched) return
-
-  scheduleNext(rule)
-}
-
-function scheduleNext(rule) {
-  const interval = rule.poll_interval || 30
-  countdowns[rule.id] = interval
-
-  if (countdownIntervals[rule.id]) clearInterval(countdownIntervals[rule.id])
-  countdownIntervals[rule.id] = setInterval(() => {
-    countdowns[rule.id]--
-    if (countdowns[rule.id] <= 0) {
-      clearInterval(countdownIntervals[rule.id])
-      delete countdownIntervals[rule.id]
+      const params = {}
+      if (searchText.value) params.search = searchText.value
+      const data = await getAutomationRules(params)
+      const newRules = data.results || data
+      // 仅更新状态，避免覆盖用户的输入
+      newRules.forEach(newRule => {
+        const oldRule = rules.value.find(r => r.id === newRule.id)
+        if (oldRule) {
+          oldRule.is_launched = newRule.is_launched
+          oldRule.process_status = newRule.process_status
+          oldRule.error_message = newRule.error_message
+          if (!launchLoading.value[oldRule.id]) {
+            oldRule.poll_interval = newRule.poll_interval
+          }
+        }
+      })
+    } catch {
+      // 忽略刷新错误
     }
-  }, 1000)
-
-  localTimers[rule.id] = setTimeout(() => {
-    delete localTimers[rule.id]
-    runPollCycle(rule)
-  }, interval * 1000)
+  }, 5000)
 }
 
-function clearLocalTimer(ruleId) {
-  if (localTimers[ruleId]) {
-    clearTimeout(localTimers[ruleId])
-    delete localTimers[ruleId]
+function stopStatusRefresh() {
+  if (statusRefreshTimer) {
+    clearInterval(statusRefreshTimer)
+    statusRefreshTimer = null
   }
-  if (countdownIntervals[ruleId]) {
-    clearInterval(countdownIntervals[ruleId])
-    delete countdownIntervals[ruleId]
-  }
-  countdowns[ruleId] = 0
-}
-
-function clearAllTimers() {
-  Object.keys(localTimers).forEach((id) => clearLocalTimer(id))
 }
 
 // ==================== 手动执行 ====================
@@ -388,7 +336,6 @@ async function handleDelete(rule) {
   } catch {
     return
   }
-  clearLocalTimer(rule.id)
   try {
     await deleteAutomationRule(rule.id)
     ElMessage.success('已删除')
@@ -462,10 +409,11 @@ function formatTime(str) {
 // ==================== 初始化 / 清理 ====================
 onMounted(() => {
   fetchRules()
+  startStatusRefresh()
 })
 
 onUnmounted(() => {
-  clearAllTimers()
+  stopStatusRefresh()
 })
 </script>
 
