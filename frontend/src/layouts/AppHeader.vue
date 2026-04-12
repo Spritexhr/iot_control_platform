@@ -323,6 +323,7 @@ async function handleLogout() {
   top: 0;
   z-index: 999;
   transition: background-color var(--iot-transition-base);
+  backdrop-filter: blur(8px);
 }
 
 .app-header__left {
@@ -347,7 +348,7 @@ async function handleLogout() {
 .app-header__right {
   display: flex;
   align-items: center;
-  gap: var(--iot-spacing-sm);
+  gap: 6px;
 }
 
 /* MQTT 状态 */
@@ -356,10 +357,12 @@ async function handleLogout() {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: 12px;
-  background: var(--iot-bg-page);
+  border-radius: 20px;
+  background: var(--iot-border-color-lighter);
+  border: 1px solid var(--iot-border-color-light);
   font-size: var(--iot-font-size-xs);
   cursor: default;
+  transition: background var(--iot-transition-fast);
 }
 
 .mqtt-label {
@@ -377,21 +380,21 @@ async function handleLogout() {
 
 /* 操作按钮 */
 .header-action-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
   border-radius: var(--iot-radius-base);
-  color: var(--iot-text-regular);
+  color: var(--iot-text-secondary);
   cursor: pointer;
   transition: all var(--iot-transition-fast);
 }
 
 .header-action-btn:hover {
-  background: var(--iot-bg-page);
+  background: var(--iot-border-color-lighter);
   color: var(--iot-color-primary);
 }
 
@@ -401,21 +404,23 @@ async function handleLogout() {
   align-items: center;
   gap: 8px;
   padding: 4px 12px 4px 4px;
-  border: 1px solid var(--iot-border-color-light);
-  background: transparent;
-  border-radius: 20px;
+  border: 1px solid var(--iot-border-color);
+  background: var(--iot-bg-card);
+  border-radius: 22px;
   cursor: pointer;
   color: var(--iot-text-regular);
   transition: all var(--iot-transition-fast);
+  box-shadow: var(--iot-shadow-sm);
 }
 
 .user-menu-btn:hover {
   border-color: var(--iot-color-primary);
   color: var(--iot-color-primary);
+  box-shadow: 0 2px 8px rgba(217, 119, 87, 0.15);
 }
 
 .user-avatar {
-  background-color: var(--iot-color-primary);
+  background: linear-gradient(135deg, #D97757, #E8885A);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -428,6 +433,7 @@ async function handleLogout() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--iot-text-primary);
 }
 
 /* 响应式：移动端 */

@@ -1,5 +1,5 @@
 /* ============================================
-   IoT 控制平台 - 全局样式
+   IoT 控制平台 - 全局样式（Claude 风格）
    ============================================ */
 
 @use './variables.scss';
@@ -25,6 +25,7 @@ body {
   color: var(--iot-text-primary);
   background-color: var(--iot-bg-page);
   line-height: 1.6;
+  letter-spacing: 0.01em;
   transition: background-color var(--iot-transition-base),
               color var(--iot-transition-base);
 }
@@ -65,8 +66,8 @@ a {
 
 /* ---------- 选中文本 ---------- */
 ::selection {
-  background-color: var(--iot-color-primary);
-  color: #fff;
+  background-color: rgba(217, 119, 87, 0.25);
+  color: var(--iot-text-primary);
 }
 
 /* ============================================
@@ -77,7 +78,7 @@ a {
 .iot-card {
   background: var(--iot-bg-card);
   border-radius: var(--iot-radius-lg);
-  box-shadow: var(--iot-shadow-base);
+  box-shadow: var(--iot-shadow-sm);
   border: 1px solid var(--iot-border-color-light);
   transition: transform var(--iot-transition-base),
               box-shadow var(--iot-transition-base),
@@ -116,7 +117,7 @@ a {
 
   &--online {
     background-color: var(--iot-color-success);
-    box-shadow: 0 0 6px rgba(0, 191, 165, 0.4);
+    box-shadow: 0 0 6px rgba(76, 175, 130, 0.45);
     animation: iot-pulse 2s ease-in-out infinite;
   }
 
@@ -149,7 +150,7 @@ a {
   align-items: center;
   gap: 6px;
   padding: 2px 10px;
-  border-radius: 10px;
+  border-radius: 20px;
   font-size: var(--iot-font-size-xs);
   font-weight: 500;
   line-height: 20px;
@@ -161,7 +162,7 @@ a {
 
   &--offline {
     color: var(--iot-color-info);
-    background: rgba(144, 147, 153, 0.08);
+    background: rgba(139, 123, 107, 0.10);
   }
 
   &--warning {
@@ -203,6 +204,7 @@ a {
   font-size: var(--iot-font-size-xs);
   color: var(--iot-text-secondary);
   margin-bottom: 4px;
+  letter-spacing: 0.02em;
 }
 
 /* ---------- 页面标题区 ---------- */
@@ -217,6 +219,7 @@ a {
   font-size: var(--iot-font-size-xl);
   font-weight: 600;
   color: var(--iot-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .iot-page-subtitle {
@@ -287,7 +290,7 @@ a {
    ============================================ */
 @keyframes iot-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.45; }
 }
 
 @keyframes iot-spin {
@@ -296,7 +299,7 @@ a {
 }
 
 @keyframes iot-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -305,33 +308,147 @@ a {
 }
 
 /* ============================================
-   Element Plus 全局样式覆盖
+   Element Plus 全局样式覆盖（Claude 风格）
    ============================================ */
 
-/* 按钮圆角 */
+/* 按钮 */
 .el-button {
   border-radius: var(--iot-radius-base) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
 }
 
-/* 弹窗圆角 */
+.el-button--primary {
+  background-color: var(--iot-color-primary) !important;
+  border-color: var(--iot-color-primary) !important;
+
+  &:hover {
+    background-color: var(--iot-color-primary-light) !important;
+    border-color: var(--iot-color-primary-light) !important;
+  }
+}
+
+/* 弹窗 */
 .el-dialog {
-  border-radius: var(--iot-radius-lg) !important;
+  border-radius: var(--iot-radius-xl) !important;
+  box-shadow: var(--iot-shadow-lg) !important;
+  border: 1px solid var(--iot-border-color-light) !important;
 }
 
-/* 抽屉内容 */
+.el-dialog__header {
+  border-bottom: 1px solid var(--iot-border-color-light);
+  padding: 20px 24px 16px !important;
+}
+
+.el-dialog__title {
+  font-weight: 600 !important;
+  font-size: var(--iot-font-size-md) !important;
+  color: var(--iot-text-primary) !important;
+}
+
+/* 抽屉 */
 .el-drawer__body {
   padding: var(--iot-spacing-lg);
 }
 
-/* 表格样式 */
+/* 表格 */
 .el-table {
   --el-table-border-color: var(--iot-border-color-light);
-  --el-table-header-bg-color: var(--iot-bg-card);
+  --el-table-header-bg-color: var(--iot-bg-page);
+  border-radius: var(--iot-radius-lg);
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600 !important;
+  color: var(--iot-text-secondary) !important;
+  font-size: var(--iot-font-size-xs) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* 标签页 */
 .el-tabs__nav-wrap::after {
   height: 1px !important;
+  background-color: var(--iot-border-color-light) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--iot-color-primary) !important;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--iot-color-primary) !important;
+}
+
+/* 输入框 */
+.el-input__wrapper {
+  border-radius: var(--iot-radius-base) !important;
+  box-shadow: 0 0 0 1px var(--iot-border-color) inset !important;
+  background-color: var(--iot-bg-card) !important;
+  transition: box-shadow var(--iot-transition-fast) !important;
+
+  &:hover {
+    box-shadow: 0 0 0 1px var(--iot-color-primary) inset !important;
+  }
+
+  &.is-focus {
+    box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25) inset,
+                0 0 0 1px var(--iot-color-primary) inset !important;
+  }
+}
+
+/* 选择器 */
+.el-select .el-input__wrapper {
+  border-radius: var(--iot-radius-base) !important;
+}
+
+/* 标签 */
+.el-tag {
+  border-radius: 20px !important;
+  font-weight: 500 !important;
+}
+
+/* 分页 */
+.el-pagination button,
+.el-pagination .el-pager li {
+  border-radius: var(--iot-radius-sm) !important;
+}
+
+/* 面包屑 */
+.el-breadcrumb__item .el-breadcrumb__inner {
+  color: var(--iot-text-secondary) !important;
+  font-weight: 400 !important;
+
+  &:hover {
+    color: var(--iot-color-primary) !important;
+  }
+}
+
+.el-breadcrumb__item:last-child .el-breadcrumb__inner {
+  color: var(--iot-text-primary) !important;
+  font-weight: 500 !important;
+}
+
+/* 下拉菜单 */
+.el-dropdown-menu {
+  border-radius: var(--iot-radius-lg) !important;
+  border: 1px solid var(--iot-border-color-light) !important;
+  box-shadow: var(--iot-shadow-md) !important;
+  padding: 6px !important;
+  overflow: hidden;
+}
+
+.el-dropdown-menu__item {
+  border-radius: var(--iot-radius-sm) !important;
+  font-size: var(--iot-font-size-sm) !important;
+  color: var(--iot-text-regular) !important;
+  transition: background var(--iot-transition-fast) !important;
+
+  &:hover {
+    background-color: var(--iot-color-primary-bg) !important;
+    color: var(--iot-color-primary) !important;
+  }
 }
 
 /* ============================================
@@ -341,24 +458,50 @@ html.dark {
   .el-table {
     --el-table-bg-color: var(--iot-bg-card);
     --el-table-tr-bg-color: var(--iot-bg-card);
-    --el-table-header-bg-color: var(--iot-bg-sidebar);
+    --el-table-header-bg-color: var(--iot-bg-page);
     --el-table-row-hover-bg-color: var(--iot-bg-card-hover);
     --el-table-text-color: var(--iot-text-primary);
+    --el-table-border-color: var(--iot-border-color);
   }
 
   .el-dialog,
   .el-drawer {
     background-color: var(--iot-bg-card);
+    border-color: var(--iot-border-color) !important;
   }
 
   .el-input__wrapper {
-    background-color: var(--iot-bg-page);
-    box-shadow: 0 0 0 1px var(--iot-border-color) inset;
+    background-color: var(--iot-bg-page) !important;
+    box-shadow: 0 0 0 1px var(--iot-border-color) inset !important;
+
+    &.is-focus {
+      box-shadow: 0 0 0 2px rgba(232, 136, 90, 0.20) inset,
+                  0 0 0 1px var(--iot-color-primary) inset !important;
+    }
   }
 
   .el-card {
     background-color: var(--iot-bg-card);
     border-color: var(--iot-border-color);
+  }
+
+  .el-dropdown-menu {
+    background-color: var(--iot-bg-card) !important;
+    border-color: var(--iot-border-color) !important;
+  }
+
+  .el-dropdown-menu__item:hover {
+    background-color: var(--iot-color-primary-bg) !important;
+  }
+
+  .el-select-dropdown {
+    background-color: var(--iot-bg-card) !important;
+    border-color: var(--iot-border-color) !important;
+  }
+
+  .el-popper.is-light {
+    background-color: var(--iot-bg-card) !important;
+    border-color: var(--iot-border-color) !important;
   }
 }
 
@@ -367,23 +510,23 @@ html.dark {
    ============================================ */
 .fade-transform-enter-active,
 .fade-transform-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
 
 .fade-transform-enter-from {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-8px);
 }
 
 .fade-transform-leave-to {
   opacity: 0;
-  transform: translateX(10px);
+  transform: translateX(8px);
 }
 
 /* 简单淡入淡出 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
 }
 
 .fade-enter-from,

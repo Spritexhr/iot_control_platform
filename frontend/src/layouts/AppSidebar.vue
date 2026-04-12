@@ -108,6 +108,7 @@ const activeMenu = computed(() => {
   left: 0;
   top: 0;
   z-index: 1001;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .app-sidebar--collapsed {
@@ -121,7 +122,7 @@ const activeMenu = computed(() => {
   align-items: center;
   padding: 0 16px;
   gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -132,15 +133,18 @@ const activeMenu = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--iot-color-primary);
+  color: #D97757;
   flex-shrink: 0;
+  background: rgba(217, 119, 87, 0.15);
+  border-radius: var(--iot-radius-base);
 }
 
 .logo-text {
   font-size: 15px;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #F5F0EB;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 /* 菜单 */
@@ -148,7 +152,7 @@ const activeMenu = computed(() => {
   flex: 1;
   border-right: none !important;
   background: transparent !important;
-  padding: 8px 0;
+  padding: 10px 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -160,28 +164,33 @@ const activeMenu = computed(() => {
 }
 
 .app-sidebar__menu :deep(.el-menu-item) {
-  height: 44px;
-  line-height: 44px;
-  margin: 2px 8px;
+  height: 42px;
+  line-height: 42px;
+  margin: 2px 10px;
   border-radius: var(--iot-radius-base);
   color: var(--iot-sidebar-text);
   transition: all var(--iot-transition-fast);
+  font-size: 13.5px;
 }
 
 .app-sidebar__menu :deep(.el-menu-item:hover) {
   background: var(--iot-sidebar-item-hover);
-  color: var(--iot-sidebar-text-active);
+  color: #C8BCB0;
 }
 
 .app-sidebar__menu :deep(.el-menu-item.is-active) {
   background: var(--iot-sidebar-item-active);
-  color: var(--iot-sidebar-text-active);
+  color: #F5F0EB;
   font-weight: 500;
 }
 
+.app-sidebar__menu :deep(.el-menu-item.is-active .el-icon) {
+  color: #D97757;
+}
+
 .app-sidebar__menu :deep(.el-menu-item .el-icon) {
-  font-size: 18px;
-  margin-right: 8px;
+  font-size: 17px;
+  margin-right: 9px;
 }
 
 .app-sidebar__menu :deep(.el-menu--collapse .el-menu-item) {
@@ -196,8 +205,8 @@ const activeMenu = computed(() => {
 
 /* 底部折叠按钮 */
 .app-sidebar__footer {
-  padding: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
 }
 
@@ -215,7 +224,7 @@ const activeMenu = computed(() => {
 
 .collapse-btn:hover {
   background: var(--iot-sidebar-item-hover);
-  color: var(--iot-sidebar-text-active);
+  color: #C8BCB0;
 }
 
 .collapse-text {
