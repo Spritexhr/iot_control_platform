@@ -267,5 +267,13 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),                   # Authorization: Bearer <token>
 }
 
+# 自动化规则脚本允许导入的模块白名单
+# 仅允许导入可信模块，危险模块（os, subprocess, socket, sys 等）禁止引入
+# 格式：逗号分隔的模块名列表
+AUTOMATION_ALLOWED_IMPORTS = os.environ.get(
+    "AUTOMATION_ALLOWED_IMPORTS",
+    "time,datetime,math,random,json,re"
+).split(",")
+
 # 日志配置（定义于 config/logging_config.py）
 from config.logging_config import LOGGING

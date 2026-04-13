@@ -17,7 +17,18 @@ import builtins as _bi
 logger = logging.getLogger(__name__)
 
 # 允许脚本 import 的模块白名单（前缀匹配）
-_IMPORT_WHITELIST = ('engine', 'automation.head_files')
+# 注意：仅添加可信模块，危险模块（如 os, subprocess, socket, sys 等）禁止引入
+# 基础白名单 + settings 中的可配置白名单
+_BASE_IMPORT_WHITELIST = ('engine', 'automation.head_files')
+
+def _get_import_whitelist():
+    """动态获取导入白名单，结合基础白名单和 settings 配置"""
+    from django.conf import settings
+    allowed = list(_BASE_IMPORT_WHITELIST)
+    extra = getattr(settings, 'AUTOMATION_ALLOWED_IMPORTS', [])
+    if extra:
+        allowed.extend(extra)
+    return tuple(allowed)
 
 # 禁用的内置函数：禁止文件/进程/动态代码操作
 _BLOCKED_BUILTINS = frozenset({
@@ -41,12 +52,13 @@ def _make_custom_import(engine_module, real_import):
     def _custom_import(name, *args, **kwargs):
         if name == 'engine':
             return engine_module
-        # 白名单前缀匹配
-        if any(name == prefix or name.startswith(prefix + '.') for prefix in _IMPORT_WHITELIST):
+        # 动态获取白名单前缀匹配
+        whitelist = _get_import_whitelist()
+        if any(name == prefix or name.startswith(prefix + '.') for prefix in whitelist):
             return real_import(name, *args, **kwargs)
         raise ImportError(
             f"自动化脚本不允许导入模块 '{name}'，"
-            f"仅允许: {', '.join(_IMPORT_WHITELIST)}"
+            f"仅允许: {', '.join(whitelist)}"
         )
     return _custom_import
 
