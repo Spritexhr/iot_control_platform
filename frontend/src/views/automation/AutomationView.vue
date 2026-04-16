@@ -288,9 +288,6 @@ function startStatusRefresh() {
           oldRule.is_launched = newRule.is_launched
           oldRule.process_status = newRule.process_status
           oldRule.error_message = newRule.error_message
-          if (!launchLoading.value[oldRule.id]) {
-            oldRule.poll_interval = newRule.poll_interval
-          }
         }
       })
     } catch {

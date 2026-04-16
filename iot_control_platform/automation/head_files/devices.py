@@ -53,10 +53,10 @@ def build_devices(device_list: List[Dict]) -> Any:
             def _make_send_cmd(did: str):
                 def _send_cmd(_self, name: str, params: Optional[Dict] = None):
                     return device_command_send_service.send_custom_command_with_make_sure(
-                        device_id=did,
+                        object_id=did,
                         command_name=name,
                         params=params or {},
-                        time=3,
+                        timeout=3,
                     )
                 return _send_cmd
 

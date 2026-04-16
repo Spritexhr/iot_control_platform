@@ -1,6 +1,6 @@
 # 物联网控制平台 - Django 后端镜像
 # 使用 Python 3.12 轻量级镜像
-FROM python:3.12-slim
+FROM docker.m.daocloud.io/library/python:3.12-slim
 
 # 设置工作目录
 WORKDIR /app
@@ -12,9 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件并安装 Python 包
+# 复制依赖文件并安装 Python 包（使用国内镜像源）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt gunicorn
 
 # 复制项目代码
 COPY . .

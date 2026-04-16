@@ -449,7 +449,6 @@ function startStatusRefresh() {
       rule.value.is_launched = data.is_launched
       rule.value.process_status = data.process_status
       rule.value.error_message = data.error_message
-      rule.value.poll_interval = data.poll_interval
     } catch {
       // 忽略刷新错误
     }

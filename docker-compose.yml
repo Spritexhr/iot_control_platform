@@ -1,6 +1,7 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
+    pull_policy: if_not_present
     container_name: iot-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
