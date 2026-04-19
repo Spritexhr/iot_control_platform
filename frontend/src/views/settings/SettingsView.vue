@@ -97,7 +97,7 @@
           <el-table-column v-if="isSuperuser" :label="ls.t('common.edit')" width="140" align="center" fixed="right">
             <template #default="{ row }">
               <div class="config-actions">
-                <el-button plain type="primary" size="small" @click="openConfigDialog(row)">
+                <el-button type="primary" size="small" @click="openConfigDialog(row)">
                   {{ ls.t('common.edit') }}
                 </el-button>
                 <el-popconfirm

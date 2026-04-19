@@ -339,6 +339,47 @@ a {
   }
 }
 
+/* plain 主色按钮 */
+.el-button.el-button--primary.is-plain {
+  background-color: var(--iot-color-primary-bg) !important;
+  border-color: var(--iot-color-primary) !important;
+  color: var(--iot-color-primary) !important;
+  --el-button-text-color: var(--iot-color-primary) !important;
+
+  &:hover {
+    background-color: var(--iot-color-primary) !important;
+    border-color: var(--iot-color-primary) !important;
+    color: var(--iot-text-inverse) !important;
+    --el-button-text-color: var(--iot-text-inverse) !important;
+  }
+
+  &:focus {
+    background-color: var(--iot-color-primary-bg) !important;
+    border-color: var(--iot-color-primary) !important;
+    color: var(--iot-color-primary) !important;
+  }
+}
+
+/* plain 危险按钮 */
+.el-button.el-button--danger.is-plain {
+  background-color: var(--iot-color-danger-bg) !important;
+  border-color: var(--iot-color-danger) !important;
+  color: var(--iot-color-danger) !important;
+  --el-button-text-color: var(--iot-color-danger) !important;
+
+  &:hover {
+    background-color: var(--iot-color-danger) !important;
+    border-color: var(--iot-color-danger) !important;
+    color: var(--iot-text-inverse) !important;
+  }
+
+  &:focus {
+    background-color: var(--iot-color-danger-bg) !important;
+    border-color: var(--iot-color-danger) !important;
+    color: var(--iot-color-danger) !important;
+  }
+}
+
 /* 弹窗 */
 .el-dialog {
   border-radius: var(--iot-radius-xl) !important;
