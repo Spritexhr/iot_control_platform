@@ -45,6 +45,11 @@
         <template #title>{{ ls.t('nav.automation') }}</template>
       </el-menu-item>
 
+      <el-menu-item index="/plugins">
+        <el-icon><Connection /></el-icon>
+        <template #title>{{ ls.t('nav.plugins') }}</template>
+      </el-menu-item>
+
       <el-menu-item index="/settings">
         <el-icon><Setting /></el-icon>
         <template #title>{{ ls.t('nav.settings') }}</template>
@@ -76,6 +81,7 @@ import {
   Monitor,
   SetUp,
   Setting,
+  Connection,
   Fold,
   Expand,
 } from '@element-plus/icons-vue'

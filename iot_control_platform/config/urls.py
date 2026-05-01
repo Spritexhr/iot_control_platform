@@ -1,9 +1,13 @@
+import logging
+
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .api_views import mqtt_status, dashboard_stats, health_check
 from .auth_views import register, user_profile, change_password
+
+logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/admin/", permanent=False)),
@@ -25,3 +29,28 @@ urlpatterns = [
     path("api/dashboard/stats/", dashboard_stats, name="dashboard-stats"),
     path("health/", health_check, name="health-check"),
 ]
+
+
+# 自动挂载已启用的插件路由到 /api/plugins/<name>/
+# 单个插件 import/include 失败不应影响其它路由
+def _mount_enabled_plugins():
+    try:
+        from plugins import discover_plugins, enabled_plugin_names
+    except Exception as e:
+        logger.warning(f"[plugins] 模块加载失败，跳过挂载: {e}")
+        return
+
+    enabled = enabled_plugin_names()
+    for meta in discover_plugins():
+        if meta.name not in enabled:
+            continue
+        try:
+            urlpatterns.append(
+                path(f"api/plugins/{meta.name}/", include(meta.url_module))
+            )
+            logger.info(f"[plugins] 已挂载: /api/plugins/{meta.name}/")
+        except Exception as e:
+            logger.exception(f"[plugins] 挂载 {meta.name} 失败，已跳过: {e}")
+
+
+_mount_enabled_plugins()

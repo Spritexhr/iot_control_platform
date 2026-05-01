@@ -2,7 +2,7 @@
 平台配置 Admin - 仅管理员可管理
 """
 from django.contrib import admin
-from .models import PlatformConfig
+from .models import PlatformConfig, Plugin
 
 
 @admin.register(PlatformConfig)
@@ -20,3 +20,12 @@ class PlatformConfigAdmin(admin.ModelAdmin):
         return s[:50] + "..." if len(s) > 50 else s
 
     value_short.short_description = "配置值"
+
+
+@admin.register(Plugin)
+class PluginAdmin(admin.ModelAdmin):
+    list_display = ["name", "enabled", "version", "description", "updated_at"]
+    list_filter = ["enabled"]
+    search_fields = ["name", "description"]
+    list_editable = ["enabled"]
+    ordering = ["name"]

@@ -10,8 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from config.permissions import IsSuperuser
-from .models import PlatformConfig
-from .serializers import PlatformConfigSerializer
+from .models import PlatformConfig, Plugin
+from .serializers import PlatformConfigSerializer, PluginSerializer
 
 
 class PlatformConfigViewSet(viewsets.ModelViewSet):
@@ -78,3 +78,59 @@ class PlatformConfigViewSet(viewsets.ModelViewSet):
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class PluginViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    插件登记表只读 + 启用切换
+    - list / retrieve：已认证用户
+    - sync / enable / disable：仅超级用户
+    - 启用状态变更后需重启 Django 进程才会影响 URL 路由
+    """
+    queryset = Plugin.objects.all()
+    serializer_class = PluginSerializer
+    lookup_field = "name"
+
+    def get_permissions(self):
+        if self.action in ("sync", "enable", "disable"):
+            return [IsAuthenticated(), IsSuperuser()]
+        return [IsAuthenticated()]
+
+    @action(detail=False, methods=["post"], url_path="sync")
+    def sync(self, request):
+        """触发 sync_plugins 管理命令，把文件系统插件同步到 DB"""
+        try:
+            from django.core.management import call_command
+            from io import StringIO
+
+            out = StringIO()
+            call_command("sync_plugins", stdout=out)
+            output = out.getvalue().strip()
+            logger.info(f"API 触发 sync_plugins: {output}")
+            return Response({"message": "sync completed", "output": output})
+        except Exception as e:
+            logger.exception("sync_plugins 失败")
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"], url_path="enable")
+    def enable(self, request, name=None):
+        plugin = self.get_object()
+        plugin.enabled = True
+        plugin.save(update_fields=["enabled", "updated_at"])
+        return Response({
+            "message": "enabled (restart required to take effect)",
+            "plugin": PluginSerializer(plugin).data,
+        })
+
+    @action(detail=True, methods=["post"], url_path="disable")
+    def disable(self, request, name=None):
+        plugin = self.get_object()
+        plugin.enabled = False
+        plugin.save(update_fields=["enabled", "updated_at"])
+        return Response({
+            "message": "disabled (restart required to take effect)",
+            "plugin": PluginSerializer(plugin).data,
+        })

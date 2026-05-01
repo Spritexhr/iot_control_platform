@@ -66,6 +66,16 @@ INSTALLED_APPS = [
     "platform_settings",
 ]
 
+# 自动发现 plugins/ 子目录下的插件 app
+# 注：所有发现到的插件都会加入 INSTALLED_APPS，保证 makemigrations 正常工作
+# 是否真正暴露 API 由 urls.py 按 Plugin.enabled 过滤
+try:
+    from plugins import discover_plugins as _discover_plugins
+    INSTALLED_APPS.extend(p.app_label for p in _discover_plugins())
+except Exception as _e:  # pragma: no cover - 启动期间不应阻断
+    import sys as _sys
+    print(f"[plugins] 发现失败，已跳过: {_e}", file=_sys.stderr)
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",

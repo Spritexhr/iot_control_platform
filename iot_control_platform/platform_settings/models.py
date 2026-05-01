@@ -59,3 +59,43 @@ class PlatformConfig(models.Model):
             return obj.value
         except cls.DoesNotExist:
             return default
+
+
+class Plugin(models.Model):
+    """
+    插件登记表 - 与 plugins/<name>/plugin.json 一一对应
+    通过 sync_plugins 管理命令从文件系统同步进来
+    """
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="插件名",
+        help_text="与 plugins/ 下的目录名一致",
+    )
+    enabled = models.BooleanField(
+        default=True,
+        verbose_name="是否启用",
+        help_text="启用/禁用后需重启 Django 进程才会影响 URL 路由",
+    )
+    version = models.CharField(
+        max_length=50,
+        default="",
+        blank=True,
+        verbose_name="版本",
+    )
+    description = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="说明",
+    )
+    installed_at = models.DateTimeField(auto_now_add=True, verbose_name="登记时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "插件"
+        verbose_name_plural = "插件"
+        ordering = ["name"]
+
+    def __str__(self):
+        flag = "✓" if self.enabled else "✗"
+        return f"[{flag}] {self.name} ({self.version})"

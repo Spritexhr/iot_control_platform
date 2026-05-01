@@ -1,0 +1,6 @@
+{
+  "name": "data_viz",
+  "version": "0.2.0",
+  "description": "数据可视化 - 按时间段查看传感器/设备的数值序列与状态事件",
+  "enabled": true
+}

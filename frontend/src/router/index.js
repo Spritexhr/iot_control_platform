@@ -65,6 +65,18 @@ const routes = [
         meta: { title: '规则详情' },
       },
       {
+        path: 'plugins',
+        name: 'Plugins',
+        component: () => import('@/views/plugins/PluginsListView.vue'),
+        meta: { title: '插件中心' },
+      },
+      {
+        path: 'plugins/data_viz',
+        name: 'PluginDataViz',
+        component: () => import('@/views/plugins/DataVizView.vue'),
+        meta: { title: '数据可视化' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsView.vue'),
