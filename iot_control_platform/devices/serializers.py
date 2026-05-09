@@ -43,6 +43,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'id', 'device_id', 'name', 'description', 'location',
             'mqtt_topic_data', 'mqtt_topic_control',
             'is_online', 'last_seen',
+            'sort_order',
             'created_at', 'updated_at',
             'device_type', 'device_type_info', 'latest_data',
         ]

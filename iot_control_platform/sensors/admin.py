@@ -5,8 +5,27 @@ from django.shortcuts import redirect
 from django.contrib import messages
 import json
 from django.utils import timezone
+from datetime import timedelta
 from .models import SensorType, Sensor, SensorData, SensorStatusCollection
 from services.sensors_service.sensor_command_send_service import sensor_command_send_service
+
+
+class SensorOnlineFilter(admin.SimpleListFilter):
+    """基于 last_seen 实时判断在线状态，避免 is_online 字段未及时回写导致的过滤偏差"""
+    title = '在线状态'
+    parameter_name = 'online'
+
+    def lookups(self, request, model_admin):
+        return (('1', '在线'), ('0', '离线'))
+
+    def queryset(self, request, queryset):
+        # 与 Sensor.computed_is_online 阈值保持一致：3 分钟
+        threshold = timezone.now() - timedelta(minutes=3)
+        if self.value() == '1':
+            return queryset.filter(last_seen__gte=threshold)
+        if self.value() == '0':
+            return queryset.filter(last_seen__lt=threshold) | queryset.filter(last_seen__isnull=True)
+        return queryset
 
 
 @admin.register(SensorType)
@@ -15,8 +34,7 @@ class SensorTypeAdmin(admin.ModelAdmin):
     
     list_display = ['SensorType_id', 'name', 'sensors_count', 'created_at']
     search_fields = ['SensorType_id', 'name', 'description']
-    filter_horizontal = []
-    
+
     fieldsets = [
         ('基本信息', {
             'fields': ['SensorType_id', 'name', 'description']
@@ -42,10 +60,10 @@ class SensorAdmin(admin.ModelAdmin):
     """传感器管理"""
     
     list_display = ['sensor_id', 'name', 'sensor_type', 'online_status', 'latest_data_time', 'created_at']
-    list_filter = ['sensor_type', 'is_online', 'created_at']
+    list_filter = ['sensor_type', SensorOnlineFilter, 'created_at']
     search_fields = ['sensor_id', 'name', 'description']
-    readonly_fields = ['created_at', 'updated_at', 'command_buttons_detail_display']
-    
+    readonly_fields = ['created_at', 'updated_at', 'last_seen', 'command_buttons_detail_display']
+
     fieldsets = [
         ('基本信息', {
             'fields': ['sensor_id', 'name', 'sensor_type', 'description']
@@ -59,7 +77,8 @@ class SensorAdmin(admin.ModelAdmin):
             'description': '保存时会自动生成，格式：iot/sensors/{sensor_id}/xxx'
         }),
         ('状态信息', {
-            'fields': ['last_seen', 'location']
+            'fields': ['last_seen', 'location'],
+            'description': 'last_seen 由系统自动维护，不可手动修改'
         }),
         ('时间戳', {
             'fields': ['created_at', 'updated_at'],
@@ -221,20 +240,19 @@ class SensorDataAdmin(admin.ModelAdmin):
     
     def data_preview(self, obj):
         """数据预览"""
-        import json
         try:
             data_str = json.dumps(obj.data, ensure_ascii=False)
             if len(data_str) > 100:
                 data_str = data_str[:100] + '...'
             return format_html('<code>{}</code>', data_str)
-        except:
+        except (TypeError, ValueError):
             return str(obj.data)
     data_preview.short_description = '数据内容'
-    
+
     def has_add_permission(self, request):
         """禁止手动添加数据"""
         return False
-    
+
     def has_change_permission(self, request, obj=None):
         """禁止修改数据"""
         return False
@@ -264,13 +282,12 @@ class SensorStatusCollectionAdmin(admin.ModelAdmin):
     
     def data_preview(self, obj):
         """数据预览"""
-        import json
         try:
             data_str = json.dumps(obj.data, ensure_ascii=False)
             if len(data_str) > 100:
                 data_str = data_str[:100] + '...'
             return format_html('<code>{}</code>', data_str)
-        except:
+        except (TypeError, ValueError):
             return str(obj.data)
     data_preview.short_description = '状态数据内容'
     

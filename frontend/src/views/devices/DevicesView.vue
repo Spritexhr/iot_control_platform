@@ -100,16 +100,26 @@
 
     <!-- 卡片网格 / 空状态 -->
     <div v-loading="loading">
-      <div v-if="devices.length" class="iot-grid iot-grid--cards">
-        <DeviceCard
-          v-for="d in devices"
-          :key="d.device_id"
-          :device="d"
-          @click="goDetail(d)"
-          @delete="handleDeleteDevice"
-        />
-      </div>
-      <div v-else class="iot-card empty-card">
+      <draggable
+        v-if="devices.length"
+        v-model="devices"
+        :item-key="'device_id'"
+        :disabled="!isStaff || hasActiveFilter"
+        :animation="200"
+        ghost-class="drag-ghost"
+        handle=".device-drag-handle, .iot-card"
+        class="iot-grid iot-grid--cards"
+        @end="handleReorderEnd"
+      >
+        <template #item="{ element: d }">
+          <DeviceCard
+            :device="d"
+            @click="goDetail(d)"
+            @delete="handleDeleteDevice"
+          />
+        </template>
+      </draggable>
+      <div v-if="!devices.length" class="iot-card empty-card">
         <el-empty :description="loading ? ls.t('common.loading') : ls.t('devices.noDevices')">
           <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('devices.addDevice') }}</el-button>
         </el-empty>
@@ -216,7 +226,8 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType } from '@/api/devices'
+import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType, reorderDevices } from '@/api/devices'
+import draggable from 'vuedraggable'
 import DeviceCard from '@/components/devices/DeviceCard.vue'
 
 const router = useRouter()
@@ -359,6 +370,22 @@ async function handleDeleteDeviceType(id) {
   }
 }
 
+// ==================== 拖拽排序 ====================
+const hasActiveFilter = computed(() =>
+  Boolean(filterType.value || filterOnline.value || searchText.value)
+)
+
+async function handleReorderEnd(evt) {
+  if (evt && evt.oldIndex === evt.newIndex) return
+  const order = devices.value.map(d => d.device_id)
+  try {
+    await reorderDevices(order)
+  } catch {
+    ElMessage.error(ls.t('devices.reorderFailed') || '排序保存失败')
+    fetchDevices()
+  }
+}
+
 // ==================== 跳转详情 ====================
 function goDetail(device) {
   router.push({ name: 'DeviceDetail', params: { deviceId: device.device_id } })
@@ -468,5 +495,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.drag-ghost {
+  opacity: 0.4;
+  background: var(--iot-color-fill-light, rgba(0, 0, 0, 0.04));
+  border: 2px dashed var(--iot-color-primary, #d97757);
+  border-radius: var(--iot-border-radius-md, 8px);
 }
 </style>

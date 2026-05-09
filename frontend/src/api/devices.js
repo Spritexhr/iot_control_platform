@@ -49,6 +49,11 @@ export function getDeviceData(deviceId, params = {}) {
   return request.get(`/devices/${deviceId}/data/`, { params })
 }
 
+/** 批量更新设备显示顺序，order 是 device_id 数组 */
+export function reorderDevices(order) {
+  return request.post('/devices/reorder/', { order })
+}
+
 /** 向设备发送命令 */
 export function sendDeviceCommand(deviceId, commandName, params = {}, makeSure = false) {
   return request.post(`/devices/${deviceId}/command/`, {

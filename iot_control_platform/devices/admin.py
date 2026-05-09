@@ -8,8 +8,27 @@ from django.utils.safestring import mark_safe
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.utils import timezone
+from datetime import timedelta
 from .models import DeviceType, Device, DeviceData
 from services.devices_service.device_command_send_service import device_command_send_service
+
+
+class DeviceOnlineFilter(admin.SimpleListFilter):
+    """基于 last_seen 实时判断在线状态，避免 is_online 字段未及时回写导致的过滤偏差"""
+    title = '在线状态'
+    parameter_name = 'online'
+
+    def lookups(self, request, model_admin):
+        return (('1', '在线'), ('0', '离线'))
+
+    def queryset(self, request, queryset):
+        # 默认心跳间隔 60s × 3 = 180s，与 Device.computed_is_online 保持一致
+        threshold = timezone.now() - timedelta(seconds=180)
+        if self.value() == '1':
+            return queryset.filter(last_seen__gte=threshold)
+        if self.value() == '0':
+            return queryset.filter(last_seen__lt=threshold) | queryset.filter(last_seen__isnull=True)
+        return queryset
 
 
 @admin.register(DeviceType)
@@ -41,9 +60,14 @@ class DeviceAdmin(admin.ModelAdmin):
     """设备管理"""
 
     list_display = ['device_id', 'name', 'device_type', 'latest_data_time', 'online_indicator', 'created_at']
-    list_filter = ['device_type', 'is_online', 'created_at']
+    list_filter = ['device_type', DeviceOnlineFilter, 'created_at']
     search_fields = ['device_id', 'name', 'description']
-    readonly_fields = ['created_at', 'updated_at', 'mqtt_topic_data', 'mqtt_topic_control', 'command_buttons_detail_display']
+    readonly_fields = [
+        'created_at', 'updated_at',
+        'mqtt_topic_data', 'mqtt_topic_control',
+        'last_seen',
+        'command_buttons_detail_display',
+    ]
 
     fieldsets = [
         ('基本信息', {
@@ -58,7 +82,8 @@ class DeviceAdmin(admin.ModelAdmin):
             'description': '保存时自动生成，格式：iot/devices/{device_id}/xxx'
         }),
         ('状态信息', {
-            'fields': ['is_online', 'last_seen']
+            'fields': ['last_seen'],
+            'description': 'last_seen 由系统自动维护，不可手动修改；实时在线状态见列表页'
         }),
         ('时间戳', {
             'fields': ['created_at', 'updated_at'],
@@ -76,10 +101,14 @@ class DeviceAdmin(admin.ModelAdmin):
         return base
 
     def latest_data_time(self, obj):
-        """最新数据时间"""
-        latest = obj.data_records.first()
-        if latest:
-            time_diff = timezone.now() - latest.timestamp
+        """最新数据时间（优先用 last_seen，避免每行触发 N+1 查询）"""
+        ts = obj.last_seen
+        if not ts:
+            latest = obj.data_records.first()
+            if latest:
+                ts = latest.timestamp
+        if ts:
+            time_diff = timezone.now() - ts
             if time_diff.total_seconds() < 300:
                 color = 'green'
             elif time_diff.total_seconds() < 3600:
@@ -89,16 +118,33 @@ class DeviceAdmin(admin.ModelAdmin):
             return format_html(
                 '<span style="color: {};">{}</span>',
                 color,
-                latest.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                timezone.localtime(ts).strftime('%Y-%m-%d %H:%M:%S')
             )
         return format_html('<span style="color: gray;">{}</span>', '无数据')
     latest_data_time.short_description = '最新数据时间'
 
     def online_indicator(self, obj):
-        """在线指示器"""
-        if obj.is_online:
-            return format_html('<span style="color: green; font-weight: bold;">{}</span>', '✓ 在线')
-        return format_html('<span style="color: red;">{}</span>', '✗ 离线')
+        """基于 last_seen 实时计算在线状态，与 sensors.online_status 行为对齐"""
+        is_online = obj.computed_is_online
+        if is_online:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">{}</span>',
+                '● 在线'
+            )
+        if obj.last_seen:
+            time_diff = timezone.now() - obj.last_seen
+            total_seconds = time_diff.total_seconds()
+            if total_seconds < 3600:
+                ago = f'{int(total_seconds // 60)}分钟前'
+            elif total_seconds < 86400:
+                ago = f'{int(total_seconds // 3600)}小时前'
+            else:
+                ago = f'{int(total_seconds // 86400)}天前'
+            return format_html(
+                '<span style="color: red;">● 离线 <small style="color: gray;">({} 上报)</small></span>',
+                ago
+            )
+        return format_html('<span style="color: gray;">{}</span>', '● 从未上报')
     online_indicator.short_description = '在线状态'
 
     def check_online_status(self, request, queryset):

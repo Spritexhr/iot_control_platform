@@ -149,7 +149,15 @@ class Sensor(models.Model):
         blank=True,
         verbose_name="最后上报时间"
     )
-    
+
+    # ========== 显示顺序 ==========
+    sort_order = models.IntegerField(
+        default=0,
+        db_index=True,
+        verbose_name="显示顺序",
+        help_text="数值越小越靠前；新建项默认 0 排在最前，由前端拖拽更新"
+    )
+
     # ========== 时间戳 ==========
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -172,7 +180,7 @@ class Sensor(models.Model):
     class Meta:
         verbose_name = "传感器"
         verbose_name_plural = "传感器列表"
-        ordering = ['-created_at']
+        ordering = ['sort_order', '-created_at']
 
     def __str__(self):
         return f"{self.name} ({self.sensor_id})"

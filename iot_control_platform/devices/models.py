@@ -161,6 +161,14 @@ class Device(models.Model):
         verbose_name="最后上报时间"
     )
 
+    # ========== 显示顺序 ==========
+    sort_order = models.IntegerField(
+        default=0,
+        db_index=True,
+        verbose_name="显示顺序",
+        help_text="数值越小越靠前；新建项默认 0 排在最前，由前端拖拽更新"
+    )
+
     # ========== 时间戳 ==========
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -183,7 +191,7 @@ class Device(models.Model):
     class Meta:
         verbose_name = "设备"
         verbose_name_plural = "设备列表"
-        ordering = ['-created_at']
+        ordering = ['sort_order', '-created_at']
 
     def __str__(self):
         return f"{self.name} ({self.device_id})"
@@ -204,6 +212,14 @@ class Device(models.Model):
             return self.device_type.get_heartbeat_interval()
         return 60
 
+    @property
+    def computed_is_online(self):
+        """根据 last_seen 实时计算在线状态：超过心跳间隔 3 倍未上报视为离线"""
+        if not self.last_seen:
+            return False
+        timeout = self.get_heartbeat_interval() * 3
+        return (timezone.now() - self.last_seen).total_seconds() < timeout
+
     def check_online_status(self):
         """
         检查设备是否在线
@@ -222,9 +238,10 @@ class Device(models.Model):
             return True
         return False
 
-    def update_heartbeat(self):
-        """更新心跳时间"""
-        self.last_seen = timezone.now()
+    def update_heartbeat(self, timestamp=None):
+        """更新心跳时间。可传入数据自带的 timestamp，缺省用当前时间。"""
+        ts = timestamp or timezone.now()
+        self.last_seen = ts
         self.is_online = True
         self.save(update_fields=['last_seen', 'is_online', 'updated_at'])
 
@@ -292,5 +309,5 @@ class DeviceData(models.Model):
 
         super().save(*args, **kwargs)
 
-        # 更新设备的最新心跳
-        self.device.update_heartbeat()
+        # 更新设备的最新心跳，使用数据时间戳，与 sensors 行为一致
+        self.device.update_heartbeat(self.timestamp)

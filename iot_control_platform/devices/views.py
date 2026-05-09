@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
+from django.db import transaction
 from django.db.models import Q, Count
 from django.utils import timezone
 from datetime import timedelta
@@ -81,6 +82,26 @@ class DeviceViewSet(viewsets.ModelViewSet):
         ).order_by('-timestamp')[:limit]
         serializer = DeviceDataSerializer(records, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='reorder',
+            permission_classes=[IsAuthenticated, IsAdminUser])
+    def reorder(self, request):
+        """
+        批量更新设备显示顺序。
+        请求体：{"order": ["device_id_a", "device_id_b", ...]}
+        按数组顺序写入 sort_order = 1, 2, ...，未列出的设备保持原值。
+        """
+        order = request.data.get('order')
+        if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+            return Response(
+                {'detail': 'order 必须是 device_id 字符串数组'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            for index, device_id in enumerate(order, start=1):
+                Device.objects.filter(device_id=device_id).update(sort_order=index)
+        return Response({'updated': len(order)})
 
     @action(detail=True, methods=['post'], url_path='command')
     def send_command(self, request, device_id=None):

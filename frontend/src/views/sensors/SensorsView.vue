@@ -99,16 +99,26 @@
 
     <!-- 卡片网格 -->
     <div v-loading="loading">
-      <div v-if="sensors.length" class="iot-grid iot-grid--cards">
-        <SensorCard
-          v-for="s in sensors"
-          :key="s.sensor_id"
-          :sensor="s"
-          @click="goDetail(s)"
-          @delete="handleDeleteSensor"
-        />
-      </div>
-      <div v-else class="iot-card empty-card">
+      <draggable
+        v-if="sensors.length"
+        v-model="sensors"
+        :item-key="'sensor_id'"
+        :disabled="!isStaff || hasActiveFilter"
+        :animation="200"
+        ghost-class="drag-ghost"
+        handle=".sensor-drag-handle, .iot-card"
+        class="iot-grid iot-grid--cards"
+        @end="handleReorderEnd"
+      >
+        <template #item="{ element: s }">
+          <SensorCard
+            :sensor="s"
+            @click="goDetail(s)"
+            @delete="handleDeleteSensor"
+          />
+        </template>
+      </draggable>
+      <div v-if="!sensors.length" class="iot-card empty-card">
         <el-empty :description="loading ? ls.t('common.loading') : ls.t('sensors.noSensors')">
           <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('sensors.addSensor') }}</el-button>
         </el-empty>
@@ -215,8 +225,9 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { getSensors, createSensor, deleteSensor, getSensorTypes, createSensorType, updateSensorType, deleteSensorType } from '@/api/sensors'
+import { getSensors, createSensor, deleteSensor, getSensorTypes, createSensorType, updateSensorType, deleteSensorType, reorderSensors } from '@/api/sensors'
 import SensorCard from '@/components/sensors/SensorCard.vue'
+import draggable from 'vuedraggable'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -358,6 +369,23 @@ async function handleDeleteSensorType(id) {
   }
 }
 
+// ==================== 拖拽排序 ====================
+const hasActiveFilter = computed(() =>
+  Boolean(filterType.value || filterOnline.value || searchText.value)
+)
+
+async function handleReorderEnd(evt) {
+  // 顺序未变就不发请求
+  if (evt && evt.oldIndex === evt.newIndex) return
+  const order = sensors.value.map(s => s.sensor_id)
+  try {
+    await reorderSensors(order)
+  } catch {
+    ElMessage.error(ls.t('sensors.reorderFailed') || '排序保存失败')
+    fetchSensors()
+  }
+}
+
 // ==================== 跳转详情 ====================
 function goDetail(sensor) {
   router.push({ name: 'SensorDetail', params: { sensorId: sensor.sensor_id } })
@@ -467,5 +495,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.drag-ghost {
+  opacity: 0.4;
+  background: var(--iot-color-fill-light, rgba(0, 0, 0, 0.04));
+  border: 2px dashed var(--iot-color-primary, #d97757);
+  border-radius: var(--iot-border-radius-md, 8px);
 }
 </style>

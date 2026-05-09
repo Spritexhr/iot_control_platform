@@ -54,6 +54,11 @@ export function getSensorStatus(deviceId, params = {}) {
   return request.get(`/sensors/${deviceId}/status/`, { params })
 }
 
+/** 批量更新传感器显示顺序，order 是 sensor_id 数组 */
+export function reorderSensors(order) {
+  return request.post('/sensors/reorder/', { order })
+}
+
 /** 向传感器发送命令 */
 export function sendSensorCommand(deviceId, commandName, params = {}, makeSure = false) {
   return request.post(`/sensors/${deviceId}/command/`, {
