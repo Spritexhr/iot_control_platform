@@ -56,8 +56,8 @@
     docker compose exec backend python manage.py createsuperuser
     ```
 5.  **访问系统**：
-    *   前端界面：`http://localhost:8080`
-    *   管理后台：`http://localhost:8081/admin/`
+    *   前端界面：`http://localhost:48080`
+    *   管理后台：`http://localhost:48081/admin/`
 
 ---
 

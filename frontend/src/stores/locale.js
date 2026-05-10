@@ -310,17 +310,17 @@ const messages = {
       execute: '执行',
       platformConfig: '平台配置',
       applyConfig: '使配置生效',
-      addConfig: '新增配置',
+      addConfig: '新增自定义配置',
       configKey: '配置键',
       category: '分类',
       configValue: '配置值',
       configDesc: '说明',
-      noConfig: '暂无配置，可运行 seed_platform_config 命令从 .env 初始化',
+      noConfig: '暂无自定义配置项',
       editConfigTitle: '编辑配置',
-      addConfigTitle: '新增配置',
-      configKeyPlaceholder: '如 mqtt_broker、sensor_data_retention_days',
+      addConfigTitle: '新增自定义配置',
+      configKeyPlaceholder: '如 my_custom_key',
       selectCategory: '选择或输入分类',
-      configValuePlaceholder: 'JSON 格式，如 "127.0.0.1"、1883、["id1","id2"]、{"a":1}',
+      configValuePlaceholder: 'JSON 格式，如 "abc"、123、["id1","id2"]、{"a":1}',
       fetchFailed: '获取平台配置失败',
       jsonError: '配置值必须是合法 JSON 格式',
       configUpdated: '配置更新成功',
@@ -337,6 +337,35 @@ const messages = {
       deleteConfigConfirm: '确定删除此配置？',
       configKeyRequired: '请输入配置键',
       saveFailed: '保存失败',
+      // 0.7 重写新增
+      categoryMqtt: 'MQTT 连接',
+      categoryDevices: '设备配置',
+      categoryDataRetention: '数据保留',
+      categoryGeneral: '通用',
+      advancedConfig: '高级 / 自定义配置',
+      advancedHint: '此处可添加 defaults.py 之外的自定义 key，供新功能或外部模块使用',
+      saveSection: '保存本组',
+      sectionSaved: '保存成功',
+      sectionSaveFailed: '保存失败',
+      testMqtt: '测试连接',
+      testMqttRunning: '测试中…',
+      testMqttSuccess: 'MQTT 连接测试成功',
+      testMqttFailed: 'MQTT 连接测试失败',
+      firstTimeBanner: '检测到 MQTT Broker 仍为默认值 127.0.0.1，请先填写实际地址再保存',
+      firstTimeBannerTitle: '首次部署引导',
+      revealSecret: '修改',
+      hideSecret: '隐藏',
+      secretPlaceholder: '已设置（点击修改可重新填写）',
+      fieldRequired: '此项必填',
+      portRange: '端口范围 1-65535',
+      unsavedChanges: '有未保存的修改',
+      schemaFetchFailed: '获取配置 schema 失败',
+      cannotDeletePredefined: '预定义配置不可删除',
+      predefinedKeyHint: '{key} 是预定义配置项，请直接在上方对应分组修改',
+    },
+    api: {
+      sessionExpired: '登录已过期，请重新登录',
+      requestFailed: '请求失败',
     },
   },
 
@@ -648,17 +677,17 @@ const messages = {
       execute: 'Run',
       platformConfig: 'Platform Config',
       applyConfig: 'Apply Config',
-      addConfig: 'Add Config',
+      addConfig: 'Add Custom Config',
       configKey: 'Key',
       category: 'Category',
       configValue: 'Value',
       configDesc: 'Description',
-      noConfig: 'No config entries. Run seed_platform_config to initialize from .env',
+      noConfig: 'No custom config entries',
       editConfigTitle: 'Edit Config',
-      addConfigTitle: 'New Config',
-      configKeyPlaceholder: 'e.g. mqtt_broker, sensor_data_retention_days',
+      addConfigTitle: 'New Custom Config',
+      configKeyPlaceholder: 'e.g. my_custom_key',
       selectCategory: 'Select or enter category',
-      configValuePlaceholder: 'JSON value, e.g. "127.0.0.1", 1883, ["id1","id2"], {"a":1}',
+      configValuePlaceholder: 'JSON value, e.g. "abc", 123, ["id1","id2"], {"a":1}',
       fetchFailed: 'Failed to fetch platform config',
       jsonError: 'Config value must be valid JSON',
       configUpdated: 'Config updated',
@@ -675,20 +704,79 @@ const messages = {
       deleteConfigConfirm: 'Delete this config entry?',
       configKeyRequired: 'Config key is required',
       saveFailed: 'Save failed',
+      // 0.7 rewrite additions
+      categoryMqtt: 'MQTT Connection',
+      categoryDevices: 'Device Settings',
+      categoryDataRetention: 'Data Retention',
+      categoryGeneral: 'General',
+      advancedConfig: 'Advanced / Custom Config',
+      advancedHint: 'Add custom keys not present in defaults.py for new features or external modules',
+      saveSection: 'Save section',
+      sectionSaved: 'Saved',
+      sectionSaveFailed: 'Save failed',
+      testMqtt: 'Test connection',
+      testMqttRunning: 'Testing…',
+      testMqttSuccess: 'MQTT test passed',
+      testMqttFailed: 'MQTT test failed',
+      firstTimeBanner: 'MQTT Broker is still the default 127.0.0.1. Please set the actual address before saving.',
+      firstTimeBannerTitle: 'First-time setup',
+      revealSecret: 'Edit',
+      hideSecret: 'Hide',
+      secretPlaceholder: 'Set (click Edit to change)',
+      fieldRequired: 'Required',
+      portRange: 'Port must be 1-65535',
+      unsavedChanges: 'Unsaved changes',
+      schemaFetchFailed: 'Failed to fetch config schema',
+      cannotDeletePredefined: 'Predefined configs cannot be deleted',
+      predefinedKeyHint: '{key} is a predefined config — edit it in the section above',
+    },
+    api: {
+      sessionExpired: 'Session expired, please log in again',
+      requestFailed: 'Request failed',
     },
   },
+}
+
+// 解析 path，按 messages 树状结构取值，找不到返回 undefined
+function resolvePath(messages, locale, path) {
+  let obj = messages[locale]
+  for (const key of path.split('.')) {
+    obj = obj?.[key]
+    if (obj === undefined) return undefined
+  }
+  return obj
+}
+
+// {name} 模板插值，params 缺失时保留原字面量便于排查
+function interpolate(template, params) {
+  if (!params || typeof template !== 'string') return template
+  return template.replace(/\{(\w+)\}/g, (m, key) =>
+    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : m,
+  )
+}
+
+/**
+ * 翻译函数（模块级，setup 外也能调用）
+ * 用法：
+ *   staticT('settings.title')
+ *   staticT('settings.found', { n: 3 })
+ * 取 locale 优先级：传入 > localStorage > 'zh'
+ */
+export function staticT(path, params, localeOverride) {
+  const locale = localeOverride || localStorage.getItem('iot-locale') || 'zh'
+  let value = resolvePath(messages, locale, path)
+  if (value === undefined) {
+    // 兜底回中文，避免英文环境缺失 key 时直接显示 path
+    value = locale === 'zh' ? path : resolvePath(messages, 'zh', path)
+  }
+  return interpolate(value ?? path, params)
 }
 
 export const useLocaleStore = defineStore('locale', () => {
   const locale = ref(localStorage.getItem('iot-locale') || 'zh')
 
-  function t(path) {
-    const keys = path.split('.')
-    let obj = messages[locale.value]
-    for (const key of keys) {
-      obj = obj?.[key]
-    }
-    return obj ?? path
+  function t(path, params) {
+    return staticT(path, params, locale.value)
   }
 
   function setLocale(lang) {

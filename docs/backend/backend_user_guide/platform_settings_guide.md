@@ -1,6 +1,6 @@
 # 平台配置使用指南
 
-本文档介绍如何在开发与部署中使用平台配置（platform_settings），包括 Shell 操作、管理命令、API 调用及前端集成。架构说明见 [platform_settings_design.md](../backend_design/platform_settings_design.md)。
+本文档介绍如何在开发与部署中使用平台配置（platform_settings），包括 `configure` 命令、Shell 操作、API 调用与前端集成。架构说明见 [platform_settings_design.md](../backend_design/platform_settings_design.md)。
 
 ---
 
@@ -10,35 +10,121 @@
 
 | 场景 | 说明 |
 |-----|------|
-| MQTT 连接参数 | 服务器地址、端口、用户名、密码等，可在前端修改 |
-| 设备离线检测 | 离线超时、重连次数、重连间隔等 |
+| MQTT 连接参数 | 服务器地址、端口、用户名、密码 |
+| 设备离线检测 | 离线超时、重连次数、重连间隔 |
 | 数据留存时间 | 传感器/设备数据保留天数，`cleanup_old_data` 按此清理 |
 | 运行时生效 | 修改后调用 `POST /api/platform-configs/reload/` 即可生效，**无需重启服务** |
 
-### 1.2 配置来源与职责分离
+### 1.2 配置职责分工
 
 | 来源 | 职责 |
 |-----|------|
-| **.env** | 仅保留启动必备项：DB 密码、MQTT 地址、SECRET_KEY 等 |
-| **default_config.json** | 平台配置默认值（数据留存、设备离线等），位于 `platform_settings/` |
-| **platform_settings 数据库** | 运行时配置，由 seed 将 .env + JSON 合并写入，可在线修改 |
+| **`.env`** | 仅进程级启动必备：`SECRET_KEY`、`DEBUG`、`ALLOWED_HOSTS`、`DB_*`、端口 |
+| **`platform_settings/defaults.py`** | `DEFAULT_CONFIGS` 常量，定义所有运行期可调配置的默认值 |
+| **`PlatformConfig` 表（数据库）** | 运行时唯一真源，由 `configure --init` 写入默认值，可通过 wizard / Admin / API 修改 |
+
+`.env` 不再包含 MQTT 相关项；MQTT 服务地址、凭据等全部通过 `configure` 命令维护。
 
 ### 1.3 配置读取（get_config）
 
-**仅从 platform_settings 数据库读取**，不存在时返回传入的 default，防止多来源混乱。
+业务代码统一通过 `config.platform_config.get_config()` 从 `PlatformConfig` 表读取，不存在时返回传入的 default。
 
-### 1.3 权限说明
+### 1.4 权限说明
 
 | 操作 | 权限 |
 |-----|------|
 | 查看配置列表、详情 | 已认证用户 |
-| 新增、编辑、删除配置 | 超级用户（is_superuser） |
+| 新增、编辑、删除配置（API） | 超级用户（is_superuser） |
+| `configure` 命令 | 容器内执行（已通过 Docker 隔离） |
 
 ---
 
-## 二、Django Shell 操作
+## 二、`configure` 管理命令（写入唯一入口）
 
-### 2.1 启动 Shell 并导入
+### 2.1 交互式 wizard（推荐用于首次部署）
+
+```bash
+docker compose exec backend python manage.py configure
+```
+
+按 `DEFAULT_CONFIGS` 顺序逐项询问；直接回车保留当前值，密码字段不回显。
+
+```
+=== 平台配置 wizard ===
+直接回车保留当前值；按 Ctrl+C 中止。
+
+[mqtt]
+  mqtt_broker (MQTT/EMQX 服务器地址) [127.0.0.1]: 192.168.1.10
+    [updated] mqtt_broker = 192.168.1.10
+  mqtt_port (MQTT 端口（默认 1883...）) [1883]: 1883
+    [updated] mqtt_port = 1883
+  mqtt_username (...) []:
+  mqtt_password (...) []: ***
+    [updated] mqtt_password = ***
+...
+触发 reload:
+  MQTT: reconnected
+```
+
+写完默认会触发 `reload`，让 MQTT 等服务无感重连，无需重启容器。
+
+### 2.2 单键设置（CI / 脚本化）
+
+```bash
+# 单条
+docker compose exec backend python manage.py configure --set mqtt_broker=192.168.1.10
+
+# 多条
+docker compose exec backend python manage.py configure \
+    --set mqtt_broker=192.168.1.10 \
+    --set mqtt_port=1883
+```
+
+值会按 `DEFAULT_CONFIGS` 中 default 的类型自动转换：`int` 用 `int(...)`、`bool` 接受 `true/1/yes`、`list/dict` 解析为 JSON。
+
+### 2.3 重置为默认
+
+```bash
+docker compose exec backend python manage.py configure --unset mqtt_password
+```
+
+把 `mqtt_password` 重置为 `defaults.py` 中的默认值（不会从 DB 删除条目）。
+
+### 2.4 列出所有当前值
+
+```bash
+docker compose exec backend python manage.py configure --list
+```
+
+```
+[mqtt]
+  mqtt_broker = 192.168.1.10   # MQTT/EMQX 服务器地址
+  mqtt_port = 1883
+  mqtt_password = ***           # 密码已打码
+[devices]
+  device_offline_timeout = 300
+  ...
+```
+
+### 2.5 首次/升级初始化
+
+```bash
+docker compose exec backend python manage.py configure --init
+```
+
+仅写入 `DEFAULT_CONFIGS` 中**当前 DB 缺失**的 key，已存在的 key 一律不动。Docker 启动 command 自动调用此模式。
+
+### 2.6 跳过 reload
+
+```bash
+docker compose exec backend python manage.py configure --set xxx=yyy --no-reload
+```
+
+写完不调 MQTT reload（启动阶段会用到，因为此时 MQTT 服务还没起）。
+
+---
+
+## 三、Django Shell 操作（兜底）
 
 ```bash
 python manage.py shell
@@ -47,125 +133,21 @@ python manage.py shell
 ```python
 from platform_settings.models import PlatformConfig
 from config.platform_config import get_config
-```
 
-### 2.2 查询配置
-
-```python
-# 全部配置
-PlatformConfig.objects.all()
-
-# 按 key 查询
-cfg = PlatformConfig.objects.get(key='mqtt_broker')
-cfg.value   # 配置值，如 "127.0.0.1"
-cfg.category  # 如 "mqtt"
-cfg.description  # 如 "MQTT/EMQX 服务器地址"
-
-# 按分类筛选
+# 查询
 PlatformConfig.objects.filter(category='mqtt')
-PlatformConfig.objects.filter(category='devices')
-```
-
-### 2.3 创建配置
-
-```python
-PlatformConfig.objects.create(
-    key='mqtt_broker',
-    value='116.62.68.29',
-    category='mqtt',
-    description='MQTT/EMQX 服务器地址'
-)
-
-# value 支持多种类型
-PlatformConfig.objects.create(key='mqtt_port', value=1883, category='mqtt', description='MQTT 端口')
-PlatformConfig.objects.create(key='some_list', value=['a', 'b'], category='general', description='示例列表')
-```
-
-### 2.4 更新配置
-
-```python
 cfg = PlatformConfig.objects.get(key='mqtt_broker')
+
+# 修改
 cfg.value = '192.168.1.100'
 cfg.save()
-```
 
-### 2.5 使用 get_value 类方法
-
-```python
-# 获取单个配置，不存在时返回 default
-val = PlatformConfig.get_value('mqtt_broker', default='127.0.0.1')
-# 返回数据库中的 value，或 default
-```
-
-### 2.6 使用 get_config 统一读取
-
-```python
-from config.platform_config import get_config
-
-# 仅从 platform_settings 数据库读取，不存在时返回 default
-broker = get_config('mqtt_broker', '127.0.0.1')
+# 业务代码统一入口
+broker = get_config('mqtt_broker', '127.0.0.1', str)
 port = get_config('mqtt_port', 1883, int)
-timeout = get_config('device_offline_timeout', 300, int)
 ```
 
----
-
-## 三、default_config.json 与 seed_platform_config
-
-### 3.1 配置文件说明
-
-`platform_settings/default_config.json` 定义所有平台配置的默认值：
-
-- **env_key 非空**：该配置可由 .env 覆盖（如 mqtt_broker、mqtt_port）
-- **env_key 为空**：仅使用 JSON 中的默认值（如 sensor_data_retention_days）
-
-新增配置时，在 JSON 的 `configs` 数组中添加一项即可。
-
-### 3.2 首次初始化
-
-将 `default_config.json` 与 `.env` 合并后写入 platform_settings，**仅创建不存在的 key**：
-
-```bash
-python manage.py seed_platform_config
-```
-
-输出示例：
-
-```
-已加载 10 项默认配置
-加载 .env: /path/to/project/.env
-  创建: mqtt_broker = 116.62.68.29
-  创建: mqtt_port = 1883
-  跳过（已存在）: mqtt_keepalive
-  ...
-
-完成: 创建 5 条, 更新 0 条
-```
-
-### 3.3 强制更新已有配置
-
-使用 `.env` 中的值覆盖数据库中已存在的配置：
-
-```bash
-python manage.py seed_platform_config --force
-```
-
-### 3.4 指定 .env 路径
-
-```bash
-python manage.py seed_platform_config --env /custom/path/.env
-```
-
-### 3.5 Docker 部署
-
-Docker 通过 `env_file` 注入环境变量，容器内无需 `.env` 文件。`seed_platform_config` 从 `os.environ` 读取，在 `migrate` 之后执行即可：
-
-```yaml
-command: >
-  sh -c "python manage.py migrate --noinput &&
-    python manage.py seed_platform_config &&
-    gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
-```
+修改后同样需要触发 reload（API 或重启）才能让 MQTT 应用新值。
 
 ---
 
@@ -174,37 +156,11 @@ command: >
 ### 4.1 获取配置列表
 
 ```bash
-# 需携带 JWT Token
 curl -H "Authorization: Bearer <access_token>" \
   http://localhost:8000/api/platform-configs/
 ```
 
-响应示例：
-
-```json
-[
-  {"key": "mqtt_broker", "value": "116.62.68.29", "category": "mqtt", "description": "MQTT/EMQX 服务器地址"},
-  {"key": "mqtt_port", "value": 1883, "category": "mqtt", "description": "MQTT 端口"}
-]
-```
-
-### 4.2 获取单个配置
-
-```bash
-curl -H "Authorization: Bearer <access_token>" \
-  http://localhost:8000/api/platform-configs/mqtt_broker/
-```
-
-### 4.3 创建配置（仅超级用户）
-
-```bash
-curl -X POST -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"key":"custom_key","value":"custom_value","category":"general","description":"自定义配置"}' \
-  http://localhost:8000/api/platform-configs/
-```
-
-### 4.4 更新配置（仅超级用户）
+### 4.2 更新配置（仅超级用户）
 
 ```bash
 curl -X PATCH -H "Authorization: Bearer <access_token>" \
@@ -213,61 +169,47 @@ curl -X PATCH -H "Authorization: Bearer <access_token>" \
   http://localhost:8000/api/platform-configs/mqtt_broker/
 ```
 
-### 4.5 删除配置（仅超级用户）
-
-```bash
-curl -X DELETE -H "Authorization: Bearer <access_token>" \
-  http://localhost:8000/api/platform-configs/custom_key/
-```
-
-### 4.6 使配置生效（reload，仅超级用户）
-
-修改 MQTT、设备离线等配置后，调用此接口使修改**立即生效**，无需重启 Django 服务：
+### 4.3 reload（仅超级用户）
 
 ```bash
 curl -X POST -H "Authorization: Bearer <access_token>" \
   http://localhost:8000/api/platform-configs/reload/
 ```
 
-响应示例：
+响应：
 
 ```json
 {"message": "reload completed", "results": {"mqtt": "reconnected"}}
 ```
 
-- **mqtt**：`reconnected` 表示 MQTT 已重连并应用新配置；`not_running` 表示 MQTT 未启动
-- 数据留存配置（`sensor_data_retention_days` 等）在 `cleanup_old_data` 执行时自动读取最新值，无需 reload
+数据留存配置（`*_retention_days`）由 `cleanup_old_data` 每次执行时读取最新值，**不需要 reload**。
 
 ---
 
 ## 五、数据清理（cleanup_old_data）
 
-### 5.1 按配置清理过期数据
-
-根据 `sensor_data_retention_days`、`device_data_retention_days` 清理超期数据。采用分批删除策略，避免大表锁表或内存溢出：
-
 ```bash
+# 立即执行
 python manage.py cleanup_old_data
-```
 
-### 5.2 试运行（仅统计不删除）
-
-```bash
+# 试运行
 python manage.py cleanup_old_data --dry-run
-```
 
-### 5.3 自定义分批大小
-
-默认每批删除 1000 条，可根据数据量调整：
-
-```bash
+# 自定义分批
 python manage.py cleanup_old_data --batch-size 500
 ```
 
-### 5.4 定时执行（cron 示例）
+**注意**：从 0.7 起，`cleanup_old_data` 不再放在容器启动 command 里；建议挂宿主机 cron：
 
 ```cron
-0 2 * * * cd /path/to/project && python manage.py cleanup_old_data
+0 2 * * * docker compose exec -T backend python manage.py cleanup_old_data
+```
+
+或通过 API（仅超级用户）：
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://localhost:8000/api/platform-configs/cleanup-old-data/
 ```
 
 ---
@@ -276,121 +218,75 @@ python manage.py cleanup_old_data --batch-size 500
 
 ### 6.1 系统设置页
 
-前端「系统设置」页包含「平台配置」区块，超级用户可：
+「系统设置」→「平台配置」区块（仅超级用户可见编辑控件）：
 
 - 查看配置列表（按 category 分组）
 - 编辑配置值
-- 新增配置（key 需唯一）
-- 删除配置
 - 点击「使配置生效」调用 reload 接口
 
 ### 6.2 API 模块
 
-`frontend/src/api/platformConfig.js` 提供：
-
-- `getPlatformConfigs()`：获取列表
-- `getPlatformConfig(key)`：获取单个
-- `createPlatformConfig(data)`：创建
-- `updatePlatformConfig(key, data)`：更新
-- `deletePlatformConfig(key)`：删除
-- `reloadPlatformConfig()`：使配置生效（MQTT 重连等）
-
-### 6.3 权限控制
-
-- `isSuperuser` 为 true 时显示新增、编辑、删除、reload 按钮
-- 非超级用户仅可查看列表
+`frontend/src/api/platformConfig.js` 提供 `getPlatformConfigs / updatePlatformConfig / reloadPlatformConfig` 等。
 
 ---
 
 ## 七、配置项速查表
 
-| key | 环境变量 | 默认值 | 类型 | 说明 |
-|-----|---------|--------|------|------|
-| mqtt_broker | MQTT_BROKER | 127.0.0.1 | str | MQTT 服务器地址 |
-| mqtt_port | MQTT_PORT | 1883 | int | MQTT 端口 |
-| mqtt_keepalive | MQTT_KEEPALIVE | 60 | int | MQTT 保活间隔（秒） |
-| mqtt_username | MQTT_USERNAME | "" | str | MQTT 用户名 |
-| mqtt_password | MQTT_PASSWORD | "" | str | MQTT 密码 |
-| device_offline_timeout | DEVICE_OFFLINE_TIMEOUT | 300 | int | 设备离线超时（秒） |
-| device_reconnect_attempts | DEVICE_RECONNECT_ATTEMPTS | 3 | int | 重连尝试次数 |
-| device_reconnect_interval | DEVICE_RECONNECT_INTERVAL | 10 | int | 重连间隔（秒） |
-| sensor_data_retention_days | - | 30 | int | 传感器数据保留天数 |
-| device_data_retention_days | - | 30 | int | 设备数据保留天数 |
+`DEFAULT_CONFIGS` 在 `platform_settings/defaults.py` 中维护，新增一条即可：
 
----
-
-## 八点五、健康检查端点
-
-### 端点
-
-`GET /health/` — 无需认证，供监控系统和负载均衡器使用。
-
-### 响应示例（正常）
-
-```json
-{
-  "status": "ok",
-  "checks": {
-    "database": "ok",
-    "mqtt": "connected"
-  },
-  "timestamp": "2026-04-12T10:30:00+08:00"
-}
-```
-
-### 响应示例（异常）
-
-```json
-{
-  "status": "degraded",
-  "checks": {
-    "database": "ok",
-    "mqtt": "disconnected"
-  },
-  "timestamp": "2026-04-12T10:30:00+08:00"
-}
-```
-
-- `status` 为 `ok` 时返回 HTTP 200，`degraded` 时返回 HTTP 503
-- `checks.database`：`ok` 或 `error: ...`
-- `checks.mqtt`：`connected` 或 `disconnected` 或 `error: ...`
-
----
-
-## 八点六、API 节流配置
-
-| 类别 | 速率 | 适用 |
-|-----|------|------|
-| 匿名用户 | 30 次/小时 | 未认证请求 |
-| 认证用户 | 100 次/小时 | 已认证请求 |
-
-节流配置在 `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']` 中设置，超限后返回 HTTP 429。
+| key | 默认值 | 类型 | 分类 | 说明 |
+|-----|-------|------|------|------|
+| mqtt_broker | 127.0.0.1 | str | mqtt | MQTT 服务器地址 |
+| mqtt_port | 1883 | int | mqtt | MQTT 端口 |
+| mqtt_keepalive | 60 | int | mqtt | 保活间隔（秒） |
+| mqtt_username | "" | str | mqtt | MQTT 用户名 |
+| mqtt_password | "" | str (secret) | mqtt | MQTT 密码 |
+| device_offline_timeout | 300 | int | devices | 离线判定（秒） |
+| device_reconnect_attempts | 3 | int | devices | 重连次数 |
+| device_reconnect_interval | 10 | int | devices | 重连间隔（秒） |
+| sensor_data_retention_days | 30 | int | data_retention | 传感器数据保留天数 |
+| device_data_retention_days | 30 | int | data_retention | 设备数据保留天数 |
 
 ---
 
 ## 八、常见问题
 
-### Q1：修改平台配置后 MQTT 未生效？
+### Q1：首次部署后 MQTT 连不上？
 
-**解决**：调用 `POST /api/platform-configs/reload/`，MQTT 会自动重连并应用新配置，**无需重启服务**。
+**预期行为**。`configure --init` 写入默认值 `127.0.0.1:1883` 仅作占位，**必须**通过 `configure` wizard 改为实际 EMQX 地址：
 
-### Q2：数据留存配置修改后何时生效？
+```bash
+docker compose exec backend python manage.py configure
+```
 
-**说明**：`sensor_data_retention_days`、`device_data_retention_days` 在每次执行 `cleanup_old_data` 时从数据库读取，无需 reload。修改后下次执行清理即生效。
+### Q2：修改 `.env` 中的 `MQTT_BROKER` 没生效？
 
-### Q3：Docker 部署时 seed_platform_config 找不到 .env？
+`.env` 不再包含 MQTT 配置——相关项已迁移到 `PlatformConfig` 表。请改用 `configure --set mqtt_broker=...`。
 
-**说明**：Docker 通过 `env_file` 将变量注入容器环境，`seed_platform_config` 从 `os.environ` 读取，无需容器内存在 `.env` 文件。只要 `docker-compose.yml` 中配置了 `env_file: .env` 即可。
+### Q3：升级后多了几个新配置项怎么办？
 
-### Q4：如何添加新的配置项？
+`docker compose up -d` 启动时自动跑 `configure --init`，会**只补缺失的 key**，你已经设置过的值不会被覆盖。
 
-1. 在 `platform_settings/default_config.json` 的 `configs` 数组中添加一项，如：
-   ```json
-   {"key": "new_key", "default": "value", "env_key": null, "category": "general", "description": "说明"}
-   ```
-2. 若需从 .env 覆盖，设置 `env_key` 为环境变量名
-3. 执行 `python manage.py seed_platform_config` 初始化
+### Q4：怎么把所有配置导出到文件 / 从文件批量恢复？
 
-### Q5：敏感信息（如 MQTT 密码）应放哪里？
+目前没有 `--from-file`，可以用：
 
-建议仍通过环境变量管理，不写入 platform_settings。若写入，需确保仅超级用户可访问 API，并做好生产环境 HTTPS 与访问控制。
+```bash
+# 导出
+docker compose exec backend python manage.py configure --list > configs.txt
+
+# 批量设置（手写 shell）
+for line in mqtt_broker=192.168.1.10 mqtt_port=1883; do
+  docker compose exec backend python manage.py configure --set "$line"
+done
+```
+
+如果有强需求可以后续给 `configure` 加 `--from-file` 选项。
+
+### Q5：MQTT 密码进 DB 安全吗？
+
+`PlatformConfig.value` 是 `JSONField`，明文存储。本平台定位是**单团队/单家庭部署**，DB 在内网，能访问 DB 的人即拥有完整管理权。如果你的部署场景对此敏感，建议：
+- 部署在内网独立机器
+- 限制 MySQL 访问 IP
+- Admin 页面用 HTTPS
+- 或自行扩展 `PlatformConfig` 加密密码字段

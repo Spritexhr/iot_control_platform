@@ -461,4 +461,4 @@ broker = get_config('mqtt_broker', '127.0.0.1')
 port = get_config('mqtt_port', 1883, int)
 ```
 
-**初始化命令**：`python manage.py seed_platform_config` 将 .env 默认值写入数据库。详见 [platform_settings_guide.md](./platform_settings_guide.md)。
+**初始化命令**：`python manage.py configure --init` 将 `platform_settings/defaults.py` 中的默认值写入数据库；`python manage.py configure` 进入交互式 wizard 修改。详见 [platform_settings_guide.md](./platform_settings_guide.md)。

@@ -180,12 +180,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vue.js开发服务器
     "http://localhost:3000",
-    "http://localhost:8080",  # Docker 前端
-    "http://localhost:8081",  # Docker Admin 管理界面
+    "http://localhost:48080",  # Docker 前端默认端口
+    "http://localhost:48081",  # Docker Admin 直连默认端口
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:8081",
+    "http://127.0.0.1:48080",
+    "http://127.0.0.1:48081",
 ]
 
 # 支持通过环境变量追加额外的 CORS 源（逗号分隔）
@@ -207,18 +207,18 @@ if not DEBUG:
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "http://localhost:8080",
-    "http://localhost:8081",  # Docker Admin 管理界面
+    "http://localhost:48080",
+    "http://localhost:48081",  # Docker Admin 直连默认端口
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:8081",
+    "http://127.0.0.1:48080",
+    "http://127.0.0.1:48081",
     # 开发时若从局域网设备访问，请添加如 "http://192.168.x.x:5173"
 ]
 
 # MQTT 与设备配置：仅从 platform_settings 数据库读取
 # 使用 SimpleLazyObject 延迟读取，避免 settings 加载时 DB 未就绪
-# 启动前需执行 seed_platform_config 将 default_config.json + .env 写入数据库
+# 启动前由 sensors.apps 自动执行 `configure --init --no-reload` 把 defaults.py 中的默认值写入 DB
 from django.utils.functional import SimpleLazyObject
 from config.platform_config import get_config
 

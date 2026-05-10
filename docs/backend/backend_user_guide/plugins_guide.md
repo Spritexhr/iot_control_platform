@@ -104,7 +104,7 @@ python manage.py sync_plugins
 
 ```bash
 TOKEN=...  # 已登录用户的 access token
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/plugins/hello/hello/
+curl -H "Authorization: Bearer $TOKEN" http://localhost:48081/api/plugins/hello/hello/
 # {"message": "hello, admin"}
 ```
 
@@ -294,22 +294,22 @@ python manage.py sync_plugins --prune
 
 ```bash
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://localhost:8081/api/plugin-manager/sync/
+  http://localhost:48081/api/plugin-manager/sync/
 ```
 
 ### 8.2 启用 / 禁用插件
 
 ```bash
 # 查看
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/plugin-manager/
+curl -H "Authorization: Bearer $TOKEN" http://localhost:48081/api/plugin-manager/
 
 # 禁用
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://localhost:8081/api/plugin-manager/hello/disable/
+  http://localhost:48081/api/plugin-manager/hello/disable/
 
 # 启用
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://localhost:8081/api/plugin-manager/hello/enable/
+  http://localhost:48081/api/plugin-manager/hello/enable/
 
 # ⚠️ 启用 / 禁用都需要重启 Django 进程才会真正影响 URL 路由
 ```

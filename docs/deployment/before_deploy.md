@@ -70,9 +70,9 @@ cd emqx
 
 1. 打开 EMQX 控制台 → **访问控制** → **认证**
 2. 添加认证方式（如用户名/密码）
-3. 在 Django 的 `MQTT_USERNAME`、`MQTT_PASSWORD` 中填写相同凭据
+3. 通过 `python manage.py configure --set mqtt_username=xxx --set mqtt_password=xxx` 写入与 EMQX 一致的凭据
 
-嵌入式固件中的 `MQTT_USERNAME`、`MQTT_PASSWORD` 也需保持一致。
+嵌入式固件中的 MQTT 用户名 / 密码也需保持一致。
 
 ---
 
@@ -180,7 +180,8 @@ docker compose version
 | EMQX 控制台 | 18083 | Web 管理界面 |
 | Django 后端 | 8000 | runserver / Gunicorn |
 | 前端开发 | 5173 | Vite dev server |
-| 前端生产 | 80 / 8080 | Nginx 或静态服务 |
+| 前端生产（Docker） | 48080 | Nginx 提供静态文件，端口由 `.env:FRONTEND_PORT` 配置 |
+| Admin 直连（Docker） | 48081 | 后端 8000 → 宿主机 48081，由 `.env:ADMIN_PORT` 配置 |
 | MySQL | 3306 | 若使用 MySQL |
 
 ### 6.2 防火墙（生产环境）
@@ -212,14 +213,35 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-### 7.2 必改项
+### 7.2 .env 必改项
+
+`.env` 现在只承载进程级启动必备项：
 
 | 变量 | 说明 | 示例 |
 |-----|------|------|
-| `DB_PASSWORD` | MySQL 密码（使用 MySQL 时） | 强密码 |
+| `DB_PASSWORD` | MySQL 密码 | 强密码 |
 | `SECRET_KEY` | Django 密钥（生产必改） | 随机字符串 |
-| `MQTT_BROKER` | MQTT 服务器地址 | `127.0.0.1`（本机）或远程 IP |
-| `MQTT_USERNAME` / `MQTT_PASSWORD` | MQTT 认证（若 EMQX 启用） | 与 EMQX 一致 |
+| `ALLOWED_HOSTS` | 允许的 Host（生产必改） | `yourdomain.com` |
+
+### 7.3 MQTT 等业务配置
+
+**不在 `.env` 中**——MQTT broker、端口、用户名、密码、设备离线超时、数据保留天数等，统一通过 `configure` 命令写入 `PlatformConfig` 表。
+
+部署完成后运行交互式 wizard：
+
+```bash
+docker compose exec backend python manage.py configure
+```
+
+或单键设置（CI/脚本化）：
+
+```bash
+docker compose exec backend python manage.py configure \
+    --set mqtt_broker=192.168.1.10 \
+    --set mqtt_port=1883
+```
+
+详见 [平台配置使用指南](../backend/backend_user_guide/platform_settings_guide.md)。
 
 ### 7.3 非 Docker 部署
 
@@ -235,12 +257,13 @@ cp .env.example .env
 
 在执行 [docker.md](docker.md) 或 [not_docker.md](not_docker.md) 部署前，请确认：
 
-- [ ] EMQX 已安装并启动，1883 端口可访问
+- [ ] EMQX 已安装并启动，1883 端口可访问（或自定义端口）
 - [ ] Python 3.10+ 已安装
 - [ ] （若需前端）Node.js 18+ 已安装
 - [ ] （若用 MySQL）MySQL 已安装，数据库已创建
 - [ ] （若用 Docker）Docker 与 Docker Compose 已安装
-- [ ] `.env` 已从 `.env.example` 复制并修改关键配置
+- [ ] `.env` 已从 `.env.example` 复制并修改 `DB_PASSWORD` / `SECRET_KEY`
+- [ ] 启动后已通过 `configure` wizard 设置 MQTT 实际地址（默认 `127.0.0.1:1883` 仅占位）
 - [ ] 防火墙已开放必要端口（生产环境）
 - [ ] 嵌入式设备与服务器在同一网络或可访问 MQTT Broker
 

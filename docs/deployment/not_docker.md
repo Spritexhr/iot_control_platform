@@ -102,17 +102,16 @@ pip install -r requirements.txt
 $env:SECRET_KEY="your-secret-key"
 $env:DEBUG="True"
 $env:ALLOWED_HOSTS="localhost,127.0.0.1"
-$env:MQTT_BROKER="your-mqtt-broker-ip"
-$env:MQTT_PORT="1883"
 
 # Linux/Mac 示例
 export SECRET_KEY="your-secret-key"
 export DEBUG=True
 export ALLOWED_HOSTS="localhost,127.0.0.1"
-export MQTT_BROKER="your-mqtt-broker-ip"
 ```
 
-不设置时使用 `config/settings.py` 中的默认值（SQLite、默认 MQTT 配置）。
+> MQTT 等业务配置不再走环境变量——统一走 `PlatformConfig` 表，由下文 3.5 的 `configure` 命令维护。
+
+不设置时使用 `config/settings.py` 中的默认值（SQLite）。
 
 ### 3.4 数据库迁移与创建管理员
 
@@ -123,6 +122,18 @@ python manage.py createsuperuser
 ```
 
 按提示输入用户名、邮箱和密码。
+
+### 3.5 平台配置初始化
+
+```bash
+# 写入默认配置（仅补缺失的 key）
+python manage.py configure --init
+
+# 交互式 wizard 修改 MQTT 等业务配置
+python manage.py configure
+```
+
+详见 [平台配置使用指南](../backend/backend_user_guide/platform_settings_guide.md)。
 
 ### 3.5 启动后端
 
@@ -205,14 +216,15 @@ python -m http.server 8080
 
 ### 5.2 使用远程 MQTT
 
-在环境变量或 `config/settings.py` 中配置：
+通过 `configure` 命令写入：
 
-```python
-MQTT_BROKER = "your-mqtt-broker-ip"  # 实际 IP 或域名
-MQTT_PORT = 1883
-MQTT_USERNAME = ""   # 若需认证
-MQTT_PASSWORD = ""
+```bash
+python manage.py configure --set mqtt_broker=192.168.1.10 --set mqtt_port=1883
+# 若需认证
+python manage.py configure --set mqtt_username=user --set mqtt_password=pass
 ```
+
+或交互式 `python manage.py configure`。
 
 ---
 
@@ -299,13 +311,13 @@ nohup gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 > gunicor
 
 ### Q1：前端访问后端 401 / CORS 错误
 
-确认 `config/settings.py` 中 `CORS_ALLOWED_ORIGINS`、`CSRF_TRUSTED_ORIGINS` 包含前端实际访问地址（如 `http://localhost:5173`、`http://your-ip:8080`）。
+确认 `config/settings.py` 中 `CORS_ALLOWED_ORIGINS`、`CSRF_TRUSTED_ORIGINS` 包含前端实际访问地址（如 `http://localhost:5173`、`http://your-ip:48080`）。或通过 `EXTRA_CORS_ORIGINS` 环境变量追加。
 
 ### Q2：MQTT 连接失败
 
-- 检查 `MQTT_BROKER`、`MQTT_PORT` 是否正确
+- 检查 `mqtt_broker` / `mqtt_port` 是否正确：`python manage.py configure --list`
 - 确认防火墙允许 1883 端口
-- 若 EMQX 在本机，`MQTT_BROKER` 可设为 `127.0.0.1` 或 `localhost`
+- 若 EMQX 在本机，`mqtt_broker` 可设为 `127.0.0.1` 或 `localhost`
 
 ### Q3：静态文件 404（生产环境）
 

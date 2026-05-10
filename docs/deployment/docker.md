@@ -68,7 +68,7 @@ iot_control_platform/           # 项目根目录
 ```
                     ┌─────────────────────────────────────┐
                     │           用户浏览器                    │
-                    │     http://localhost:80 或 8080       │
+                    │   http://localhost:48080（默认）      │
                     └──────────────────┬──────────────────┘
                                        │
                                        ▼
@@ -98,8 +98,8 @@ iot_control_platform/           # 项目根目录
 | 服务        | 说明                         | 对外端口 |
 |-------------|------------------------------|----------|
 | `mysql`     | MySQL 8.0 数据库             | 3307（可配置） |
-| `frontend`  | Vue 前端构建 + Nginx 提供静态文件与 API 代理 | 8080（可配置） |
-| `backend`   | Django REST API + Gunicorn + MQTT 客户端（连接公网 EMQX） | 8000 → 8081（Admin 直连，可配置） |
+| `frontend`  | Vue 前端构建 + Nginx 提供静态文件与 API 代理 | 48080（可由 `.env:FRONTEND_PORT` 配置） |
+| `backend`   | Django REST API + Gunicorn + MQTT 客户端（连接 EMQX） | 8000 → 48081（Admin 直连，可由 `.env:ADMIN_PORT` 配置） |
 | 数据卷       | 持久化 MySQL 数据            | -        |
 
 ---
@@ -116,33 +116,28 @@ cp .env.example .env               # Linux/Mac
 # 或 copy .env.example .env        # Windows
 ```
 
-然后编辑 `.env`，**务必修改 `DB_PASSWORD`**（MySQL 根密码）：
+然后编辑 `.env`，**务必修改 `DB_PASSWORD`** 和 `SECRET_KEY`：
 
 ```env
-# 前端访问端口
-FRONTEND_PORT=8080
-# Admin 管理界面端口（Django Admin 直连）
-ADMIN_PORT=8081
-
-# Django 配置
+# Django 必备
 SECRET_KEY=your-secret-key-change-in-production
 DEBUG=True
 ALLOWED_HOSTS=*
 
-# MySQL 数据库（必填）
+# MySQL 数据库
 DB_NAME=iot_platform
 DB_USER=root
 DB_PASSWORD=你的MySQL密码
-MYSQL_HOST_PORT=3307
 
-# MQTT/EMQX 配置（Docker 容器需能访问）
-MQTT_BROKER=116.62.68.29
-MQTT_PORT=1883
-# MQTT_USERNAME=
-# MQTT_PASSWORD=
+# 端口
+MYSQL_HOST_PORT=3307
+FRONTEND_PORT=48080
+ADMIN_PORT=48081
 ```
 
-> **注意**：`DB_PASSWORD` 为 MySQL root 密码，生产环境务必使用强密码，并修改 `SECRET_KEY`、`DEBUG=False`。
+> **注意**：`.env` 不再包含 MQTT 相关配置。MQTT broker、端口、用户名、密码等已迁移到 `PlatformConfig` 表，由 `configure` 命令在部署后维护（见 4.4）。
+>
+> 生产环境务必使用强密码，并修改 `SECRET_KEY`、`DEBUG=False`、`ALLOWED_HOSTS=yourdomain.com`。
 
 ### 4.2 构建并启动所有服务
 
@@ -163,20 +158,54 @@ docker compose up -d --build
 
 后端启动时会自动执行：
 1. **数据库迁移**：`migrate --noinput`
-2. **平台配置初始化**：`seed_platform_config`（将 .env 中的 MQTT 等配置写入数据库，仅创建不存在的项）
+2. **平台配置种子**：`configure --init`（将 `defaults.py` 中的默认值写入 DB，仅补缺失的 key）
 
-首次部署只需创建管理员账号：
+首次部署需要做两件事：
+
+**(1) 创建管理员账号**
 
 ```bash
 docker compose exec backend python manage.py createsuperuser
 ```
 
-按提示输入用户名、邮箱和密码即可。
+**(2) 配置 MQTT 等业务参数**（启动后必做）
+
+默认 MQTT broker 是 `127.0.0.1:1883`，仅作占位。运行交互式 wizard 改为实际值：
+
+```bash
+docker compose exec backend python manage.py configure
+```
+
+```
+=== 平台配置 wizard ===
+直接回车保留当前值；按 Ctrl+C 中止。
+
+[mqtt]
+  mqtt_broker (MQTT/EMQX 服务器地址) [127.0.0.1]: 192.168.1.10
+  mqtt_port (MQTT 端口) [1883]: 1883
+  mqtt_username (...) []: emqx_user
+  mqtt_password (...) []: ********
+...
+
+触发 reload:
+  MQTT: reconnected
+```
+
+写完自动调 reload，MQTT 服务无感重连，**不需要重启容器**。配置错了再跑一次 wizard 即可。
+
+也可以单键设置：
+
+```bash
+docker compose exec backend python manage.py configure \
+    --set mqtt_broker=192.168.1.10 --set mqtt_port=1883
+```
+
+完整使用见 [平台配置使用指南](../backend/backend_user_guide/platform_settings_guide.md)。
 
 ### 4.4 访问应用
 
-- **前端页面**：http://localhost:8080（`.env` 中 `FRONTEND_PORT=8080`）
-- **Django Admin**：http://localhost:8081/admin/（`.env` 中 `ADMIN_PORT=8081`，直连后端）
+- **前端页面**：http://localhost:48080（`.env` 中 `FRONTEND_PORT=48080`）
+- **Django Admin**：http://localhost:48081/admin/（`.env` 中 `ADMIN_PORT=48081`，直连后端）
 
 使用上一步创建的超级管理员账号登录 Admin。
 
@@ -271,7 +300,7 @@ CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers
 ### 6.4 docker-compose.yml
 
 - `mysql`：MySQL 8.0 数据库，数据持久化到 `mysql_data` 卷
-- `backend`：Django + Gunicorn，启动时执行 migrate、seed_platform_config，连接 MySQL 和 MQTT
+- `backend`：Django + Gunicorn，启动时执行 `migrate` 和 `configure --init`（仅补缺失的默认配置），通过 `PlatformConfig` 表读取 MQTT 配置
 - `frontend`：Vue 构建 + Nginx，代理 `/api/` 到 backend，依赖 `backend`
 - `volumes`：`mysql_data` 持久化 MySQL 数据
 
@@ -361,16 +390,29 @@ docker compose exec backend python manage.py migrate
 
 ### Q4：Docker 部署后无法连接 EMQX/MQTT
 
-**说明**：后端通过 `.env` 中的 `MQTT_BROKER`、`MQTT_PORT` 连接公网或远程 EMQX。
+**说明**：MQTT 配置已不在 `.env`，存于 `PlatformConfig` 表。默认占位值是 `127.0.0.1:1883`，连不上是预期行为。
 
-- **公网 EMQX**：在 `.env` 中设置 `MQTT_BROKER=实际IP或域名`、`MQTT_PORT=1883`
-- **EMQX 在本机运行**：设置 `MQTT_BROKER=host.docker.internal`（Windows/Mac Docker Desktop 支持）
-- 若 EMQX 开启认证，需配置 `MQTT_USERNAME`、`MQTT_PASSWORD`
-- 修改后执行 `docker compose restart backend`
+修改方式：
+
+```bash
+# 公网 EMQX
+docker compose exec backend python manage.py configure \
+    --set mqtt_broker=实际IP --set mqtt_port=1883
+
+# EMQX 在宿主机运行（Docker Desktop 的 Windows/Mac）
+docker compose exec backend python manage.py configure \
+    --set mqtt_broker=host.docker.internal --set mqtt_port=1883
+
+# EMQX 开启认证
+docker compose exec backend python manage.py configure \
+    --set mqtt_username=user --set mqtt_password=pass
+```
+
+写完会自动 reload，MQTT 服务无感重连，**不需要重启容器**。
 
 ### Q5：端口被占用
 
-修改 `.env` 中的 `FRONTEND_PORT`，例如改为 `8080`，然后访问 http://localhost:8080。
+修改 `.env` 中的 `FRONTEND_PORT`，例如改为 `28080`，然后访问 http://localhost:28080。
 
 ---
 
@@ -381,6 +423,9 @@ docker compose exec backend python manage.py migrate
 | 首次启动       | `docker compose up -d --build`                |
 | 首次数据库迁移 | `docker compose exec backend python manage.py migrate` |
 | 创建管理员     | `docker compose exec backend python manage.py createsuperuser` |
+| 配置平台（wizard） | `docker compose exec backend python manage.py configure` |
+| 单键设置配置   | `docker compose exec backend python manage.py configure --set mqtt_broker=x.x.x.x` |
+| 列出当前配置   | `docker compose exec backend python manage.py configure --list` |
 | 查看状态       | `docker compose ps`                           |
 | 查看后端日志   | `docker compose logs backend -f`              |
 | 停止服务       | `docker compose down`                         |

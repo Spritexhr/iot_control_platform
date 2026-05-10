@@ -1,6 +1,8 @@
 # 平台配置 (platform_settings) 设计文档
 
-本文档描述物联网控制平台的平台配置模块设计，涵盖 `PlatformConfig` 模型、`get_config` 配置读取机制、`seed_platform_config` 初始化命令，以及与前端的集成方式。
+本文档描述物联网控制平台的平台配置模块设计，涵盖 `PlatformConfig` 模型、`get_config` 配置读取机制、`configure` 管理命令（wizard / --init / --set），以及与前端的集成方式。
+
+> **0.7 重构说明**：自 0.7 起 `default_config.json` 与 `seed_platform_config` 已废弃，由 `platform_settings/defaults.py:DEFAULT_CONFIGS` 常量 + `configure` 管理命令替代。`.env` 不再含 MQTT 相关项，所有业务配置只走 `PlatformConfig` 表。
 
 ---
 
@@ -37,9 +39,13 @@
 │                        配置写入流程                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   default_config.json  ──┐                                                │
-│   .env (仅必备项)  ──────┼──►  seed_platform_config  ──►  PlatformConfig   │
-│                         │     (合并后仅创建不存在的 key)                    │
+│   defaults.py: DEFAULT_CONFIGS  ──┐                                       │
+│                                   ├──►  configure --init  ──►  PlatformConfig │
+│                                   │     (仅补缺失的 key，已有不动)             │
+│                                                                         │
+│   人工/CI 输入  ──►  configure (wizard / --set / --unset)  ──►  PlatformConfig │
+│                                                                         │
+│   写入后默认调用 reload，让 MQTT 等服务无感重连                              │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -112,47 +118,77 @@ MQTT_PORT = _lazy_config("mqtt_port", 1883, int)
 
 ---
 
-## 四、seed_platform_config 管理命令
+## 四、configure 管理命令
 
 ### 4.1 职责
 
-将 `.env` 或环境变量中的配置作为默认值写入 `platform_settings`，**仅当 key 不存在时创建**，已存在的配置默认不覆盖。
+`PlatformConfig` 表的**唯一写入入口**。支持五种模式：
+
+| 模式 | 用途 |
+|-----|------|
+| `configure`（无参） | 交互式 wizard，按 DEFAULT_CONFIGS 顺序询问，回车保留当前值 |
+| `--init` | 仅写入 DB 中缺失的 key，已存在不动；用于首次部署/升级补默认值 |
+| `--set k=v` | 单键写入，支持重复传，CI/脚本化 |
+| `--unset key` | 把 key 重置为 DEFAULT_CONFIGS 中的默认值 |
+| `--list` | 列出所有当前配置（密码字段打码） |
+
+写入后默认触发 reload，让 MQTT 等服务无感重连；`--no-reload` 跳过（启动阶段使用）。
 
 ### 4.2 配置项定义
 
-| platform_key | env_key | 默认值 | category | 说明 |
-|-------------|---------|--------|----------|------|
-| mqtt_broker | MQTT_BROKER | 127.0.0.1 | mqtt | MQTT/EMQX 服务器地址 |
-| mqtt_port | MQTT_PORT | 1883 | mqtt | MQTT 端口 |
-| mqtt_keepalive | MQTT_KEEPALIVE | 60 | mqtt | MQTT 保活间隔（秒） |
-| mqtt_username | MQTT_USERNAME | "" | mqtt | MQTT 用户名（可选） |
-| mqtt_password | MQTT_PASSWORD | "" | mqtt | MQTT 密码（可选） |
-| device_offline_timeout | DEVICE_OFFLINE_TIMEOUT | 300 | devices | 设备离线判定超时（秒） |
-| device_reconnect_attempts | DEVICE_RECONNECT_ATTEMPTS | 3 | devices | 设备重连尝试次数 |
-| device_reconnect_interval | DEVICE_RECONNECT_INTERVAL | 10 | devices | 设备重连间隔（秒） |
+由 `platform_settings/defaults.py` 中的 `DEFAULT_CONFIGS: List[Dict]` 维护：
 
-### 4.3 命令用法
-
-```bash
-# 默认：从项目根目录 .env 加载，仅创建不存在的 key
-python manage.py seed_platform_config
-
-# 强制更新已存在的配置（用 env 值覆盖）
-python manage.py seed_platform_config --force
-
-# 指定 .env 路径
-python manage.py seed_platform_config --env /path/to/.env
+```python
+DEFAULT_CONFIGS = [
+    {"key": "mqtt_broker", "default": "127.0.0.1", "category": "mqtt",
+     "description": "MQTT/EMQX 服务器地址"},
+    {"key": "mqtt_password", "default": "", "category": "mqtt",
+     "description": "MQTT 密码", "secret": True},
+    ...
+]
 ```
+
+| key | 默认值 | category | 备注 |
+|-----|-------|----------|------|
+| mqtt_broker | 127.0.0.1 | mqtt | 占位地址，wizard 必改 |
+| mqtt_port | 1883 | mqtt | EMQX 标准端口 |
+| mqtt_keepalive | 60 | mqtt | |
+| mqtt_username | "" | mqtt | |
+| mqtt_password | "" | mqtt | secret=True，输入不回显 |
+| device_offline_timeout | 300 | devices | |
+| device_reconnect_attempts | 3 | devices | |
+| device_reconnect_interval | 10 | devices | |
+| sensor_data_retention_days | 30 | data_retention | |
+| device_data_retention_days | 30 | data_retention | |
+
+新增配置项只需追加一条 dict 到 `DEFAULT_CONFIGS`，下次 `configure --init` 即被写入。
+
+### 4.3 类型转换
+
+`configure._coerce` 按 `default` 的 Python 类型自动转换字符串输入：
+- `int / float`：直接转，失败抛 CommandError
+- `bool`：接受 `true / 1 / yes / y / on`
+- `list / dict`：解析为 JSON
+- 其他：保持 str
 
 ### 4.4 Docker 部署
 
-Docker Compose 通过 `env_file: .env` 将变量注入容器，`seed_platform_config` 从 `os.environ` 读取，无需容器内存在 `.env` 文件。启动命令中在 `migrate` 之后执行：
+启动 command 在 `migrate` 之后调用 `configure --init --no-reload`：
 
 ```yaml
 command: >
   sh -c "python manage.py migrate --noinput &&
-    python manage.py seed_platform_config &&
+    python manage.py configure --init --no-reload &&
+    python manage.py collectstatic --noinput &&
     gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
+```
+
+`--init` 仅在 DB 缺失 key 时写入，已配置过的不会被覆盖；`--no-reload` 因为此时 MQTT 服务还未启动。
+
+首次部署后用户手动跑 wizard 完成配置：
+
+```bash
+docker compose exec backend python manage.py configure
 ```
 
 ---
@@ -182,10 +218,10 @@ command: >
 
 MQTT 服务在 `sensors.apps.SensorsConfig.ready()` 中启动，连接时读取 `settings.MQTT_BROKER`、`settings.MQTT_PORT` 等。这些值通过 `_lazy_config` 从 `get_config` 获取，因此：
 
-- 首次启动：若未执行 `seed_platform_config`，则使用环境变量或默认值
-- 修改 platform_settings 后：需重启 Django 进程才能生效（因 settings 在启动时已求值，LazyObject 仅首次访问时求值）
+- 首次启动：若未执行 `configure --init`，`get_config()` 会回退到 default
+- 修改 platform_settings 后：调用 `POST /api/platform-configs/reload/` 或 `configure` 写完触发的 reload，让 MQTT 重连应用新值，**无需重启进程**
 
-若需**运行时热更新** MQTT 配置，需在 mqtt_service 内部直接调用 `get_config`，而非通过 settings。当前实现为启动时读取，修改后需重启。
+`mqtt_service` 直接调用 `get_config`（见 `services/mqtt_service.py`），所以热更新有效。
 
 ---
 
@@ -198,22 +234,26 @@ config/
 └── settings.py                 # _lazy_config、MQTT_* 等
 
 platform_settings/
-├── models.py                   # PlatformConfig
-├── views.py                    # PlatformConfigViewSet
+├── models.py                   # PlatformConfig / Plugin
+├── defaults.py                 # DEFAULT_CONFIGS 常量（替代 default_config.json）
+├── views.py                    # PlatformConfigViewSet（含 reload / cleanup-old-data API）
 ├── serializers.py              # PlatformConfigSerializer
 └── management/commands/
-    └── seed_platform_config.py # 初始化命令
+    ├── configure.py            # 写入唯一入口（wizard / --init / --set / --unset / --list）
+    ├── cleanup_old_data.py     # 数据清理命令
+    └── sync_plugins.py         # 插件同步命令
 ```
 
 ---
 
 ## 八、设计要点总结
 
-1. **数据库优先**：平台配置优先从数据库读取，便于前端管理、无需改 .env
-2. **环境变量回退**：数据库无或异常时回退到环境变量，兼容 Docker、传统部署
+1. **数据库唯一真源**：业务配置只在 `PlatformConfig` 表，不再有 `.env`/JSON/DB 三重来源
+2. **`.env` 极简化**：仅保留进程级启动必备项（`SECRET_KEY` / `DB_*` / `DEBUG` / 端口）
 3. **延迟加载**：settings 使用 SimpleLazyObject，避免启动时 DB 未就绪
-4. **seed 幂等**：默认仅创建不存在的 key，`--force` 可覆盖已有配置
-5. **权限隔离**：仅超级用户可增删改平台配置，普通用户只读
+4. **写入入口收敛**：所有写入走 `configure` 命令或 API，统一类型转换、reload、密码打码
+5. **`--init` 幂等**：仅补 DB 缺失的 key，已有不动；用户改过的值永远不被覆盖
+6. **权限隔离**：API 仅超级用户可增删改；命令行依赖 Docker exec 隔离
 
 ---
 

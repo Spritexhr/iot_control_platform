@@ -105,14 +105,17 @@ CREATE DATABASE iot_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ### 4. MQTT 服务器配置
 
-在 `config/settings.py` 中配置 MQTT 连接信息：
+MQTT 配置已迁移到 `PlatformConfig` 表（自 0.7 起），通过 `configure` 命令维护：
 
-```python
-MQTT_BROKER = "localhost"  # EMQX 服务器地址
-MQTT_PORT = 1883
-MQTT_USERNAME = ""  # 如果需要认证
-MQTT_PASSWORD = ""  # 如果需要认证
+```bash
+# 交互式 wizard
+python manage.py configure
+
+# 或单键设置
+python manage.py configure --set mqtt_broker=192.168.1.10 --set mqtt_port=1883
 ```
+
+详见 [平台配置使用指南](../docs/backend/backend_user_guide/platform_settings_guide.md)。
 
 ### 5. 初始化数据库
 
@@ -169,8 +172,8 @@ docker compose exec backend python manage.py createsuperuser
 ```
 
 4. 访问系统：
-   - 前端界面：`http://localhost:8080`（或 `.env` 中 `FRONTEND_PORT` 指定端口）
-   - 管理后台：`http://localhost:8081/admin/`（`.env` 中 `ADMIN_PORT` 指定端口）
+   - 前端界面：`http://localhost:48080`（或 `.env` 中 `FRONTEND_PORT` 指定端口）
+   - 管理后台：`http://localhost:48081/admin/`（`.env` 中 `ADMIN_PORT` 指定端口）
 
 详细说明请参阅 [docs/deployment/docker.md](../docs/deployment/docker.md)。
 

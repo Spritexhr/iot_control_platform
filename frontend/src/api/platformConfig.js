@@ -34,3 +34,13 @@ export function reloadPlatformConfig() {
 export function runCleanupOldData() {
   return request.post('/platform-configs/cleanup-old-data/')
 }
+
+/** 获取平台预定义配置项 schema（来源 defaults.py） */
+export function getConfigSchema() {
+  return request.get('/platform-configs/schema/')
+}
+
+/** 测试 MQTT 连接（可传入临时 broker/port/username/password） */
+export function testMqttConnection(payload = {}) {
+  return request.post('/platform-configs/test-mqtt/', payload)
+}

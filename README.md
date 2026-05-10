@@ -44,7 +44,7 @@ docker compose up -d --build
 docker compose exec backend python manage.py createsuperuser
 ```
 
-访问：http://localhost:8080
+访问：http://localhost:48080
 
 **非 Docker：**
 
@@ -52,8 +52,8 @@ docker compose exec backend python manage.py createsuperuser
 
 ### 3. 访问系统
 
-- **前端界面**：http://localhost:8080（或 5173 开发模式）
-- **Django Admin**：http://localhost:8081/admin/（Docker 部署时直连后端）
+- **前端界面**：http://localhost:48080（或 5173 开发模式）
+- **Django Admin**：http://localhost:48081/admin/（Docker 部署时直连后端）
 
 ---
 

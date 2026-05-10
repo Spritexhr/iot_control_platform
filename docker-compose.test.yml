@@ -32,17 +32,13 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql-test
       - DB_PORT=3306
-      - MQTT_BROKER=${MQTT_BROKER:-116.62.68.29}
-      - MQTT_PORT=${MQTT_PORT:-1883}
-      - MQTT_USERNAME=${MQTT_USERNAME:-}
-      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
       - MQTT_CLIENT_ID_SUFFIX=test
       - PYTHONDONTWRITEBYTECODE=1
     volumes:
       - ./iot_control_platform:/app
     command: >
       sh -c "python manage.py migrate --noinput &&
-        python manage.py seed_platform_config &&
+        python manage.py configure --init --no-reload &&
         python manage.py runserver 0.0.0.0:8000"
     env_file:
       - .env
