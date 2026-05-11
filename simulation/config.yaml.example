@@ -1,0 +1,21 @@
+# 虚拟节点启动配置模板 —— 复制为 config.yaml 后再按需修改
+#   cp config.yaml.example config.yaml
+#
+# 数据生成（波形）逻辑写在各节点的 .py 中，这里只配运行时参数
+
+broker:
+  host: 127.0.0.1          # 改成你的 EMQX 地址
+  port: 1883
+  username: ""             # 留空表示不使用认证
+  password: ""
+
+nodes:
+  - module: temp_humi_sensor
+    id: DHT11-WEMOS-001
+    sampling_interval: 10           # 可选，默认 60
+    status_report_interval: 30      # 可选，默认 120
+
+  - module: sg90_servo
+    id: sg90_001
+    status_report_interval: 30      # 可选，默认 120
+    initial_angle: 90               # 可选，默认 90
