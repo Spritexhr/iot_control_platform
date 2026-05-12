@@ -204,10 +204,10 @@ class Sensor(models.Model):
 
     def save(self, *args, **kwargs):
         """保存时自动设置 MQTT 主题，与 Arduino 固件保持一致"""
-        # 仅在字段为 None（未设置）时自动生成，空字符串视为用户主动清空
-        if self.mqtt_topic_data is None:
+        # CharField 默认存 ""（不是 None），所以判断 falsy 覆盖空字符串和 None
+        if not self.mqtt_topic_data:
             self.mqtt_topic_data = f"iot/sensors/{self.sensor_id}/data"
-        if self.mqtt_topic_control is None:
+        if not self.mqtt_topic_control:
             self.mqtt_topic_control = f"iot/sensors/{self.sensor_id}/control"
 
         super().save(*args, **kwargs)
