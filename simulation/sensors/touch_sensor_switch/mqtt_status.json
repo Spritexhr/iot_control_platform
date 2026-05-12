@@ -1,0 +1,35 @@
+{
+    "online": {
+        "sensor_id": "Switch-Touch-001",
+        "event": "online",
+        "status": {"is_enabled": true, "statusReportInterval": 120, "switch": false},
+        "timestamp": 1770733931
+    },
+    "heartbeat": {
+        "sensor_id": "Switch-Touch-001",
+        "event": "heartbeat",
+        "status": {"is_enabled": true, "statusReportInterval": 120, "switch": true},
+        "timestamp": 1770733931
+    },
+    "status_interval_updated": {
+        "sensor_id": "Switch-Touch-001",
+        "event": "status_interval_updated",
+        "status": {"is_enabled": true, "statusReportInterval": 60, "switch": false},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "sensor_enabled": {
+        "sensor_id": "Switch-Touch-001",
+        "event": "sensor_enabled",
+        "status": {"is_enabled": true, "statusReportInterval": 120, "switch": false},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "sensor_disabled": {
+        "sensor_id": "Switch-Touch-001",
+        "event": "sensor_disabled",
+        "status": {"is_enabled": false, "statusReportInterval": 120, "switch": false},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    }
+}

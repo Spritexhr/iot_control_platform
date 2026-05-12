@@ -17,15 +17,33 @@ import yaml
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from common.mqtt_node import MqttNode
-from sensors.temp_humi_sensor import TempHumiSensor
-from devices.sg90_servo import SG90Servo
+from sensors.temp_humi_sensor.temp_humi_sensor import TempHumiSensor
+from sensors.bmp280_temp_pressure_sensor.bmp280_temp_pressure_sensor import BMP280TempPressureSensor
+from sensors.temp_pressure_sensor.temp_pressure_sensor import TempPressureSensor
+from sensors.rotation_sensor.rotation_sensor import RotationSensor
+from sensors.touch_sensor_switch.touch_sensor_switch import TouchSensorSwitch
+from sensors.radial_counting_module.radial_counting_module import RadialCountingModule
+from sensors.flow_sensor.flow_sensor import FlowSensor
+from devices.sg90_servo.sg90_servo import SG90Servo
+from devices.pin_control.pin_control import PinControl
+from devices.pump.pump import Pump
 
 log = logging.getLogger(__name__)
 
 # 节点模块注册表：config.yaml 里 module 字段 -> 类
 REGISTRY = {
+    # 硬件复刻
     "temp_humi_sensor": TempHumiSensor,
+    "bmp280_temp_pressure_sensor": BMP280TempPressureSensor,
+    "rotation_sensor": RotationSensor,
+    "touch_sensor_switch": TouchSensorSwitch,
+    "radial_counting_module": RadialCountingModule,
     "sg90_servo": SG90Servo,
+    "pin_control": PinControl,
+    # 新增（无对应固件）
+    "temp_pressure_sensor": TempPressureSensor,
+    "flow_sensor": FlowSensor,
+    "pump": Pump,
 }
 
 
@@ -39,15 +57,20 @@ def build_node(entry: dict, broker: dict) -> MqttNode:
     if not node_id:
         raise ValueError(f"节点配置缺少 id 字段: {entry}")
 
-    # 从 entry 中收集除 module/id 之外的所有键作为构造参数
-    extra_kwargs = {k: v for k, v in entry.items() if k not in ("module", "id")}
+    # 鉴权：节点级覆盖 > broker 级默认（复刻每台 .ino 独立 credentials 的能力）
+    username = entry.get("username", broker.get("username", ""))
+    password = entry.get("password", broker.get("password", ""))
+
+    # 其余字段作为构造参数透传（剔除已显式处理的字段，避免重复传参）
+    reserved = {"module", "id", "username", "password"}
+    extra_kwargs = {k: v for k, v in entry.items() if k not in reserved}
 
     return cls(
         node_id=node_id,
         broker=broker["host"],
         port=broker.get("port", 1883),
-        username=broker.get("username", ""),
-        password=broker.get("password", ""),
+        username=username,
+        password=password,
         **extra_kwargs,
     )
 

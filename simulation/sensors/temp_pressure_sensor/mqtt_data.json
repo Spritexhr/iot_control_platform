@@ -1,0 +1,8 @@
+{
+    "sensor_id": "TempPressure-001",
+    "data": {
+        "temperature": 24.1,
+        "pressure": 1008.50
+    },
+    "timestamp": 1770733931
+}

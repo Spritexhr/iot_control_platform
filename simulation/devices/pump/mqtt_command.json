@@ -1,0 +1,27 @@
+{
+    "start": {
+        "mqtt_message": {"command": "start"},
+        "description": "启动水泵",
+        "params": []
+    },
+    "stop": {
+        "mqtt_message": {"command": "stop"},
+        "description": "停止水泵",
+        "params": []
+    },
+    "set_power": {
+        "mqtt_message": {"command": "set_power", "power_kw": "{val}"},
+        "description": "设置目标功率（kW，0.0-max_power_kw）",
+        "params": ["val"]
+    },
+    "current_status": {
+        "mqtt_message": {"command": "current_status"},
+        "description": "查询当前运行状态和功率",
+        "params": []
+    },
+    "set_status_interval": {
+        "mqtt_message": {"command": "set_status_interval", "interval": "{val}"},
+        "description": "设置状态上报间隔（心跳，10-600秒）",
+        "params": ["val"]
+    }
+}

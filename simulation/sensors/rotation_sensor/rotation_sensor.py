@@ -1,37 +1,45 @@
 """
-虚拟 DHT11 温湿度传感器 —— 复刻 hardware/wemos-d1/sensors/temp_humi_sensor/temp_humi_sensor_v3.ino
+虚拟旋转编码器 —— 复刻
+hardware/wemos-d1/sensors/rotation_sensor/rotation_sensor_v1.ino
 
-MQTT 主题：
-  数据:   iot/sensors/{sensor_id}/data
-  状态:   iot/sensors/{sensor_id}/status
-  控制:   iot/sensors/{sensor_id}/control
-
-支持命令：enable / disable / set_interval / set_data_interval / set_status_interval
+数据字段：raw (0-1023 ADC 原值)、position (0-100 百分比)、angle (0-360 度)
+三个值由 raw 派生：position = raw/1023*100, angle = raw/1023*360
+status payload 中也带最新一次读数（与 .ino 行为一致）
 """
 import argparse
 import logging
-import math
 import os
-import random
 import sys
 import time
 from typing import Optional
 
-# 支持作为脚本独立运行：把 simulation/ 加入 sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.waveforms import build_waveform_map
 
 log = logging.getLogger(__name__)
 
 
-class TempHumiSensor(MqttNode):
+DEFAULT_WAVEFORMS = {
+    "raw": {
+        "type": "sine",
+        "min": 0.0,
+        "max": 1023.0,
+        "period": 60,
+        "jitter": 5.0,
+    },
+}
+
+
+class RotationSensor(MqttNode):
     NODE_TYPE = "sensor"
     ID_FIELD = "sensor_id"
 
-    # 与 .ino 默认值一致
-    DEFAULT_SAMPLING_INTERVAL = 60
-    DEFAULT_STATUS_REPORT_INTERVAL = 120
+    DEFAULT_SAMPLING_INTERVAL = 1
+    DEFAULT_STATUS_REPORT_INTERVAL = 60
+
+    RAW_MAX = 1023
 
     def __init__(
         self,
@@ -42,6 +50,7 @@ class TempHumiSensor(MqttNode):
         password: str = "",
         sampling_interval: int = DEFAULT_SAMPLING_INTERVAL,
         status_report_interval: int = DEFAULT_STATUS_REPORT_INTERVAL,
+        waveforms: Optional[dict] = None,
     ):
         super().__init__(
             node_id=node_id,
@@ -55,39 +64,43 @@ class TempHumiSensor(MqttNode):
         self.sampling_interval = sampling_interval
         self.is_enabled = True
         self._last_sample_time = 0.0
-        self._t0 = time.time()  # 波形相位起点
 
-    # ============ status payload ============
+        # 最近一次读数（status 上报时一并带出）
+        self._last_raw = 0
+        self._last_position = 0
+        self._last_angle = 0
+
+        wf_cfg = {**DEFAULT_WAVEFORMS, **(waveforms or {})}
+        self._waveforms = build_waveform_map(wf_cfg)
+
+    def _sample(self) -> tuple:
+        raw = int(max(0, min(self.RAW_MAX, self._waveforms["raw"].sample())))
+        position = int(round(raw / self.RAW_MAX * 100))
+        angle = int(round(raw / self.RAW_MAX * 360))
+        self._last_raw = raw
+        self._last_position = position
+        self._last_angle = angle
+        return raw, position, angle
+
     def build_status_payload(self) -> dict:
         return {
             "is_enabled": self.is_enabled,
             "samplingInterval": self.sampling_interval,
             "statusReportInterval": self.status_report_interval,
+            "raw": self._last_raw,
+            "position": self._last_position,
+            "angle": self._last_angle,
         }
 
-    # ============ 数据生成（仿真核心）============
-    # 想换波形就改下面两个方法
-    def read_temperature(self) -> float:
-        """正弦波昼夜温度：周期 1 小时，22±5°C，附加 ±0.3°C 抖动"""
-        period_s = 3600
-        elapsed = time.time() - self._t0
-        base = 22.0 + 5.0 * math.sin(2 * math.pi * elapsed / period_s)
-        return round(base + random.uniform(-0.3, 0.3), 1)
-
-    def read_humidity(self) -> float:
-        """45~65% 区间均匀分布"""
-        return round(random.uniform(45.0, 65.0), 1)
-
-    # ============ 控制命令 ============
     def handle_command(self, command: str, payload: dict, check_code: Optional[str]) -> None:
         if command in ("set_interval", "set_data_interval"):
             interval = int(payload.get("interval", 0))
-            if 10 <= interval <= 3600:
+            if 1 <= interval <= 3600:
                 self.sampling_interval = interval
                 log.info(f"[{self.node_id}] ✓ samplingInterval → {interval}s")
                 self.publish_status("interval_updated", check_code)
             else:
-                log.warning(f"[{self.node_id}] ✗ interval 越界（10-3600）: {interval}")
+                log.warning(f"[{self.node_id}] ✗ interval 越界（1-3600）: {interval}")
 
         elif command == "set_status_interval":
             interval = int(payload.get("interval", 0))
@@ -100,18 +113,15 @@ class TempHumiSensor(MqttNode):
 
         elif command == "enable":
             self.is_enabled = True
-            log.info(f"[{self.node_id}] ✓ 已启用")
             self.publish_status("sensor_enabled", check_code)
 
         elif command == "disable":
             self.is_enabled = False
-            log.info(f"[{self.node_id}] ✓ 已禁用")
             self.publish_status("sensor_disabled", check_code)
 
         else:
             log.warning(f"[{self.node_id}] ⚠ 未知命令: {command}")
 
-    # ============ 主循环 hook：周期发数据 ============
     def on_tick(self) -> None:
         if not self.is_enabled:
             return
@@ -119,40 +129,33 @@ class TempHumiSensor(MqttNode):
         if now - self._last_sample_time < self.sampling_interval:
             return
 
-        temperature = self.read_temperature()
-        humidity = self.read_humidity()
+        raw, position, angle = self._sample()
         data_msg = {
             "sensor_id": self.node_id,
-            "data": {
-                "temperature": temperature,
-                "humidity": humidity,
-            },
+            "data": {"raw": raw, "position": position, "angle": angle},
             "timestamp": self.now_ts(),
         }
         if self.publish_json(self.topic_data, data_msg):
-            log.info(
-                f"[{self.node_id}] → data temperature={temperature}°C humidity={humidity}%"
-            )
+            log.info(f"[{self.node_id}] → data raw={raw} pos={position}% angle={angle}°")
         self._last_sample_time = now
 
 
 def main():
-    parser = argparse.ArgumentParser(description="虚拟 DHT11 温湿度传感器")
-    parser.add_argument("--id", default="DHT11-WEMOS-001", help="sensor_id")
+    parser = argparse.ArgumentParser(description="虚拟旋转编码器")
+    parser.add_argument("--id", default="Rotation-001")
     parser.add_argument("--broker", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=1883)
     parser.add_argument("--username", default="")
     parser.add_argument("--password", default="")
-    parser.add_argument("--sampling-interval", type=int, default=TempHumiSensor.DEFAULT_SAMPLING_INTERVAL)
-    parser.add_argument("--status-report-interval", type=int, default=TempHumiSensor.DEFAULT_STATUS_REPORT_INTERVAL)
+    parser.add_argument("--sampling-interval", type=int,
+                        default=RotationSensor.DEFAULT_SAMPLING_INTERVAL)
+    parser.add_argument("--status-report-interval", type=int,
+                        default=RotationSensor.DEFAULT_STATUS_REPORT_INTERVAL)
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    node = TempHumiSensor(
+    node = RotationSensor(
         node_id=args.id,
         broker=args.broker,
         port=args.port,
@@ -164,7 +167,6 @@ def main():
     try:
         node.run()
     except KeyboardInterrupt:
-        log.info("⚠ Ctrl-C，停止中…")
         node.stop()
 
 

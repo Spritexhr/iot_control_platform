@@ -1,0 +1,32 @@
+{
+    "high": {
+        "mqtt_message": {"command": "high", "pin": "{pin}"},
+        "description": "设置指定引脚为高电平（D5 / D6 / D7）",
+        "params": ["pin"]
+    },
+    "low": {
+        "mqtt_message": {"command": "low", "pin": "{pin}"},
+        "description": "设置指定引脚为低电平（D5 / D6 / D7）",
+        "params": ["pin"]
+    },
+    "high_all": {
+        "mqtt_message": {"command": "high_all"},
+        "description": "将所有引脚（D5、D6、D7）依次设为高电平",
+        "params": []
+    },
+    "low_all": {
+        "mqtt_message": {"command": "low_all"},
+        "description": "将所有引脚（D5、D6、D7）依次设为低电平",
+        "params": []
+    },
+    "current_status": {
+        "mqtt_message": {"command": "current_status", "pin": "{pin}"},
+        "description": "查询引脚状态（不传 pin 则返回全部）",
+        "params": ["pin"]
+    },
+    "set_status_interval": {
+        "mqtt_message": {"command": "set_status_interval", "interval": "{val}"},
+        "description": "设置状态上报间隔（心跳，30-600秒）",
+        "params": ["val"]
+    }
+}

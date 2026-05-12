@@ -1,0 +1,49 @@
+{
+    "online": {
+        "device_id": "pump_001",
+        "event": "online",
+        "status": {"is_running": false, "power_kw": 0.0, "target_power_kw": 0.0, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931
+    },
+    "heartbeat": {
+        "device_id": "pump_001",
+        "event": "heartbeat",
+        "status": {"is_running": true, "power_kw": 1.85, "target_power_kw": 2.0, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931
+    },
+    "started": {
+        "device_id": "pump_001",
+        "event": "started",
+        "status": {"is_running": true, "power_kw": 0.0, "target_power_kw": 2.0, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "stopped": {
+        "device_id": "pump_001",
+        "event": "stopped",
+        "status": {"is_running": false, "power_kw": 0.0, "target_power_kw": 0.0, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "power_updated": {
+        "device_id": "pump_001",
+        "event": "power_updated",
+        "status": {"is_running": true, "power_kw": 1.20, "target_power_kw": 1.50, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "check_current_status": {
+        "device_id": "pump_001",
+        "event": "check_current_status",
+        "status": {"is_running": true, "power_kw": 1.85, "target_power_kw": 2.0, "max_power_kw": 2.2, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "status_interval_updated": {
+        "device_id": "pump_001",
+        "event": "status_interval_updated",
+        "status": {"is_running": true, "power_kw": 1.85, "target_power_kw": 2.0, "max_power_kw": 2.2, "statusReportInterval": 30},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    }
+}

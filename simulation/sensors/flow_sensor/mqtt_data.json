@@ -1,0 +1,8 @@
+{
+    "sensor_id": "Flow-001",
+    "data": {
+        "flow_rate": 12.50,
+        "accumulated_volume": 48.325
+    },
+    "timestamp": 1770733931
+}

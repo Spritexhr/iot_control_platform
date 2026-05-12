@@ -1,0 +1,35 @@
+{
+    "online": {
+        "device_id": "sg90_001",
+        "event": "online",
+        "status": {"angle": 90, "statusReportInterval": 120},
+        "timestamp": 1770733931
+    },
+    "heartbeat": {
+        "device_id": "sg90_001",
+        "event": "heartbeat",
+        "status": {"angle": 90, "statusReportInterval": 120},
+        "timestamp": 1770733931
+    },
+    "angle_updated": {
+        "device_id": "sg90_001",
+        "event": "angle_updated",
+        "status": {"angle": 45, "statusReportInterval": 120},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "check_current_angle": {
+        "device_id": "sg90_001",
+        "event": "check_current_angle",
+        "status": {"angle": 45, "statusReportInterval": 120},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "status_interval_updated": {
+        "device_id": "sg90_001",
+        "event": "status_interval_updated",
+        "status": {"angle": 90, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    }
+}

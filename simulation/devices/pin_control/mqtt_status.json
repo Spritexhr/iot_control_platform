@@ -1,0 +1,42 @@
+{
+    "online": {
+        "device_id": "pin_ctrl_001",
+        "event": "online",
+        "status": {"level_d5": "low", "level_d6": "low", "level_d7": "low", "statusReportInterval": 120},
+        "timestamp": 1770733931
+    },
+    "heartbeat": {
+        "device_id": "pin_ctrl_001",
+        "event": "heartbeat",
+        "status": {"level_d5": "high", "level_d6": "low", "level_d7": "low", "statusReportInterval": 120},
+        "timestamp": 1770733931
+    },
+    "level_updated": {
+        "device_id": "pin_ctrl_001",
+        "event": "level_updated",
+        "status": {"level_d5": "high", "level_d6": "low", "level_d7": "low", "statusReportInterval": 120},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "all_level_updated": {
+        "device_id": "pin_ctrl_001",
+        "event": "all_level_updated",
+        "status": {"level_d5": "high", "level_d6": "high", "level_d7": "high", "statusReportInterval": 120},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "check_current_level": {
+        "device_id": "pin_ctrl_001",
+        "event": "check_current_level",
+        "status": {"level_d5": "high", "level_d6": "low", "level_d7": "low", "statusReportInterval": 120},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "status_interval_updated": {
+        "device_id": "pin_ctrl_001",
+        "event": "status_interval_updated",
+        "status": {"level_d5": "low", "level_d6": "low", "level_d7": "low", "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    }
+}

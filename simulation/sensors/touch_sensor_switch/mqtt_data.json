@@ -1,0 +1,7 @@
+{
+    "sensor_id": "Switch-Touch-001",
+    "data": {
+        "switch": true
+    },
+    "timestamp": 1770733931
+}
