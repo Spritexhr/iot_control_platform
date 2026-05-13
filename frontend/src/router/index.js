@@ -77,6 +77,12 @@ const routes = [
         meta: { title: '数据可视化' },
       },
       {
+        path: 'plant/eb',
+        name: 'EBPlant',
+        component: () => import('@/views/plant/EBPlantView.vue'),
+        meta: { title: '乙苯装置大屏' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsView.vue'),
