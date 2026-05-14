@@ -14,7 +14,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from devices.models import Device, DeviceData
+from devices.models import Device, DeviceStatusCollection
 from sensors.models import Sensor, SensorData, SensorStatusCollection
 
 # 单次返回上限，避免一次性把 10w 行扔给前端图表
@@ -80,7 +80,7 @@ def sources(request):
             "id": d.device_id,
             "name": d.name,
             "type": d.device_type.name if d.device_type else "",
-            "state_fields": d.device_type.state_fields if d.device_type else [],
+            "config_parameters": d.device_type.config_parameters if d.device_type else [],
             "is_online": d.is_online,
             "last_seen": d.last_seen.isoformat() if d.last_seen else None,
             "location": d.location,
@@ -161,22 +161,29 @@ def series(request):
     except Device.DoesNotExist:
         return Response({"detail": f"设备 {source_id} 不存在"}, status=404)
 
-    data_qs = DeviceData.objects.filter(
+    data_qs = DeviceStatusCollection.objects.filter(
         device=device, timestamp__gte=start, timestamp__lte=end
     )
     rows, total = _truncate_window(data_qs, limit)
-    points = [{"t": r.timestamp.isoformat(), "data": r.data} for r in rows]
+    points = [
+        {"t": r.timestamp.isoformat(), "data": r.data, "event": r.event_name}
+        for r in rows
+    ]
+    events = [
+        {"t": r.timestamp.isoformat(), "event": r.event_name, "data": r.data}
+        for r in rows if r.event_name
+    ]
 
     return Response({
         "kind": "device",
         "source_id": device.device_id,
         "name": device.name,
         "type": device.device_type.name if device.device_type else "",
-        "fields": device.device_type.state_fields if device.device_type else [],
+        "fields": device.device_type.config_parameters if device.device_type else [],
         "start": start.isoformat(),
         "end": end.isoformat(),
         "points": points,
         "count": total,
         "truncated": total > limit,
-        "events": [],
+        "events": events,
     })

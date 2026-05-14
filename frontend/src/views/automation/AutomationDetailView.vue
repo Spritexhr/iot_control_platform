@@ -258,7 +258,7 @@ class MyController:
             <h4>设备 API</h4>
             <ul>
               <li><code>devices.get('device_id')</code> — 获取设备包装对象</li>
-              <li><code>.current_state</code> — 最新 DeviceData.data 字典</li>
+              <li><code>.current_state</code> — 最新 DeviceStatusCollection.data 字典</li>
               <li><code>.send_command('name', params)</code> — 发送控制命令</li>
             </ul>
           </div>

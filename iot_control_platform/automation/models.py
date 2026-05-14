@@ -20,7 +20,7 @@ class AutomationRule(models.Model):
 
     脚本可访问关联的设备和传感器，数据来源于：
     - Sensor：sensor.data_records (SensorData)，最新一条的 data 字段
-    - Device：device.data_records (DeviceData)，最新一条的 data 字段
+    - Device：device.status_records (DeviceStatusCollection)，最新一条的 data 字段
     设备控制通过 DeviceType.commands 定义的命令发送
     """
 

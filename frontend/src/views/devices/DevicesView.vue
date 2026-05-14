@@ -19,10 +19,10 @@
         <el-table :data="deviceTypes" v-loading="deviceTypesLoading" stripe>
           <el-table-column prop="DeviceType_id" :label="ls.t('common.typeId')" width="160" />
           <el-table-column prop="name" :label="ls.t('common.name')" width="180" />
-          <el-table-column :label="ls.t('devices.stateFields')" min-width="200">
+          <el-table-column :label="ls.t('devices.configParams')" min-width="200">
             <template #default="{ row }">
               <el-tag
-                v-for="field in (row.state_fields || [])"
+                v-for="field in (row.config_parameters || [])"
                 :key="field"
                 size="small"
                 type="warning"
@@ -30,7 +30,7 @@
               >
                 {{ field }}
               </el-tag>
-              <span v-if="!row.state_fields || row.state_fields.length === 0" class="iot-text-secondary">-</span>
+              <span v-if="!row.config_parameters || row.config_parameters.length === 0" class="iot-text-secondary">-</span>
             </template>
           </el-table-column>
           <el-table-column :label="ls.t('common.cmdCount')" width="80" align="center">
@@ -142,17 +142,6 @@
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="deviceTypeForm.description" type="textarea" :rows="2" :placeholder="ls.t('devices.descPlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="ls.t('devices.stateFieldsLabel')">
-          <el-select
-            v-model="deviceTypeForm.state_fields"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            :placeholder="ls.t('devices.stateFieldsPlaceholder')"
-            style="width: 100%"
-          />
         </el-form-item>
         <el-form-item :label="ls.t('devices.configParamsLabel')">
           <el-select
@@ -290,7 +279,6 @@ const emptyDeviceTypeForm = () => ({
   DeviceType_id: '',
   name: '',
   description: '',
-  state_fields: [],
   config_parameters: [],
   commands_json: '{}',
 })
@@ -305,7 +293,6 @@ function openDeviceTypeDialog(row) {
       DeviceType_id: row.DeviceType_id,
       name: row.name,
       description: row.description || '',
-      state_fields: row.state_fields || [],
       config_parameters: row.config_parameters || [],
       commands_json: JSON.stringify(row.commands || {}, null, 2),
     }
@@ -335,7 +322,6 @@ async function handleSaveDeviceType() {
     DeviceType_id: deviceTypeForm.value.DeviceType_id,
     name: deviceTypeForm.value.name,
     description: deviceTypeForm.value.description,
-    state_fields: deviceTypeForm.value.state_fields,
     config_parameters: deviceTypeForm.value.config_parameters,
     commands: commands,
   }

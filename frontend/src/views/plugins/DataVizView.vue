@@ -165,7 +165,7 @@ const currentSource = computed(() => {
 const availableFields = computed(() => {
   const src = currentSource.value
   if (!src) return []
-  return src.data_fields || src.state_fields || []
+  return src.data_fields || src.config_parameters || []
 })
 
 // ==================== 事件 ====================
