@@ -65,7 +65,7 @@ def mqtt_status(request):
 def dashboard_stats(request):
     """仪表盘统计数据"""
     from sensors.models import Sensor, SensorData
-    from devices.models import Device, DeviceData
+    from devices.models import Device, DeviceStatusCollection
     from automation.models import AutomationRule
 
     now = timezone.now()
@@ -85,7 +85,7 @@ def dashboard_stats(request):
 
     # 24小时数据量
     sensor_data_24h = SensorData.objects.filter(timestamp__gte=last_24h).count()
-    device_data_24h = DeviceData.objects.filter(timestamp__gte=last_24h).count()
+    device_data_24h = DeviceStatusCollection.objects.filter(timestamp__gte=last_24h).count()
 
     # 最近传感器数据（每个传感器最新一条）
     recent_sensors = []
@@ -105,7 +105,7 @@ def dashboard_stats(request):
     # 最近设备状态
     recent_devices = []
     for d in Device.objects.select_related('device_type').all()[:20]:
-        latest = d.data_records.order_by('-timestamp').first()
+        latest = d.status_records.order_by('-timestamp').first()
         is_online = d.last_seen and (now - d.last_seen) < timedelta(minutes=3)
         recent_devices.append({
             'device_id': d.device_id,

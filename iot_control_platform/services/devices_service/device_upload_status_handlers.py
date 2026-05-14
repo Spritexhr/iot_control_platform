@@ -7,7 +7,7 @@ MQTT设备状态接收解析程序
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
-from devices.models import Device, DeviceData
+from devices.models import Device, DeviceStatusCollection
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +37,11 @@ def handle_mqtt_device_status_message(topic: str, payload: Dict) -> bool:
             logger.error(f"✗ 未能从消息中提取状态数据: {device_id}")
             return False
 
-        data_to_save = {**status_to_save, 'event': event_name}
         timestamp = _convert_timestamp(payload['timestamp'])
-        success = _save_device_data(device, data_to_save, timestamp)
+        success = _save_device_status(device, status_to_save, event_name, timestamp)
 
         if success:
-            logger.info(f"✓ 设备状态保存成功 - {device_id}, 状态: {status_to_save}")
+            logger.info(f"✓ 设备状态保存成功 - {device_id}, event={event_name}, 状态: {status_to_save}")
         return success
 
     except Exception as e:
@@ -98,11 +97,12 @@ def _convert_timestamp(ts) -> datetime:
         return django_tz.now()
 
 
-def _save_device_data(device: Device, data_dict: Dict, timestamp: datetime) -> bool:
+def _save_device_status(device: Device, status_data: Dict, event_name: str, timestamp: datetime) -> bool:
     try:
-        DeviceData.objects.create(
+        DeviceStatusCollection.objects.create(
             device=device,
-            data=data_dict,
+            data=status_data,
+            event_name=event_name,
             timestamp=timestamp,
         )
         return True

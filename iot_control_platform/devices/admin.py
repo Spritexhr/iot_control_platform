@@ -9,7 +9,7 @@ from django.shortcuts import redirect
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
-from .models import DeviceType, Device, DeviceData
+from .models import DeviceType, Device, DeviceStatusCollection
 from services.devices_service.device_command_send_service import device_command_send_service
 
 
@@ -43,8 +43,8 @@ class DeviceTypeAdmin(admin.ModelAdmin):
             'fields': ['DeviceType_id', 'name', 'description']
         }),
         ('状态与配置', {
-            'fields': ['state_fields', 'config_parameters', 'commands'],
-            'description': '使用JSON格式。commands 格式参见 SensorType'
+            'fields': ['config_parameters', 'commands'],
+            'description': '使用JSON格式。config_parameters 是该类型设备所有可读字段名（状态值与配置项合并）。commands 格式参见 SensorType。'
         }),
     ]
 
@@ -104,7 +104,7 @@ class DeviceAdmin(admin.ModelAdmin):
         """最新数据时间（优先用 last_seen，避免每行触发 N+1 查询）"""
         ts = obj.last_seen
         if not ts:
-            latest = obj.data_records.first()
+            latest = obj.status_records.first()
             if latest:
                 ts = latest.timestamp
         if ts:
@@ -230,19 +230,19 @@ class DeviceAdmin(admin.ModelAdmin):
     command_buttons_detail_display.short_description = '控制命令'
 
 
-@admin.register(DeviceData)
-class DeviceDataAdmin(admin.ModelAdmin):
-    """设备数据管理"""
+@admin.register(DeviceStatusCollection)
+class DeviceStatusCollectionAdmin(admin.ModelAdmin):
+    """设备状态记录管理"""
 
-    list_display = ['device_device_id', 'data_preview', 'timestamp', 'received_at']
-    list_filter = ['device__device_type', 'timestamp', 'received_at']
-    search_fields = ['device__device_id', 'device__name']
-    readonly_fields = ['device', 'data', 'timestamp', 'received_at']
+    list_display = ['device_device_id', 'event_name', 'data_preview', 'timestamp', 'received_at']
+    list_filter = ['device__device_type', 'event_name', 'timestamp', 'received_at']
+    search_fields = ['device__device_id', 'device__name', 'event_name']
+    readonly_fields = ['device', 'event_name', 'data', 'timestamp', 'received_at']
     date_hierarchy = 'timestamp'
 
     fieldsets = [
-        ('数据信息', {
-            'fields': ['device', 'data', 'timestamp', 'received_at']
+        ('状态信息', {
+            'fields': ['device', 'event_name', 'data', 'timestamp', 'received_at']
         }),
     ]
 
@@ -253,7 +253,7 @@ class DeviceDataAdmin(admin.ModelAdmin):
     device_device_id.admin_order_field = 'device__device_id'
 
     def data_preview(self, obj):
-        """数据预览"""
+        """状态内容预览"""
         import json
         try:
             data_str = json.dumps(obj.data, ensure_ascii=False)
@@ -262,12 +262,12 @@ class DeviceDataAdmin(admin.ModelAdmin):
             return format_html('<code>{}</code>', data_str)
         except Exception:
             return str(obj.data)
-    data_preview.short_description = '数据内容'
+    data_preview.short_description = '状态内容'
 
     def has_add_permission(self, request):
-        """禁止手动添加数据"""
+        """禁止手动添加状态记录"""
         return False
 
     def has_change_permission(self, request, obj=None):
-        """禁止修改数据"""
+        """禁止修改状态记录"""
         return False

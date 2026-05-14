@@ -25,16 +25,16 @@
     <!-- 设备名称 -->
     <div class="device-card__name">{{ device.name }}</div>
 
-    <!-- 状态区域：根据 state_fields 动态渲染 -->
+    <!-- 状态区域：按 config_parameters 渲染最新值 -->
     <div class="device-card__data">
-      <div v-for="field in stateFields" :key="field" class="data-item">
+      <div v-for="field in fields" :key="field" class="data-item">
         <span class="data-item__label">{{ field }}</span>
         <span class="data-item__value">
           {{ formatState(latestValue(field)) }}
         </span>
       </div>
-      <div v-if="!stateFields.length" class="iot-text-secondary" style="font-size: 12px;">
-        未定义状态字段
+      <div v-if="!fields.length" class="iot-text-secondary" style="font-size: 12px;">
+        未定义字段
       </div>
     </div>
 
@@ -64,8 +64,8 @@ const typeName = computed(() => {
   return props.device.device_type_info?.name || '未知类型'
 })
 
-const stateFields = computed(() => {
-  return props.device.device_type_info?.state_fields || []
+const fields = computed(() => {
+  return props.device.device_type_info?.config_parameters || []
 })
 
 const latestData = computed(() => {

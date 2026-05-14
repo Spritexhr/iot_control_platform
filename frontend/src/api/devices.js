@@ -44,9 +44,9 @@ export function deleteDevice(deviceId) {
   return request.delete(`/devices/${deviceId}/`)
 }
 
-/** 获取设备历史数据 */
-export function getDeviceData(deviceId, params = {}) {
-  return request.get(`/devices/${deviceId}/data/`, { params })
+/** 获取设备状态记录历史 */
+export function getDeviceStatus(deviceId, params = {}) {
+  return request.get(`/devices/${deviceId}/status/`, { params })
 }
 
 /** 批量更新设备显示顺序，order 是 device_id 数组 */

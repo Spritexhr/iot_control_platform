@@ -27,16 +27,16 @@ def query_device_data(device_name):
         device_id = device_data["device_id"]
         actual_name = device_data["name"]
 
-        # 2. 获取设备的历史/状态数据 (GET /api/devices/{device_id}/data/)
-        endpoint = f"/devices/{device_id}/data/"
-        # 获取最近 1 小时的 1 条最新数据
+        # 2. 获取设备的状态记录 (GET /api/devices/{device_id}/status/)
+        endpoint = f"/devices/{device_id}/status/"
+        # 获取最近 1 小时的 1 条最新记录
         history = api_client.get(endpoint, params={"hours": 1, "limit": 1})
-        
+
         if not history or len(history) == 0:
             return f"API 返回设备 {actual_name} 目前没有上报的状态数据。"
 
         latest = history[0]
-        # 后端 DeviceData 模型中的字段名为 'data'
+        # 后端 DeviceStatusCollection 模型中的字段名为 'data'
         business_data = latest.get("data", {})
         time_str = latest.get("timestamp", "未知时间")
         

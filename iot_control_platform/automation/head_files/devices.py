@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_device_current_state(device) -> dict:
-    """获取设备最新状态（来自 DeviceData.data）"""
+    """获取设备最新状态（来自 DeviceStatusCollection.data）"""
     if not device:
         return {}
-    latest = device.data_records.order_by('-timestamp').first()
+    latest = device.status_records.order_by('-timestamp').first()
     return latest.data if latest and latest.data else {}
 
 
@@ -27,7 +27,7 @@ def build_devices(device_list: List[Dict]) -> Any:
     Returns:
         具有 get(device_id) 方法的对象，get 返回的包装对象含：
         - device_id
-        - current_state: 最新 DeviceData.data
+        - current_state: 最新 DeviceStatusCollection.data
         - send_command(name, params): 发送控制命令
         - model: Device 模型实例（不存在时为 None）
     """

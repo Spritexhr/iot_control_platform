@@ -49,18 +49,18 @@ class Command(BaseCommand):
         device_cutoff = timezone.now() - timedelta(days=device_days)
 
         from sensors.models import SensorData
-        from devices.models import DeviceData
+        from devices.models import DeviceStatusCollection
 
         sensor_qs = SensorData.objects.filter(timestamp__lt=sensor_cutoff)
-        device_qs = DeviceData.objects.filter(timestamp__lt=device_cutoff)
+        device_qs = DeviceStatusCollection.objects.filter(timestamp__lt=device_cutoff)
 
         sensor_count = sensor_qs.count()
         device_count = device_qs.count()
 
         logger.info(f"传感器数据保留 {sensor_days} 天，将清理 {sensor_count} 条")
-        logger.info(f"设备数据保留 {device_days} 天，将清理 {device_count} 条")
+        logger.info(f"设备状态记录保留 {device_days} 天，将清理 {device_count} 条")
         self.stdout.write(f"传感器数据保留 {sensor_days} 天，将清理 {sensor_count} 条")
-        self.stdout.write(f"设备数据保留 {device_days} 天，将清理 {device_count} 条")
+        self.stdout.write(f"设备状态记录保留 {device_days} 天，将清理 {device_count} 条")
 
         if not dry_run:
             total_deleted = 0

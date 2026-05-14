@@ -82,13 +82,13 @@
               </span>
             </div>
             <div class="iot-card__body">
-              <div v-if="stateFields.length" class="realtime-values">
-                <div v-for="field in stateFields" :key="field" class="realtime-item">
+              <div v-if="fields.length" class="realtime-values">
+                <div v-for="field in fields" :key="field" class="realtime-item">
                   <div class="iot-data-label">{{ field }}</div>
                   <div class="iot-data-value">{{ formatState(latestValue(field)) }}</div>
                 </div>
               </div>
-              <div v-else class="empty-hint">{{ ls.t('deviceDetail.noStateFields') }}</div>
+              <div v-else class="empty-hint">{{ ls.t('deviceDetail.noFields') }}</div>
             </div>
           </div>
 
@@ -109,42 +109,36 @@
         </div>
       </div>
 
-      <!-- ========== 第二行：数据记录表格 ========== -->
+      <!-- ========== 第二行：状态记录表格（对齐 SensorStatusCollection 风格）========== -->
       <div class="iot-card iot-mt-lg">
         <div class="iot-card__header">
-          <span class="section-title">{{ `${ls.t('deviceDetail.dataRecords')} (DeviceData)` }}</span>
-          <div class="toolbar">
-            <el-radio-group v-model="dataHours" size="small" @change="fetchDataRecords">
-              <el-radio-button :value="1">{{ ls.t('common.hour1') }}</el-radio-button>
-              <el-radio-button :value="6">{{ ls.t('common.hour6') }}</el-radio-button>
-              <el-radio-button :value="24">{{ ls.t('common.hour24') }}</el-radio-button>
-              <el-radio-button :value="168">{{ ls.t('common.day7') }}</el-radio-button>
-            </el-radio-group>
-            <el-button :icon="Refresh" size="small" @click="fetchDataRecords">{{ ls.t('common.refresh') }}</el-button>
-          </div>
+          <span class="section-title">{{ `${ls.t('deviceDetail.statusRecords')} (DeviceStatusCollection)` }}</span>
+          <el-button :icon="Refresh" size="small" @click="fetchStatusRecords">{{ ls.t('common.refresh') }}</el-button>
         </div>
         <div class="iot-card__body" style="padding-top: 0;">
-          <el-table :data="dataRecords" v-loading="dataLoading" size="small" stripe max-height="420">
+          <el-table :data="statusRecords" v-loading="statusLoading" size="small" stripe max-height="420">
             <el-table-column label="#" type="index" width="50" />
-            <el-table-column :label="ls.t('deviceDetail.time')" width="180">
-              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
-            </el-table-column>
-            <el-table-column v-for="field in stateFields" :key="field" :label="field" min-width="110">
+            <el-table-column :label="ls.t('deviceDetail.event')" width="140">
               <template #default="{ row }">
-                {{ formatField(row.data?.[field]) }}
+                <el-tag size="small" :type="eventTagType(row.event_name)">
+                  {{ row.event_name || '--' }}
+                </el-tag>
               </template>
             </el-table-column>
-            <el-table-column :label="ls.t('deviceDetail.rawJson')" min-width="220">
+            <el-table-column :label="ls.t('deviceDetail.dataContent')" min-width="280">
               <template #default="{ row }">
                 <span class="raw-json">{{ JSON.stringify(row.data) }}</span>
               </template>
+            </el-table-column>
+            <el-table-column :label="ls.t('deviceDetail.time')" width="180">
+              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
             </el-table-column>
             <el-table-column :label="ls.t('deviceDetail.receivedAt')" width="180">
               <template #default="{ row }">{{ formatTime(row.received_at) }}</template>
             </el-table-column>
           </el-table>
           <div class="table-footer">
-            {{ `${ls.t('common.total')} ${dataRecords.length} ${ls.t('common.records')}` }}
+            {{ `${ls.t('common.total')} ${statusRecords.length} ${ls.t('common.records')}` }}
           </div>
         </div>
       </div>
@@ -160,7 +154,7 @@ import { ArrowLeft, Refresh } from '@element-plus/icons-vue'
 import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
-import { getDevice, getDeviceData, sendDeviceCommand } from '@/api/devices'
+import { getDevice, getDeviceStatus, sendDeviceCommand } from '@/api/devices'
 
 const ls = useLocaleStore()
 const route = useRoute()
@@ -172,8 +166,8 @@ const router = useRouter()
 const device = ref(null)
 const pageLoading = ref(false)
 
-const stateFields = computed(() => {
-  return device.value?.device_type_info?.state_fields || []
+const fields = computed(() => {
+  return device.value?.device_type_info?.config_parameters || []
 })
 
 function latestValue(field) {
@@ -203,21 +197,20 @@ async function fetchDeviceDetail() {
   }
 }
 
-// ==================== 数据记录 ====================
-const dataHours = ref(1)
-const dataRecords = ref([])
-const dataLoading = ref(false)
+// ==================== 状态记录 ====================
+const statusRecords = ref([])
+const statusLoading = ref(false)
 
-async function fetchDataRecords() {
+async function fetchStatusRecords() {
   if (!device.value) return
-  dataLoading.value = true
+  statusLoading.value = true
   try {
-    const res = await getDeviceData(device.value.device_id, { hours: dataHours.value, limit: 500 })
-    dataRecords.value = Array.isArray(res) ? res : (res.results || [])
+    const res = await getDeviceStatus(device.value.device_id, { limit: 100 })
+    statusRecords.value = Array.isArray(res) ? res : (res.results || [])
   } catch {
-    dataRecords.value = []
+    statusRecords.value = []
   } finally {
-    dataLoading.value = false
+    statusLoading.value = false
   }
 }
 
@@ -229,23 +222,26 @@ function formatTime(str) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function formatField(val) {
-  if (val === undefined || val === null) return '--'
-  if (typeof val === 'boolean') return val ? ls.t('common.on') : ls.t('common.off')
-  if (typeof val === 'number') return val.toFixed(2)
-  return String(val)
+function eventTagType(name) {
+  if (!name) return 'info'
+  if (name.includes('online') || name.includes('enable') || name.includes('start')) return 'success'
+  if (name.includes('offline') || name.includes('disable') || name.includes('stop')) return 'danger'
+  return 'info'
 }
 
 function onCommandSent() {
   ElMessage.success(ls.t('common.commandSent'))
-  setTimeout(fetchDeviceDetail, 1000)
+  setTimeout(() => {
+    fetchDeviceDetail()
+    fetchStatusRecords()
+  }, 1000)
 }
 
 // ==================== 初始化 ====================
 onMounted(async () => {
   await fetchDeviceDetail()
   if (device.value) {
-    fetchDataRecords()
+    fetchStatusRecords()
   }
 })
 </script>
@@ -332,13 +328,6 @@ onMounted(async () => {
 
 .realtime-item .iot-data-value {
   font-size: var(--iot-font-size-data);
-}
-
-/* 工具栏 */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--iot-spacing-sm);
 }
 
 /* 原始 JSON */

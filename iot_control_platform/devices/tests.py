@@ -6,7 +6,7 @@ Devices模块测试
 from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
-from devices.models import DeviceType, Device, DeviceData
+from devices.models import DeviceType, Device, DeviceStatusCollection
 
 
 class DeviceTypeTest(TestCase):
@@ -18,12 +18,11 @@ class DeviceTypeTest(TestCase):
             DeviceType_id="LED-01",
             name="LED灯",
             description="智能LED灯",
-            state_fields=['power_state', 'brightness'],
-            config_parameters=['heartbeat_interval']
+            config_parameters=['power_state', 'brightness', 'heartbeat_interval']
         )
 
         self.assertEqual(device_type.name, "LED灯")
-        self.assertIn('power_state', device_type.state_fields)
+        self.assertIn('power_state', device_type.config_parameters)
 
     def test_device_type_str(self):
         """测试字符串表示"""
@@ -42,8 +41,7 @@ class DeviceModelTest(TestCase):
         self.device_type = DeviceType.objects.create(
             DeviceType_id="LED-01",
             name="智能灯",
-            state_fields=['power_state', 'brightness'],
-            config_parameters=['heartbeat_interval']
+            config_parameters=['power_state', 'brightness', 'heartbeat_interval']
         )
 
     def test_create_device(self):
@@ -126,8 +124,8 @@ class DeviceModelTest(TestCase):
         self.assertEqual(str(device), "客厅灯 (LED-001)")
 
 
-class DeviceDataTest(TestCase):
-    """设备数据记录测试"""
+class DeviceStatusCollectionTest(TestCase):
+    """设备状态记录测试"""
 
     def setUp(self):
         """创建测试设备"""
@@ -141,14 +139,16 @@ class DeviceDataTest(TestCase):
             device_type=device_type
         )
 
-    def test_create_device_data(self):
-        """测试创建设备数据"""
-        data = DeviceData.objects.create(
+    def test_create_device_status(self):
+        """测试创建设备状态记录"""
+        record = DeviceStatusCollection.objects.create(
             device=self.device,
             data={'power_state': True, 'brightness': 80},
+            event_name='current_status',
             timestamp=timezone.now()
         )
 
-        self.assertEqual(data.device, self.device)
-        self.assertEqual(data.data['power_state'], True)
-        self.assertEqual(data.data['brightness'], 80)
+        self.assertEqual(record.device, self.device)
+        self.assertEqual(record.data['power_state'], True)
+        self.assertEqual(record.data['brightness'], 80)
+        self.assertEqual(record.event_name, 'current_status')

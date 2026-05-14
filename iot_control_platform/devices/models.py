@@ -36,18 +36,11 @@ class DeviceType(models.Model):
         help_text="设备类型的详细说明"
     )
 
-    # 状态字段列表（设备上报状态内容中需要提取的字段）
-    state_fields = models.JSONField(
-        default=list,
-        verbose_name="状态字段列表",
-        help_text='设备上报的状态字段名称列表。示例：["power_state", "brightness"]'
-    )
-
-    # 设备参数列表（设备上报状态时需提取的配置字段）
+    # 配置参数列表（该类型设备的所有可读字段名，含状态值与配置项）
     config_parameters = models.JSONField(
         default=list,
         verbose_name="配置参数列表",
-        help_text='可配置的参数名称列表。示例：["heartbeat_interval"]'
+        help_text='该类型设备的所有可读字段名（状态值 + 配置项合并）。示例：["power_state", "brightness", "heartbeat_interval"]'
     )
 
     # 命令列表（可发送给设备的控制命令）
@@ -90,10 +83,6 @@ class DeviceType(models.Model):
 
     def __str__(self):
         return self.name
-
-    def get_state_fields(self):
-        """获取状态字段列表"""
-        return self.state_fields if isinstance(self.state_fields, list) else []
 
     def get_config_parameters(self):
         """获取配置参数列表"""
@@ -256,32 +245,40 @@ class Device(models.Model):
             int: 数据记录数
         """
         start_time = timezone.now() - timedelta(hours=hours)
-        return self.data_records.filter(timestamp__gte=start_time).count()
+        return self.status_records.filter(timestamp__gte=start_time).count()
 
 
-class DeviceData(models.Model):
+class DeviceStatusCollection(models.Model):
     """
-    设备数据记录模型
-    存储设备上报的状态、命令执行记录和操作日志
+    设备状态记录模型
+    存储设备上报的状态事件（与 SensorStatusCollection 对齐）
     """
     device = models.ForeignKey(
         Device,
         on_delete=models.CASCADE,
-        related_name='data_records',
+        related_name='status_records',
         verbose_name="设备"
     )
 
-    # 数据内容（灵活存储各种设备数据）
+    # 状态内容（灵活存储设备上报的状态字段）
     data = models.JSONField(
-        verbose_name="数据内容",
-        help_text="设备上报的数据，如：{'power_state': true, 'brightness': 80}"
+        verbose_name="状态内容",
+        help_text="设备上报的状态字段，如：{'power_state': true, 'brightness': 80}"
+    )
+
+    # 事件名（参照 SensorStatusCollection.event_name）
+    event_name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="事件名",
+        help_text="状态事件标签，如 online / offline / interval_updated"
     )
 
     # 时间戳
     timestamp = models.DateTimeField(
         db_index=True,
-        verbose_name="数据时间",
-        help_text="数据记录的时间戳"
+        verbose_name="状态时间",
+        help_text="状态记录的时间戳"
     )
 
     received_at = models.DateTimeField(
@@ -291,8 +288,8 @@ class DeviceData(models.Model):
     )
 
     class Meta:
-        verbose_name = "设备数据"
-        verbose_name_plural = "设备数据记录"
+        verbose_name = "设备状态"
+        verbose_name_plural = "设备状态记录"
         ordering = ['-timestamp']
         indexes = [
             models.Index(fields=['device', '-timestamp']),

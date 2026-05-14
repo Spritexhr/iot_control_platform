@@ -6,13 +6,13 @@ from django.db import transaction
 from django.db.models import Q, Count
 from django.utils import timezone
 from datetime import timedelta
-from .models import DeviceType, Device, DeviceData
+from .models import DeviceType, Device, DeviceStatusCollection
 from .serializers import (
     DeviceTypeSerializer,
     DeviceListSerializer,
     DeviceDetailSerializer,
     DeviceCreateUpdateSerializer,
-    DeviceDataSerializer,
+    DeviceStatusSerializer,
 )
 
 
@@ -34,7 +34,7 @@ class DeviceViewSet(viewsets.ModelViewSet):
     创建/修改/删除/发送命令仅限工作人员，非工作人员仅可查看
     """
     queryset = Device.objects.select_related('device_type').prefetch_related(
-        'data_records'
+        'status_records'
     ).all()
     lookup_field = 'device_id'
 
@@ -70,17 +70,17 @@ class DeviceViewSet(viewsets.ModelViewSet):
             qs = qs.filter(Q(name__icontains=search) | Q(device_id__icontains=search))
         return qs
 
-    @action(detail=True, methods=['get'], url_path='data')
-    def device_data(self, request, device_id=None):
-        """获取设备历史数据，支持时间范围查询"""
+    @action(detail=True, methods=['get'], url_path='status')
+    def device_status(self, request, device_id=None):
+        """获取设备历史状态记录，支持时间范围查询。"""
         device = self.get_object()
         hours = int(request.query_params.get('hours', 1))
         limit = int(request.query_params.get('limit', 200))
         start_time = timezone.now() - timedelta(hours=hours)
-        records = DeviceData.objects.filter(
+        records = DeviceStatusCollection.objects.filter(
             device=device, timestamp__gte=start_time
         ).order_by('-timestamp')[:limit]
-        serializer = DeviceDataSerializer(records, many=True)
+        serializer = DeviceStatusSerializer(records, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], url_path='reorder',
