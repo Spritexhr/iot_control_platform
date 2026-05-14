@@ -13,24 +13,28 @@ simulation/
 ├── README.md                 本文档
 ├── TESTING.md                端到端验证教程（L1 日志 / L2 抓包 / L3 入库）
 ├── requirements.txt          paho-mqtt + PyYAML
-├── config.yaml.example       配置模板（提交到 git）
-├── config.yaml               真实配置（gitignore，复制 .example 后改）
-├── run.py                    统一启动器，按 config.yaml 起多节点
+├── config.yaml.example       broker 配置模板（提交到 git）
+├── config.yaml               broker 真实配置（gitignore，复制 .example 后改）
+├── run.py                    统一启动器，加载 manifests/ 下的清单
+├── manifests/                节点清单目录（提交到 git，按项目分文件）
+│   ├── default.yaml          默认清单：常规测试节点
+│   └── eb_plant.yaml         乙苯(EB)装置清单（占位，等设备拆分）
 ├── common/
 │   ├── mqtt_node.py          基类：连接/重连/订阅/心跳/check_code 回传
 │   └── waveforms.py          数据波形：sine / random_walk / uniform / constant
 ├── sensors/                  传感器节点（上报 data，可能上报 status）
-│   ├── temp_humi_sensor.py
-│   ├── bmp280_temp_pressure_sensor.py
-│   ├── rotation_sensor.py
-│   ├── touch_sensor_switch.py
-│   ├── radial_counting_module.py
-│   ├── temp_pressure_sensor.py
-│   └── flow_sensor.py
+│   ├── temp_humi_sensor/
+│   ├── bmp280_temp_pressure_sensor/
+│   ├── rotation_sensor/
+│   ├── touch_sensor_switch/
+│   ├── radial_counting_module/
+│   ├── temp_pressure_sensor/
+│   └── flow_sensor/
 └── devices/                  设备节点（执行器，只上报 status，响应命令）
-    ├── sg90_servo.py
-    ├── pin_control.py
-    └── pump.py
+    ├── sg90_servo/
+    ├── pin_control/
+    ├── pump/
+    └── eb_plant/             乙苯装置（装置级模拟器，独立运行）
 ```
 
 ---
@@ -52,21 +56,24 @@ pip install -r simulation/requirements.txt
 
 ## 配置
 
-首次使用：
-```bash
-cp simulation/config.yaml.example simulation/config.yaml
-```
+配置分两层：
 
-然后编辑 `simulation/config.yaml`，把 `broker.host` 改成你的 EMQX 地址。`config.yaml` 已被 gitignore，可以放心写入真实地址/账号；提交到 git 的是 `config.yaml.example`。
+- **`config.yaml`** —— 只放 broker 地址/默认账号（gitignore，每人本地一份）。首次使用 `cp config.yaml.example config.yaml` 后改 broker.host。
+- **`manifests/*.yaml`** —— 节点清单，按项目/场景分文件（进 git，团队共享）。`run.py` 根据 `--manifest` 决定加载哪一份（或哪几份）。
 
-最小配置：
+最小 `config.yaml`：
 ```yaml
 broker:
   host: 116.62.68.29       # 你的 EMQX 地址
   port: 1883
-  username: ""             # 留空表示匿名连
+  username: ""             # broker 级默认账号，留空表示匿名
   password: ""
+```
 
+最小 `manifests/<name>.yaml`：
+```yaml
+name: <name>
+description: 给团队成员的说明
 nodes:
   - module: temp_humi_sensor
     id: DHT11-WEMOS-001
@@ -76,12 +83,9 @@ nodes:
 
 ### 节点级 username/password 覆盖
 
-`broker.username/password` 是所有节点的默认账号。如果 EMQX 启用了 ACL，可以给单个节点指定自己的账号：
+`broker.username/password` 是所有节点的默认账号。如果 EMQX 启用了 ACL，可以在 manifest 里给单个节点指定自己的账号：
 
 ```yaml
-broker:
-  username: ""           # 默认匿名
-
 nodes:
   - module: temp_humi_sensor
     id: DHT11-WEMOS-001
@@ -99,17 +103,35 @@ nodes:
 
 ### 方式 1：批量启动（推荐）
 
-读 `config.yaml`，为每个节点起一个独立线程，每个节点有自己的 MQTT client（client_id = `WemosD1-<id>`，与固件一致）。
+`run.py` 从 `config.yaml` 拿 broker，从 `manifests/*.yaml` 拿节点列表，每个节点起一个独立线程，client_id = `WemosD1-<id>`（与固件一致）。
 
 ```bash
+# 加载默认清单 manifests/default.yaml
 python simulation/run.py
+
+# 加载指定清单（manifest 名 = 文件名去掉 .yaml）
+python simulation/run.py --manifest eb_plant
+python simulation/run.py -m eb_plant            # 短写法
+
+# 同时加载多份清单（会合并并检测重复的 module+id）
+python simulation/run.py -m default -m eb_plant
+
+# 也可以直接指定 yaml 路径
+python simulation/run.py -m ./my_custom_manifest.yaml
 ```
 
 `Ctrl-C` 会优雅停止所有节点。
 
+### 清单的设计意图
+
+- **一个项目一份清单**：苯乙烯装置写在 `eb_plant.yaml`、常规测试写在 `default.yaml`、有新场景就新建一份。
+- **按需启动**：跑 EB 大屏时只需 `-m eb_plant`，不会被无关节点污染。
+- **组合启动**：调试时可以叠加，比如 `-m eb_plant -m sandbox`。重复的 `(module, id)` 会直接报错，避免 client_id 冲突。
+- **共享进 git**：manifest 不含敏感凭据（凭据走 broker 级默认或节点级覆盖），团队成员 clone 下来就能跑。
+
 ### 方式 2：单独跑一个节点
 
-每个 `.py` 都可以独立运行，使用 `argparse` 接受命令行参数。这种方式不读 `config.yaml`，适合调试单个节点或者快速验证。
+每个 `.py` 都可以独立运行，使用 `argparse` 接受命令行参数。这种方式不读 `config.yaml`、不读 manifest，适合调试单个节点或者快速验证。
 
 ```bash
 # 温湿度
@@ -216,7 +238,7 @@ python simulation/devices/pump.py \
    - `handle_command(command, payload, check_code)` —— 处理控制命令；**响应命令后必须调用 `self.publish_status(event, check_code)`**，把收到的 check_code 原样回传，否则后端 `send_custom_command_with_make_sure` 会超时
    - `on_tick()` —— （可选）周期任务，比如发数据。基类的 tick 频率约 10 Hz
 4. 在 `run.py` 顶部 `from xxx import XxxClass`，并加到 `REGISTRY` 字典
-5. 在 `config.yaml` 的 `nodes:` 里加一条 `module: xxx`
+5. 在某份 `manifests/*.yaml`（或新建一份）的 `nodes:` 里加一条 `module: xxx`
 
 最简模板参考 `sensors/radial_counting_module.py`（继承 `TouchSensorSwitch` 仅 20 行）。完整模板参考 `sensors/temp_humi_sensor.py` 或 `devices/pump.py`。
 

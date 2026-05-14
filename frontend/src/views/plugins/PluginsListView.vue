@@ -81,7 +81,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh, Connection, View, DataLine, Box } from '@element-plus/icons-vue'
+import { Refresh, Connection, View, DataLine, DataAnalysis, Box } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getPlugins, syncPlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 
@@ -96,6 +96,7 @@ const toggling = ref('')
 // 已知插件的 UI 入口与展示信息
 const KNOWN_PLUGINS = {
   data_viz: { route: '/plugins/data_viz', title: '数据可视化', icon: DataLine },
+  eb_plant: { route: '/plugins/eb_plant', title: '乙苯装置大屏', icon: DataAnalysis },
 }
 
 function hasUI(name) {

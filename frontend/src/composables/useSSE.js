@@ -10,7 +10,7 @@ import { onScopeDispose, ref } from 'vue'
  * @param {number}  options.retryDelay 断开后重连延迟(ms),默认 3000
  *
  * 用法:
- *   const { status, start, stop } = useSSE('/api/realtime/plant/EB/stream', {
+ *   const { status, start, stop } = useSSE('/api/plugins/eb_plant/stream', {
  *     snapshot: (data) => store.applySnapshot(data),
  *     sample:   (data) => store.applySample(data),
  *   })

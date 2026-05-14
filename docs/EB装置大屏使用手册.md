@@ -2,7 +2,7 @@
 
 > 适用版本:`beta_version` 分支(2026-05-13 起)
 > 对应方案文档:[development_plans/EB装置IoT辅助监测预警系统方案.md](./development_plans/EB装置IoT辅助监测预警系统方案.md)
-> 路由入口:`/plant/eb`
+> 路由入口:`/plugins/eb_plant`(已重构为后端插件 `plugins/eb_plant/`)
 
 ---
 
@@ -49,14 +49,15 @@
               │
               ▼
 ┌──────────────────────────────┐
-│ SSE endpoint                 │  /api/realtime/plant/EB/stream
-│  /api/realtime/plant/EB/snapshot│
-│  /api/realtime/plant/EB/disturbance(POST)│
+│ EB Plant 插件 (Django)       │  iot_control_platform/plugins/eb_plant/
+│  /api/plugins/eb_plant/stream      (SSE)│
+│  /api/plugins/eb_plant/snapshot         │
+│  /api/plugins/eb_plant/disturbance (POST)│
 └─────────────┬────────────────┘
               │ EventSource (text/event-stream)
               ▼
 ┌──────────────────────────────┐
-│ Vue3 前端                    │  frontend/src/views/plant/EBPlantView.vue
+│ Vue3 前端                    │  frontend/src/views/plugins/eb_plant/EBPlantView.vue
 │  - useSSE composable         │
 │  - usePlantStore (Pinia)     │
 │  - InstrumentCard ×5         │
@@ -126,7 +127,7 @@ npm run dev
 
 ### 5. 访问大屏
 
-浏览器打开 <http://localhost:5173/plant/eb>(或登录后从左侧菜单【乙苯装置大屏】进入)。
+浏览器打开 <http://localhost:5173/plugins/eb_plant>(或登录后从左侧菜单【乙苯装置大屏】进入)。
 
 **正常画面**:5 张仪表卡片,数值每秒跳动一次,顶栏【SSE】显示绿色"已连接",【更新】显示"刚刚"。
 
@@ -158,9 +159,11 @@ npm run dev
 
 | 方法 | 路径 | 用途 |
 |------|------|------|
-| GET | `/api/realtime/plant/EB/snapshot` | 当前所有点位的 JSON 快照(前端初始化用) |
-| GET | `/api/realtime/plant/EB/stream` | SSE 长连接,持续推送 `snapshot` / `sample` 事件 |
-| POST | `/api/realtime/plant/EB/disturbance` | 注入扰动,body: `{"scenario": "deb_snowball"}` |
+| GET | `/api/plugins/eb_plant/snapshot` | 当前所有点位的 JSON 快照(前端初始化用) |
+| GET | `/api/plugins/eb_plant/stream` | SSE 长连接,持续推送 `snapshot` / `sample` 事件 |
+| POST | `/api/plugins/eb_plant/disturbance` | 注入扰动,body: `{"scenario": "deb_snowball"}` |
+
+> 这些路由由 `plugins/eb_plant/urls.py` 提供;插件在 `platform_settings.Plugin` 表里被 disable 后整个 EB 大屏功能下线(需重启 Django)。
 
 SSE 事件格式:
 ```
@@ -187,9 +190,9 @@ data: {"sensor_id":"EB-TT-101","tag":"TT-101","value":434.2,"unit":"K","status":
 
 ### 调试小贴士
 
-- **看后端缓存里现有点位**:`curl http://localhost:8000/api/realtime/plant/EB/snapshot`
-- **手动注入扰动**:`curl -X POST http://localhost:8000/api/realtime/plant/EB/disturbance -H "Content-Type: application/json" -d '{"scenario":"deb_snowball"}'`
-- **不开前端测 SSE**:`curl -N http://localhost:8000/api/realtime/plant/EB/stream`(终端里能看到 event-stream 流)
+- **看后端缓存里现有点位**:`curl http://localhost:8000/api/plugins/eb_plant/snapshot`
+- **手动注入扰动**:`curl -X POST http://localhost:8000/api/plugins/eb_plant/disturbance -H "Content-Type: application/json" -d '{"scenario":"deb_snowball"}'`
+- **不开前端测 SSE**:`curl -N http://localhost:8000/api/plugins/eb_plant/stream`(终端里能看到 event-stream 流)
 - **单独跑模拟器某个场景**:`python eb_plant_simulator.py --broker 116.62.68.29 --scenario deb_snowball`
 
 ---

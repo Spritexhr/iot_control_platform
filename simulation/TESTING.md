@@ -10,7 +10,8 @@
 |------|------|----------|
 | conda 环境 `simulation_env` | 运行 simulator | `conda env list \| grep simulation_env` |
 | 可达的 MQTT broker | 数据中转 | `nc -zv 116.62.68.29 1883` |
-| `simulation/config.yaml` | 真实运行配置 | `ls simulation/config.yaml`（首次运行需 `cp config.yaml.example config.yaml` 并改 broker） |
+| `simulation/config.yaml` | broker 配置（地址/默认账号） | `ls simulation/config.yaml`（首次运行需 `cp config.yaml.example config.yaml` 并改 broker） |
+| `simulation/manifests/*.yaml` | 节点清单（按项目分文件） | `ls simulation/manifests/` 至少能看到 `default.yaml` |
 | Django 后端（仅 L3 验证需要） | 接收 MQTT 并入库 | `python iot_control_platform/manage.py runserver` |
 
 ```bash
@@ -256,10 +257,23 @@ Sensor.objects.get(sensor_id='DHT11-WEMOS-001').computed_is_online  # 应为 Fal
 ## L4：批量启动验证
 
 ```bash
+# 默认清单（manifests/default.yaml）
 python simulation/run.py
+
+# 指定其他清单 / 多份清单合并
+python simulation/run.py -m default -m eb_plant
 ```
 
-预期：两个节点的日志交错出现，各自独立心跳，互不干扰。`Ctrl-C` 后所有节点应优雅停止：
+预期：清单里的每个节点日志交错出现，各自独立心跳，互不干扰。启动时会先打印一行清单加载信息：
+
+```
+INFO 加载清单: default (6 节点) - 常规测试用节点（DHT11 + 舵机 + 双泵 + pin_control + 工业 TP）
+INFO 已启动: temp_humi_sensor id=DHT11-WEMOS-001
+...
+INFO 共启动 6 个虚拟节点。Ctrl-C 退出。
+```
+
+`Ctrl-C` 后所有节点应优雅停止：
 ```
 INFO 收到信号 2，停止所有节点…
 INFO [DHT11-WEMOS-001] 已停止

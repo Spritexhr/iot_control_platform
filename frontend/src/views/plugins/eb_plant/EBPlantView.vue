@@ -58,13 +58,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
-import InstrumentCard from '@/components/plant/InstrumentCard.vue'
+import InstrumentCard from './InstrumentCard.vue'
 import { useSSE } from '@/composables/useSSE'
 import { usePlantStore } from '@/stores/plant'
-import { buildPlantStreamUrl } from '@/api/realtime'
+import { buildPlantStreamUrl } from '@/api/plugins/eb_plant'
 
 const store = usePlantStore()
 
@@ -106,13 +106,12 @@ const lastUpdateLabel = computed(() => {
 store.loadSnapshot()
 
 // 2. 建立 SSE 长连接
-const { status } = useSSE(buildPlantStreamUrl(store.plantCode), {
+const { status } = useSSE(buildPlantStreamUrl(), {
   snapshot: (data) => store.applySnapshot(data),
   sample:   (data) => store.applySample(data),
 })
 
 // 把 SSE 状态镜像到 store(方便其他组件查看)
-import { watch } from 'vue'
 watch(status, (v) => { store.sseStatus = v }, { immediate: true })
 
 async function onInject(scenario) {

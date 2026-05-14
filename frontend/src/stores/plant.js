@@ -1,16 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { getPlantSnapshot, injectDisturbance } from '@/api/realtime'
+import { getPlantSnapshot, injectDisturbance } from '@/api/plugins/eb_plant'
 
 /**
- * 装置实时数据 store。
+ * EB 装置实时数据 store。
  * - samples: Map<sensor_id, sample>,sample 字段见后端 PointSample.to_dict()
  * - SSE 推 sample 事件 → applySample 更新单点
  * - 初始化或重连后用 applySnapshot 全量刷新
  */
 export const usePlantStore = defineStore('plant', () => {
-  const plantCode = ref('EB')
   const samples = ref(new Map())
   const lastUpdateTs = ref(0)
   const sseStatus = ref('idle')
@@ -37,7 +36,7 @@ export const usePlantStore = defineStore('plant', () => {
 
   async function loadSnapshot() {
     try {
-      const data = await getPlantSnapshot(plantCode.value)
+      const data = await getPlantSnapshot()
       applySnapshot(data)
     } catch (e) {
       console.error('[plant] 加载快照失败', e)
@@ -68,7 +67,6 @@ export const usePlantStore = defineStore('plant', () => {
 
   return {
     // state
-    plantCode,
     samples,
     samplesList,
     lastUpdateTs,

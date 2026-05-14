@@ -1,0 +1,49 @@
+# 默认虚拟节点清单 —— `python run.py` 不带 --manifest 时加载这一份
+#
+# 清单格式：
+#   name        可选，仅用于启动日志展示
+#   description 可选，给团队成员看的说明
+#   nodes       必填，节点列表；字段定义同 config.yaml.example 的 nodes 段
+#
+# 节点级 username/password 可选；不写则继承 config.yaml 的 broker 级默认。
+# 多个清单可一起加载：`python run.py --manifest default --manifest eb_plant`
+
+name: default
+description: 常规测试用节点（DHT11 + 舵机 + 双泵 + pin_control + 工业 TP）
+
+nodes:
+  - module: temp_humi_sensor
+    id: DHT11-WEMOS-001
+    sampling_interval: 10
+    status_report_interval: 30
+    waveforms:
+      temperature: {type: sine, min: 20, max: 26, period: 3600, jitter: 0.3}
+      humidity:    {type: random_walk, start: 55, step: 1.5, bounds: [40, 70]}
+
+  - module: sg90_servo
+    id: sg90_001
+    status_report_interval: 30
+    initial_angle: 90
+
+  - module: pump
+    id: pump_001
+    status_report_interval: 30
+    max_power_kw: 15.0
+
+  - module: pump
+    id: pump_002
+    status_report_interval: 30
+    max_power_kw: 15.0
+
+  - module: pin_control
+    id: pin_control_002
+    status_report_interval: 60
+    initial_levels: {D5: low, D6: high, D7: low}
+
+  - module: temp_pressure_sensor
+    id: TP-KPA-001
+    sampling_interval: 15
+    status_report_interval: 60
+    waveforms:
+      temperature: {type: sine, min: 25, max: 55, period: 1800, jitter: 0.5}
+      pressure:    {type: random_walk, start: 250, step: 2, bounds: [200, 300]}

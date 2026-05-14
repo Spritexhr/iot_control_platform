@@ -50,11 +50,6 @@
         <template #title>{{ ls.t('nav.plugins') }}</template>
       </el-menu-item>
 
-      <el-menu-item index="/plant/eb">
-        <el-icon><DataAnalysis /></el-icon>
-        <template #title>{{ ls.t('nav.ebPlant') }}</template>
-      </el-menu-item>
-
       <el-menu-item index="/settings">
         <el-icon><Setting /></el-icon>
         <template #title>{{ ls.t('nav.settings') }}</template>
@@ -87,7 +82,6 @@ import {
   SetUp,
   Setting,
   Connection,
-  DataAnalysis,
   Fold,
   Expand,
 } from '@element-plus/icons-vue'
@@ -107,8 +101,6 @@ const route = useRoute()
 
 const activeMenu = computed(() => {
   if (route.path === '/') return '/'
-  // 装置子页面保留两级,匹配 sidebar 的 /plant/eb 入口
-  if (route.path.startsWith('/plant/')) return '/plant/' + route.path.split('/')[2]
   return '/' + route.path.split('/')[1]
 })
 </script>

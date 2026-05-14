@@ -1,112 +1,11 @@
-# 虚拟节点启动配置模板 —— 复制为 config.yaml 后再按需修改
+# Broker 连接配置模板 —— 复制为 config.yaml 后再按需修改
 #   cp config.yaml.example config.yaml
 #
-# 节点的运行时参数（采样间隔、心跳间隔、波形参数等）都在这里配置；
-# 数据生成的实现写在各节点的 .py 中（通过 common/waveforms.py 提供的波形类装配）。
+# 节点列表不在这里，请到 simulation/manifests/*.yaml 编辑/新增清单，
+# 用 `python run.py --manifest <name>` 选择启动哪一份（可重复）。
 
 broker:
   host: 127.0.0.1          # 改成你的 EMQX 地址
   port: 1883
   username: ""             # broker 级默认账号，留空表示匿名
-  password: ""
-
-# ============ 节点列表 ============
-# 每个节点的通用字段：
-#   module                    必填，对应 run.py REGISTRY 里的键
-#   id                        必填，sensor_id 或 device_id
-#   username / password       可选，节点级覆盖（不写则用 broker 级默认）
-#   status_report_interval    可选，心跳间隔（秒）
-#   sampling_interval         可选，周期性传感器专用
-#   waveforms                 可选，仅传感器；字段名 → 波形配置
-#
-# waveforms 支持的 type：
-#   sine        参数：min, max, period(秒), jitter(±噪声), phase(初始相位秒)
-#   random_walk 参数：start, step, bounds: [下界, 上界]
-#   uniform     参数：min, max
-#   constant    参数：value
-
-nodes:
-  # ============ 复刻硬件 ============
-  # DHT11 温湿度
-  - module: temp_humi_sensor
-    id: DHT11-WEMOS-001
-    sampling_interval: 10
-    status_report_interval: 30
-    waveforms:
-      temperature: {type: sine, min: 20, max: 26, period: 3600, jitter: 0.3}
-      humidity:    {type: random_walk, start: 55, step: 1.5, bounds: [40, 70]}
-
-  # BMP280 大气温度气压（单位 hPa，与硬件一致）
-  - module: bmp280_temp_pressure_sensor
-    id: BMP280-WEMOS-001
-    sampling_interval: 15
-    status_report_interval: 60
-    waveforms:
-      temperature: {type: sine, min: 18, max: 25, period: 3600, jitter: 0.2}
-      pressure:    {type: random_walk, start: 1013.25, step: 0.3, bounds: [995, 1030]}
-
-  # 旋转编码器
-  - module: rotation_sensor
-    id: Rotation-001
-    sampling_interval: 2
-    status_report_interval: 60
-    waveforms:
-      raw: {type: sine, min: 0, max: 1023, period: 30, jitter: 5}
-
-  # 触摸开关（事件驱动；flip_period_s 控制翻转频率）
-  - module: touch_sensor_switch
-    id: Switch-Touch-001
-    status_report_interval: 60
-    flip_period_s: 12
-
-  # H2010 光电开关
-  - module: radial_counting_module
-    id: H2010-PHOTO-001
-    status_report_interval: 60
-    flip_period_s: 5
-
-  # SG90 舵机
-  - module: sg90_servo
-    id: sg90_001
-    status_report_interval: 30
-    initial_angle: 90
-
-  # D5/D6/D7 电平控制器
-  - module: pin_control
-    id: potential_controler_001
-    status_report_interval: 60
-    initial_levels: {D5: low, D6: low, D7: low}
-
-  # ============ 新增（无对应固件）============
-  # 工业管路温度+压力（kPa）
-  - module: temp_pressure_sensor
-    id: TP-KPA-001
-    sampling_interval: 15
-    status_report_interval: 60
-    waveforms:
-      temperature: {type: sine, min: 25, max: 55, period: 1800, jitter: 0.5}
-      pressure:    {type: random_walk, start: 250, step: 2, bounds: [200, 300]}
-
-  # 水泵设备（kW 输出功率）
-  - module: pump
-    id: pump_001
-    status_report_interval: 30
-    max_power_kw: 15.0
-
-  # 流量传感器（L/min + 累计 L）
-  - module: flow_sensor
-    id: FLOW-001
-    sampling_interval: 5
-    status_report_interval: 60
-    waveforms:
-      flow_rate: {type: sine, min: 8, max: 25, period: 600, jitter: 0.8}
-
-  # ============ 节点级 username/password 覆盖示例 ============
-  # 当 EMQX 开了 ACL，每个设备用不同账号时这样写：
-  # - module: temp_humi_sensor
-  #   id: DHT11-WEMOS-002
-  #   username: sensor_002
-  #   password: "secret"
-  #   waveforms:
-  #     temperature: {type: sine, min: 15, max: 22, period: 3600, jitter: 0.5, phase: 900}
-  #     humidity:    {type: uniform, min: 60, max: 80}
+  password: ""             # 节点级也可以在 manifest 里单独覆盖
