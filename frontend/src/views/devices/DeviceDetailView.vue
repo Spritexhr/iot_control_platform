@@ -118,6 +118,9 @@
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="statusRecords" v-loading="statusLoading" size="small" stripe max-height="420">
             <el-table-column label="#" type="index" width="50" />
+            <el-table-column :label="ls.t('deviceDetail.time')" width="180">
+              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
+            </el-table-column>
             <el-table-column :label="ls.t('deviceDetail.event')" width="140">
               <template #default="{ row }">
                 <el-tag size="small" :type="eventTagType(row.event_name)">
@@ -125,13 +128,15 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column :label="ls.t('deviceDetail.dataContent')" min-width="280">
+            <el-table-column v-for="field in fields" :key="field" :label="field" min-width="110">
+              <template #default="{ row }">
+                {{ formatField(row.data?.[field]) }}
+              </template>
+            </el-table-column>
+            <el-table-column :label="ls.t('deviceDetail.rawJson')" min-width="220">
               <template #default="{ row }">
                 <span class="raw-json">{{ JSON.stringify(row.data) }}</span>
               </template>
-            </el-table-column>
-            <el-table-column :label="ls.t('deviceDetail.time')" width="180">
-              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
             </el-table-column>
             <el-table-column :label="ls.t('deviceDetail.receivedAt')" width="180">
               <template #default="{ row }">{{ formatTime(row.received_at) }}</template>
@@ -180,6 +185,14 @@ function formatState(val) {
   if (val === null || val === undefined) return '--'
   if (typeof val === 'boolean') return val ? ls.t('common.on') : ls.t('common.off')
   if (typeof val === 'number') return Number(val.toFixed(2))
+  return String(val)
+}
+
+function formatField(val) {
+  if (val === undefined || val === null) return '--'
+  if (typeof val === 'number') return val.toFixed(2)
+  if (typeof val === 'boolean') return val ? ls.t('common.yes') : ls.t('common.no')
+  if (typeof val === 'object') return JSON.stringify(val)
   return String(val)
 }
 

@@ -158,6 +158,9 @@
         <div class="iot-card__body" style="padding-top: 0;">
           <el-table :data="statusRecords" v-loading="statusLoading" size="small" stripe max-height="350">
             <el-table-column label="#" type="index" width="50" />
+            <el-table-column :label="ls.t('sensorDetail.time')" width="180">
+              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
+            </el-table-column>
             <el-table-column :label="ls.t('sensorDetail.event')" width="140">
               <template #default="{ row }">
                 <el-tag size="small" :type="eventTagType(row.event_name)">
@@ -165,13 +168,15 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column :label="ls.t('sensorDetail.dataContent')" min-width="280">
+            <el-table-column v-for="field in statusFields" :key="field" :label="field" min-width="110">
+              <template #default="{ row }">
+                {{ formatField(row.data?.[field]) }}
+              </template>
+            </el-table-column>
+            <el-table-column :label="ls.t('sensorDetail.rawJson')" min-width="220">
               <template #default="{ row }">
                 <span class="raw-json">{{ JSON.stringify(row.data) }}</span>
               </template>
-            </el-table-column>
-            <el-table-column :label="ls.t('sensorDetail.time')" width="180">
-              <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
             </el-table-column>
             <el-table-column :label="ls.t('sensorDetail.receivedAt')" width="180">
               <template #default="{ row }">{{ formatTime(row.received_at) }}</template>
@@ -208,6 +213,10 @@ const pageLoading = ref(false)
 
 const dataFields = computed(() => {
   return sensor.value?.sensor_type_info?.data_fields || []
+})
+
+const statusFields = computed(() => {
+  return sensor.value?.sensor_type_info?.config_parameters || []
 })
 
 function latestValue(field) {

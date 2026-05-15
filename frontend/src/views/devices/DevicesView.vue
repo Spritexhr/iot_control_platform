@@ -25,7 +25,6 @@
                 v-for="field in (row.config_parameters || [])"
                 :key="field"
                 size="small"
-                type="warning"
                 class="field-tag"
               >
                 {{ field }}
@@ -456,6 +455,13 @@ onMounted(() => {
 
 .field-tag {
   margin: 2px 4px 2px 0;
+  background-color: var(--iot-color-primary-bg) !important;
+  border-color: transparent !important;
+  color: var(--iot-color-primary-dark) !important;
+}
+
+html.dark .field-tag {
+  color: var(--iot-color-primary-light) !important;
 }
 
 .commands-editor {
