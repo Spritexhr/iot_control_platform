@@ -1,12 +1,14 @@
 """
 MQTT传感器数据接收解析程序
 负责接收MQTT消息，解析传感器数据并存入数据库
+
+实时广播（用于插件大屏 SSE）由各插件通过 SensorData post_save signal 自行接管，
+本模块不直接耦合任何插件。
 """
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 from sensors.models import Sensor, SensorData
-from services.realtime.latest_values import ingest_sensor_data
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +38,6 @@ def handle_mqtt_data_message(topic: str, payload: Dict) -> bool:
 
         if success:
             logger.info(f"✓ 数据保存成功 - 传感器: {sensor_id}, 数据: {data_to_save}")
-
-        # 不论 DB 是否落库成功,都更新实时缓存并广播 SSE(用于 P&ID 大屏)
-        if sensor.plant_code:
-            try:
-                ingest_sensor_data(
-                    sensor_id=sensor.sensor_id,
-                    plant_code=sensor.plant_code,
-                    data=data_to_save,
-                    timestamp=timestamp.timestamp(),
-                    plant_metadata=sensor.plant_metadata or {},
-                )
-            except Exception as e:
-                logger.warning(f"realtime 广播失败 - 传感器: {sensor_id}, {e}")
 
         return success
 

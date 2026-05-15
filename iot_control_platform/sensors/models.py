@@ -158,34 +158,6 @@ class Sensor(models.Model):
         help_text="数值越小越靠前；新建项默认 0 排在最前，由前端拖拽更新"
     )
 
-    # ========== 装置/工艺归属（用于 EB 装置等场景）==========
-    plant_code = models.CharField(
-        max_length=50,
-        blank=True,
-        db_index=True,
-        verbose_name="所属装置代号",
-        help_text='所属工艺装置代号，例如 "EB" 表示乙苯装置。空表示通用传感器'
-    )
-
-    plant_metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name="工艺元数据",
-        help_text=(
-            '工艺场景下的扩展字段。示例：\n'
-            '{\n'
-            '  "tag": "TT-101",          // 仪表位号\n'
-            '  "area": "R1",             // 区域\n'
-            '  "data_key": "temperature",// data 字段中的取值键\n'
-            '  "unit": "K",\n'
-            '  "normal_value": 434,\n'
-            '  "hi_threshold": 440,\n'
-            '  "lo_threshold": 425,\n'
-            '  "severity": "high"        // low / mid / high / critical\n'
-            '}'
-        )
-    )
-
     # ========== 时间戳 ==========
     created_at = models.DateTimeField(
         auto_now_add=True,

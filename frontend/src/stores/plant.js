@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { getPlantSnapshot, injectDisturbance } from '@/api/plugins/eb_plant'
+import { getPlantSnapshot } from '@/api/plugins/eb_plant'
 
 /**
  * EB 装置实时数据 store。
@@ -13,7 +13,6 @@ export const usePlantStore = defineStore('plant', () => {
   const samples = ref(new Map())
   const lastUpdateTs = ref(0)
   const sseStatus = ref('idle')
-  const currentScenario = ref('none')
 
   function applySnapshot(payload) {
     const list = payload?.samples || []
@@ -27,7 +26,6 @@ export const usePlantStore = defineStore('plant', () => {
 
   function applySample(sample) {
     if (!sample || !sample.sensor_id) return
-    // Vue 3 的 reactivity 对 Map 是浅响应,直接 set 即可触发 getter 中的依赖
     const m = new Map(samples.value)
     m.set(sample.sensor_id, sample)
     samples.value = m
@@ -43,18 +41,6 @@ export const usePlantStore = defineStore('plant', () => {
     }
   }
 
-  async function setDisturbance(scenario) {
-    try {
-      await injectDisturbance(scenario)
-      currentScenario.value = scenario
-      return true
-    } catch (e) {
-      console.error('[plant] 下发扰动失败', e)
-      return false
-    }
-  }
-
-  // ---------- getters ----------
   const samplesList = computed(() => Array.from(samples.value.values()))
 
   const alarmCount = computed(() => {
@@ -66,17 +52,13 @@ export const usePlantStore = defineStore('plant', () => {
   })
 
   return {
-    // state
     samples,
     samplesList,
     lastUpdateTs,
     sseStatus,
-    currentScenario,
     alarmCount,
-    // actions
     applySnapshot,
     applySample,
     loadSnapshot,
-    setDisturbance,
   }
 })

@@ -83,6 +83,28 @@ const routes = [
         meta: { title: '乙苯装置大屏' },
       },
       {
+        path: 'plugins/eb_plant/config',
+        name: 'PluginEBPlantConfig',
+        component: () => import('@/views/plugins/eb_plant/EBPlantConfigView.vue'),
+        meta: { title: 'EB 大屏配置' },
+      },
+      {
+        path: 'plugins/plant_diagram',
+        redirect: '/plugins/plant_diagram/list/EB',
+      },
+      {
+        path: 'plugins/plant_diagram/list/:plantCode',
+        name: 'PluginPlantDiagramList',
+        component: () => import('@/views/plugins/plant_diagram/PlantDiagramListView.vue'),
+        meta: { title: 'P&ID 画板列表' },
+      },
+      {
+        path: 'plugins/plant_diagram/:id',
+        name: 'PluginPlantDiagram',
+        component: () => import('@/views/plugins/plant_diagram/PlantDiagramView.vue'),
+        meta: { title: 'P&ID 画板' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsView.vue'),

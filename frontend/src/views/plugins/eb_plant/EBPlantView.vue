@@ -29,17 +29,13 @@
       </div>
     </header>
 
-    <!-- 扰动控制台 -->
-    <div class="eb-plant__console">
-      <span class="eb-plant__console-label">演示场景:</span>
-      <el-button
-        v-for="s in scenarios"
-        :key="s.value"
-        :type="store.currentScenario === s.value ? 'primary' : 'default'"
-        size="small"
-        @click="onInject(s.value)"
-      >
-        {{ s.label }}
+    <!-- 操作栏 -->
+    <div class="eb-plant__toolbar">
+      <el-button size="small" type="primary" @click="$router.push('/plugins/eb_plant/config')">
+        配置面板
+      </el-button>
+      <el-button size="small" @click="$router.push('/plugins/plant_diagram/list/EB')">
+        P&amp;ID 画板
       </el-button>
     </div>
 
@@ -51,7 +47,14 @@
         :sample="s"
       />
       <div v-if="store.samplesList.length === 0" class="eb-plant__empty">
-        暂无数据。请确认 MQTT broker、模拟器、Django 后端均已启动。
+        <p>暂无可显示的传感器。</p>
+        <p class="eb-plant__empty-hint">
+          请先到
+          <el-link type="primary" @click="$router.push('/plugins/eb_plant/config')">
+            配置面板
+          </el-link>
+          从主模型选取要展示的传感器。
+        </p>
       </div>
     </main>
   </div>
@@ -59,7 +62,6 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import InstrumentCard from './InstrumentCard.vue'
 import { useSSE } from '@/composables/useSSE'
@@ -68,14 +70,6 @@ import { buildPlantStreamUrl } from '@/api/plugins/eb_plant'
 
 const store = usePlantStore()
 
-const scenarios = [
-  { value: 'none', label: '正常工况' },
-  { value: 'ethylene_overfeed', label: '乙烯进料过量' },
-  { value: 'cooling_failure', label: 'R1 冷却失效' },
-  { value: 'deb_snowball', label: 'DEB 雪球效应' },
-]
-
-// 状态显示标签
 const sseStatus = computed(() => store.sseStatus)
 const sseStatusLabel = computed(() => ({
   idle: '未连接',
@@ -101,8 +95,7 @@ const lastUpdateLabel = computed(() => {
   return `${diff}s 前`
 })
 
-// ============ 数据流 ============
-// 1. 初始拉一次快照(防止 SSE 没连上之前页面空白)
+// 1. 初始拉一次快照
 store.loadSnapshot()
 
 // 2. 建立 SSE 长连接
@@ -111,21 +104,13 @@ const { status } = useSSE(buildPlantStreamUrl(), {
   sample:   (data) => store.applySample(data),
 })
 
-// 把 SSE 状态镜像到 store(方便其他组件查看)
 watch(status, (v) => { store.sseStatus = v }, { immediate: true })
-
-async function onInject(scenario) {
-  const ok = await store.setDisturbance(scenario)
-  ElMessage[ok ? 'success' : 'error'](
-    ok ? `已下发: ${scenario}` : '下发失败,请确认 MQTT 已连接',
-  )
-}
 </script>
 
 <style scoped lang="scss">
 .eb-plant {
   min-height: calc(100vh - 64px);
-  background: #f4f3ee;  // 工程图纸的米白
+  background: #f4f3ee;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
@@ -202,23 +187,11 @@ async function onInject(scenario) {
   &.status-connecting { color: #b07a16; }
 }
 
-.eb-plant__console {
+.eb-plant__toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
-  padding: 10px 12px;
-  background: #ffffff;
-  border: 1px dashed #2a2a2a;
-  border-radius: 4px;
-}
-
-.eb-plant__console-label {
-  font-size: 12px;
-  color: #555;
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 1px;
-  margin-right: 4px;
 }
 
 .eb-plant__grid {
@@ -235,5 +208,10 @@ async function onInject(scenario) {
   font-size: 14px;
   border: 1px dashed #aaa;
   background: #ffffff;
+}
+
+.eb-plant__empty-hint {
+  margin-top: 8px;
+  font-size: 13px;
 }
 </style>

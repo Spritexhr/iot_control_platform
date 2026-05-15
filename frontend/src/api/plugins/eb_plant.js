@@ -1,25 +1,64 @@
 import request from '../index'
 
-/**
- * 获取 EB 装置当前所有点位快照。
- */
+const BASE = '/plugins/eb_plant'
+
+/** 取大屏当前已绑定传感器的快照 */
 export function getPlantSnapshot() {
-  return request.get('/plugins/eb_plant/snapshot')
+  return request.get(`${BASE}/snapshot`)
 }
 
 /**
- * 下发扰动场景给模拟器。
- * @param {string} scenario  none / ethylene_overfeed / cooling_failure / deb_snowball
- */
-export function injectDisturbance(scenario) {
-  return request.post('/plugins/eb_plant/disturbance', { scenario })
-}
-
-/**
- * 构造 SSE 流的完整 URL（由 useSSE 直接交给 EventSource 用）。
- * 注意:EventSource 无法附带 Authorization header,
- * SSE 端点目前用 AllowAny 权限。生产环境可换为 token 查询参数 + 自定义鉴权。
+ * SSE 流的完整 URL（无 /api 前缀的 request 实例）。
+ * EventSource 不支持自定义 header，SSE 端点目前用 AllowAny。
  */
 export function buildPlantStreamUrl() {
-  return '/api/plugins/eb_plant/stream'
+  return `/api${BASE}/stream`
+}
+
+// ---------- 视图配置 ----------
+export function getEBConfig() {
+  return request.get(`${BASE}/config`)
+}
+
+export function saveEBConfig(payload) {
+  return request.put(`${BASE}/config`, payload)
+}
+
+// ---------- 主模型来源 ----------
+export function listBindableSources() {
+  return request.get(`${BASE}/bindable_sources`)
+}
+
+// ---------- 传感器绑定 ----------
+export function listSensorBindings() {
+  return request.get(`${BASE}/sensor_bindings/`)
+}
+
+export function createSensorBindings(sensorIds) {
+  return request.post(`${BASE}/sensor_bindings/`, { sensor_ids: sensorIds })
+}
+
+export function updateSensorBinding(id, patch) {
+  return request.patch(`${BASE}/sensor_bindings/${id}/`, patch)
+}
+
+export function deleteSensorBinding(id) {
+  return request.delete(`${BASE}/sensor_bindings/${id}/`)
+}
+
+// ---------- 设备绑定 ----------
+export function listDeviceBindings() {
+  return request.get(`${BASE}/device_bindings/`)
+}
+
+export function createDeviceBindings(deviceIds) {
+  return request.post(`${BASE}/device_bindings/`, { device_ids: deviceIds })
+}
+
+export function updateDeviceBinding(id, patch) {
+  return request.patch(`${BASE}/device_bindings/${id}/`, patch)
+}
+
+export function deleteDeviceBinding(id) {
+  return request.delete(`${BASE}/device_bindings/${id}/`)
 }

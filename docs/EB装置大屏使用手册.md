@@ -1,5 +1,13 @@
 # 乙苯(EB)装置辅助监测大屏 — 使用手册
 
+> ⚠️ **2026-05-15 重构提示**：本插件已与主模型解耦，旧的 `seed_eb_plant` / `seed_eb_devices` 管理命令、`eb_plant_simulator` 模拟器、`disturbance` 演示场景接口、`plant_code` / `plant_metadata` 主模型字段均已移除。
+>
+> **新流程**：在主菜单创建传感器/设备 → 进入 `/plugins/eb_plant/config` 配置面板从主模型导入并配置位号/阈值/单位 → `/plugins/eb_plant` 大屏展示绑定的点位最新数据。
+>
+> 本文档下文为重构前的旧版描述，留作历史参考；命令与接口请以 `plugins/eb_plant/views.py` 和 `urls.py` 为准。
+
+---
+
 > 适用版本:`beta_version` 分支(2026-05-13 起)
 > 对应方案文档:[development_plans/EB装置IoT辅助监测预警系统方案.md](./development_plans/EB装置IoT辅助监测预警系统方案.md)
 > 路由入口:`/plugins/eb_plant`(已重构为后端插件 `plugins/eb_plant/`)
