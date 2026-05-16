@@ -99,12 +99,12 @@ const lastUpdateLabel = computed(() => {
 store.loadSnapshot()
 
 // 2. 建立 SSE 长连接
-const { status } = useSSE(buildPlantStreamUrl(), {
+const { displayStatus } = useSSE(buildPlantStreamUrl(), {
   snapshot: (data) => store.applySnapshot(data),
   sample:   (data) => store.applySample(data),
 })
 
-watch(status, (v) => { store.sseStatus = v }, { immediate: true })
+watch(displayStatus, (v) => { store.sseStatus = v }, { immediate: true })
 </script>
 
 <style scoped lang="scss">

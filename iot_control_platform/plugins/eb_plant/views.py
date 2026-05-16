@@ -17,14 +17,16 @@ import queue
 import time
 
 from django.http import JsonResponse, StreamingHttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from devices.models import Device
-from sensors.models import Sensor
-from services.realtime.latest_values import broadcaster, latest_values
+from sensors.models import Sensor, SensorData
+from services.realtime.latest_values import broadcaster, ingest_sensor_data, latest_values
 
 from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSensorBinding
 from .serializers import (
@@ -39,7 +41,7 @@ log = logging.getLogger(__name__)
 
 PLUGIN_CODE = "EB"
 
-_KEEPALIVE_SECONDS = 15
+_KEEPALIVE_SECONDS = 10
 _QUEUE_GET_TIMEOUT = 5.0
 
 
@@ -88,21 +90,45 @@ class EBPlantSensorBindingViewSet(_AdminWritePermission, viewsets.ModelViewSet):
     serializer_class = EBPlantSensorBindingSerializer
 
     def create(self, request, *args, **kwargs):
-        """单条或批量导入：传 sensor_ids=[...] 走批量，否则走单条标准流程。"""
+        """单条或批量导入：
+        - 传 sensor_ids=[...] 走批量，按各 sensor 的 sensor_type.data_fields 自动拆分：
+          * 多字段（>=2）→ 每个字段建一条 binding，data_key=field、tag=sensorId-field
+          * 单字段（=1）或无字段元数据 → 一条 data_key="" 的 binding（保持 P&ID 老画板兼容）
+          * (sensor, data_key) 已存在的跳过；UniqueConstraint + ignore_conflicts 兜底并发
+        - 否则走 ViewSet 标准 create（用于"+字段"按钮单条新增）
+        """
         sensor_ids = request.data.get("sensor_ids")
         if isinstance(sensor_ids, list):
-            created = []
-            sensors = Sensor.objects.filter(id__in=sensor_ids)
-            existing = set(
-                EBPlantSensorBinding.objects.filter(sensor_id__in=sensor_ids).values_list("sensor_id", flat=True)
-            )
+            sensors = Sensor.objects.filter(id__in=sensor_ids).select_related("sensor_type")
+            to_create = []
             for s in sensors:
-                if s.id in existing:
-                    continue
-                b = EBPlantSensorBinding.objects.create(sensor=s, tag=s.sensor_id)
-                created.append(b)
-            data = EBPlantSensorBindingSerializer(created, many=True).data
-            return Response({"created": data, "skipped": len(existing)}, status=status.HTTP_201_CREATED)
+                fields = s.sensor_type.data_fields if s.sensor_type_id else None
+                if not (isinstance(fields, list) and fields) or len(fields) == 1:
+                    fields_to_use = [""]
+                else:
+                    fields_to_use = list(fields)
+
+                existing = set(
+                    EBPlantSensorBinding.objects.filter(sensor=s).values_list("data_key", flat=True)
+                )
+                for f in fields_to_use:
+                    if f in existing:
+                        continue
+                    tag = (f"{s.sensor_id}-{f}" if f else s.sensor_id)[:50]
+                    to_create.append(EBPlantSensorBinding(sensor=s, data_key=f, tag=tag))
+
+            EBPlantSensorBinding.objects.bulk_create(to_create, ignore_conflicts=True)
+            # bulk_create + ignore_conflicts 不保证 PK 返回，重新按 (sensor, data_key) 查回实际写入的行
+            created_keys = {(b.sensor_id, b.data_key) for b in to_create}
+            if created_keys:
+                created_qs = EBPlantSensorBinding.objects.filter(
+                    sensor_id__in={k[0] for k in created_keys}
+                ).select_related("sensor", "sensor__sensor_type")
+                created_qs = [b for b in created_qs if (b.sensor_id, b.data_key) in created_keys]
+            else:
+                created_qs = []
+            data = EBPlantSensorBindingSerializer(created_qs, many=True).data
+            return Response({"created": data}, status=status.HTTP_201_CREATED)
         return super().create(request, *args, **kwargs)
 
 
@@ -135,11 +161,39 @@ def _sse_pack(event_type: str, data: dict) -> bytes:
     return f"event: {event_type}\ndata: {payload}\n\n".encode("utf-8")
 
 
-def _bound_sensor_ids() -> set:
-    return set(
-        EBPlantSensorBinding.objects.filter(is_visible=True)
-        .values_list("sensor__sensor_id", flat=True)
-    )
+def _bound_point_ids() -> set:
+    """已可见 binding 的 point_id 集合（区分同 sensor 不同 data_key）。"""
+    bindings = EBPlantSensorBinding.objects.filter(is_visible=True).select_related("sensor")
+    return {b.point_id for b in bindings}
+
+
+def _backfill_missing_from_db() -> None:
+    """
+    内存缓存 latest_values 是进程级的：导入新传感器后、或进程刚启动时缓存为空，
+    UI 就会"配了没显示"。这里对每个可见 binding，若 point_id 在缓存里没有，
+    就从 SensorData 取最近一条 ingest 进来，让大屏立即拿到最后一帧。新帧上来照常推。
+    """
+    bindings = EBPlantSensorBinding.objects.filter(is_visible=True).select_related("sensor")
+    for binding in bindings:
+        if latest_values.get(binding.point_id) is not None:
+            continue
+        last = (
+            SensorData.objects.filter(sensor=binding.sensor)
+            .order_by("-timestamp")
+            .first()
+        )
+        if last is None:
+            continue
+        try:
+            ingest_sensor_data(
+                sensor_id=binding.point_id,
+                data=last.data,
+                timestamp=last.timestamp.timestamp() if last.timestamp else None,
+                plugin_code=PLUGIN_CODE,
+                binding=binding,
+            )
+        except Exception as exc:
+            log.warning("EB 回填最近一帧失败 point_id=%s err=%s", binding.point_id, exc)
 
 
 def _event_stream():
@@ -147,7 +201,8 @@ def _event_stream():
     q = broadcaster.subscribe()
     last_keepalive = time.time()
     try:
-        bound = _bound_sensor_ids()
+        _backfill_missing_from_db()
+        bound = _bound_point_ids()
         snap = [s.to_dict() for s in latest_values.snapshot(PLUGIN_CODE) if s.sensor_id in bound]
         yield _sse_pack("snapshot", {"plugin_code": PLUGIN_CODE, "samples": snap})
 
@@ -171,16 +226,20 @@ def _event_stream():
             if now - last_keepalive >= _KEEPALIVE_SECONDS:
                 yield b": keepalive\n\n"
                 last_keepalive = now
-                bound = _bound_sensor_ids()
+                bound = _bound_point_ids()
     except GeneratorExit:
         pass
     finally:
         broadcaster.unsubscribe(q)
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
+@csrf_exempt
+@require_GET
 def stream(request):
+    """SSE 端点。不走 DRF 的 @api_view —— DRF 的内容协商会因为
+    EventSource 发 `Accept: text/event-stream` 而找不到 renderer 返回 406。
+    SSE 是纯流式响应，用 Django 原生 view 即可，权限层面跟 snapshot 一样靠 AllowAny。
+    """
     response = StreamingHttpResponse(
         _event_stream(),
         content_type="text/event-stream",
@@ -194,6 +253,7 @@ def stream(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def snapshot(request):
-    bound = _bound_sensor_ids()
+    _backfill_missing_from_db()
+    bound = _bound_point_ids()
     samples = [s.to_dict() for s in latest_values.snapshot(PLUGIN_CODE) if s.sensor_id in bound]
     return JsonResponse({"plugin_code": PLUGIN_CODE, "samples": samples})

@@ -11,7 +11,16 @@
       </el-icon>
       <el-breadcrumb separator="/">
         <el-breadcrumb-item :to="{ path: '/' }">{{ ls.t('header.home') }}</el-breadcrumb-item>
-        <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
+        <template v-if="breadcrumbItems.length">
+          <el-breadcrumb-item
+            v-for="(item, idx) in breadcrumbItems"
+            :key="idx"
+            :to="item.to ? { path: item.to } : undefined"
+          >
+            {{ item.title }}
+          </el-breadcrumb-item>
+        </template>
+        <el-breadcrumb-item v-else-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
       </el-breadcrumb>
     </div>
 
@@ -181,6 +190,10 @@ const ls = useLocaleStore()
 
 const isDark = computed(() => appStore.theme === 'dark')
 const currentTitle = computed(() => route.meta.title || '')
+const breadcrumbItems = computed(() => {
+  const items = route.meta.breadcrumb
+  return Array.isArray(items) ? items : []
+})
 const avatarText = computed(() => (userStore.username || 'U').charAt(0).toUpperCase())
 
 // ==================== MQTT 状态轮询 ====================

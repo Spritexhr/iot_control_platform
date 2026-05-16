@@ -3,16 +3,7 @@
     <header class="diagram-view__header">
       <div class="diagram-view__title-group">
         <el-button text :icon="ArrowLeft" @click="goBack">返回画板列表</el-button>
-        <el-breadcrumb separator="/" class="diagram-view__crumb">
-          <el-breadcrumb-item :to="{ path: '/plugins' }">插件中心</el-breadcrumb-item>
-          <el-breadcrumb-item
-            v-if="diagram"
-            :to="{ path: `/plugins/plant_diagram/list/${diagram.plant_code}` }"
-          >
-            {{ diagram.plant_code }} 装置画板
-          </el-breadcrumb-item>
-          <el-breadcrumb-item>{{ diagram?.name || '画板' }}</el-breadcrumb-item>
-        </el-breadcrumb>
+        <span class="diagram-view__diagram-name">{{ diagram?.name || '画板' }}</span>
       </div>
       <div class="diagram-view__actions">
         <el-tag v-if="dirty" type="warning" size="small">未保存</el-tag>
@@ -116,7 +107,8 @@ async function loadData() {
   if (!id) return
   try {
     diagram.value = await getDiagram(id)
-    targets.value = await getBindableTargets()
+    // 装置插件决定该画板能绑定哪些点位（EB 走 EBPlantSensorBinding 等），传 plant_code 给后端
+    targets.value = await getBindableTargets(diagram.value?.plant_code || 'EB')
   } catch (e) {
     console.error('[diagram] 加载失败', e)
     ElMessage.error('加载画板失败')
@@ -125,7 +117,7 @@ async function loadData() {
 
 // 复用 EB 的 SSE 流喂 plantStore。useSSE 内部用 onScopeDispose 自清理。
 plantStore.loadSnapshot()
-const { status: sseStatus } = useSSE(buildPlantStreamUrl(), {
+const { displayStatus: sseStatus } = useSSE(buildPlantStreamUrl(), {
   snapshot: (data) => plantStore.applySnapshot(data),
   sample:   (data) => plantStore.applySample(data),
 })
@@ -171,11 +163,8 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
   gap: 12px;
 }
 
-.diagram-view__crumb {
+.diagram-view__diagram-name {
   font-size: var(--iot-font-size-sm);
-}
-
-.diagram-view__crumb :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
   font-weight: 600;
   color: var(--iot-text-primary);
 }

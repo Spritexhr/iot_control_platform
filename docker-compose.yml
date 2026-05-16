@@ -32,11 +32,19 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql
       - DB_PORT=3306
-    command: >
-      sh -c "python manage.py migrate --noinput &&
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py migrate --noinput &&
         python manage.py configure --init --no-reload &&
         python manage.py collectstatic --noinput &&
-        gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1"
+        gunicorn config.wsgi:application
+        --bind 0.0.0.0:8000
+        --workers 2
+        --worker-class gthread
+        --threads 8
+        --timeout 0
     env_file:
       - .env
     depends_on:

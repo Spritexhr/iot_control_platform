@@ -1,5 +1,38 @@
+import json
+
 from rest_framework import serializers
 from .models import SensorType, Sensor, SensorData, SensorStatusCollection
+
+
+def normalize_commands_payload(value):
+    """规范化 SensorType.commands / DeviceType.commands 写入数据。
+    要求顶层是 dict<command_name, info>，每条 info.mqtt_message 必须能解析成 dict。
+    前端编辑器有时把 mqtt_message 整个序列化成 JSON 字符串保存，这里兜底解析回 dict；
+    解析不动时报 400，避免脏数据进库导致命令调用时 .copy() 抛 AttributeError。
+    """
+    if value in (None, '', [], {}):
+        return value
+    if not isinstance(value, dict):
+        raise serializers.ValidationError('commands 必须是 JSON 对象')
+    cleaned = {}
+    for cmd_name, info in value.items():
+        if not isinstance(info, dict):
+            raise serializers.ValidationError(f"命令 '{cmd_name}' 必须是 JSON 对象")
+        info = dict(info)
+        msg = info.get('mqtt_message')
+        if isinstance(msg, str):
+            try:
+                msg = json.loads(msg)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError(
+                    f"命令 '{cmd_name}' 的 mqtt_message 不是合法 JSON")
+        if msg is not None and not isinstance(msg, dict):
+            raise serializers.ValidationError(
+                f"命令 '{cmd_name}' 的 mqtt_message 必须是 JSON 对象，而不是 {type(msg).__name__}")
+        if msg is not None:
+            info['mqtt_message'] = msg
+        cleaned[cmd_name] = info
+    return cleaned
 
 
 class SensorTypeSerializer(serializers.ModelSerializer):
@@ -14,6 +47,9 @@ class SensorTypeSerializer(serializers.ModelSerializer):
             'created_at', 'sensor_count',
         ]
         read_only_fields = ['id', 'created_at', 'sensor_count']
+
+    def validate_commands(self, value):
+        return normalize_commands_payload(value)
 
     def get_sensor_count(self, obj):
         # 优先使用 annotate 预计算的值，避免额外查询

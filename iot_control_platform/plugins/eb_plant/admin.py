@@ -10,9 +10,9 @@ class EBPlantConfigAdmin(admin.ModelAdmin):
 
 @admin.register(EBPlantSensorBinding)
 class EBPlantSensorBindingAdmin(admin.ModelAdmin):
-    list_display = ["tag", "sensor", "area", "data_key", "unit", "hi_threshold", "lo_threshold", "severity", "is_visible", "sort_order"]
+    list_display = ["tag", "sensor", "data_key", "area", "unit", "hi_threshold", "lo_threshold", "severity", "is_visible", "sort_order"]
     list_filter = ["area", "severity", "is_visible"]
-    search_fields = ["tag", "sensor__sensor_id", "sensor__name"]
+    search_fields = ["tag", "sensor__sensor_id", "sensor__name", "data_key"]
     autocomplete_fields = ["sensor"]
 
 

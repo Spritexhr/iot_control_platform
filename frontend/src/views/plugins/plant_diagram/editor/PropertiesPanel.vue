@@ -30,13 +30,13 @@
           <el-select
             v-model="local.binding.id"
             filterable
-            placeholder="搜索传感器 ID / 名称"
+            placeholder="搜索位号 / 名称"
             @change="emitChange"
           >
             <el-option
               v-for="s in targets.sensors"
               :key="s.id"
-              :label="`${s.id} · ${s.name}`"
+              :label="sensorOptionLabel(s)"
               :value="s.id"
             />
           </el-select>
@@ -46,13 +46,13 @@
           <el-select
             v-model="local.binding.id"
             filterable
-            placeholder="搜索设备 ID / 名称"
+            placeholder="搜索位号 / 名称"
             @change="emitChange"
           >
             <el-option
               v-for="d in targets.devices"
               :key="d.id"
-              :label="`${d.id} · ${d.name}`"
+              :label="deviceOptionLabel(d)"
               :value="d.id"
             />
           </el-select>
@@ -162,6 +162,18 @@ function nodeTypeLabel(t) {
     instrument: '仪表', vessel: '反应器', column: '塔', valve: '阀门', pump: '泵',
     heat_exchanger: '换热器', mixer: '混合器', filter: '过滤器', label: '文本',
   })[t] || t
+}
+
+function sensorOptionLabel(s) {
+  // 优先用位号，工程师习惯；带上字段名（data_key）和单位辅助识别
+  const head = s.tag ? `${s.tag} · ${s.name}` : `${s.id} · ${s.name}`
+  const dk = s.data_key ? ` / ${s.data_key}` : ''
+  const unit = s.unit ? ` (${s.unit})` : ''
+  return `${head}${dk}${unit}`
+}
+
+function deviceOptionLabel(d) {
+  return d.tag ? `${d.tag} · ${d.name}` : `${d.id} · ${d.name}`
 }
 </script>
 

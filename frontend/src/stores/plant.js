@@ -51,6 +51,25 @@ export const usePlantStore = defineStore('plant', () => {
     return n
   })
 
+  /**
+   * 按 P&ID 节点 binding 取实时样本。
+   * - 完整 point_id (e.g. "S001::temperature") → 直接命中
+   * - 纯 sensor_id (e.g. "S001") → 直接命中（单字段传感器），或回落到 sensor_id::* 中的第一条
+   *   （兼容多字段传感器在老画板里 binding 用纯 sensor_id 的情况）
+   */
+  function findByBinding(id) {
+    if (!id) return null
+    const map = samples.value
+    if (map.has(id)) return map.get(id)
+    const prefix = `${id}::`
+    for (const s of map.values()) {
+      if (s.sensor_id === id || (typeof s.sensor_id === 'string' && s.sensor_id.startsWith(prefix))) {
+        return s
+      }
+    }
+    return null
+  }
+
   return {
     samples,
     samplesList,
@@ -60,5 +79,6 @@ export const usePlantStore = defineStore('plant', () => {
     applySnapshot,
     applySample,
     loadSnapshot,
+    findByBinding,
   }
 })

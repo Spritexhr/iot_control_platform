@@ -74,19 +74,38 @@ const routes = [
         path: 'plugins/data_viz',
         name: 'PluginDataViz',
         component: () => import('@/views/plugins/DataVizView.vue'),
-        meta: { title: '数据可视化' },
+        meta: {
+          title: '数据可视化',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '数据可视化' },
+          ],
+        },
       },
       {
         path: 'plugins/eb_plant',
         name: 'PluginEBPlant',
         component: () => import('@/views/plugins/eb_plant/EBPlantView.vue'),
-        meta: { title: '乙苯装置大屏' },
+        meta: {
+          title: '乙苯装置大屏',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '乙苯装置大屏' },
+          ],
+        },
       },
       {
         path: 'plugins/eb_plant/config',
         name: 'PluginEBPlantConfig',
         component: () => import('@/views/plugins/eb_plant/EBPlantConfigView.vue'),
-        meta: { title: 'EB 大屏配置' },
+        meta: {
+          title: '配置面板',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
+            { title: '配置面板' },
+          ],
+        },
       },
       {
         path: 'plugins/plant_diagram',
@@ -96,13 +115,28 @@ const routes = [
         path: 'plugins/plant_diagram/list/:plantCode',
         name: 'PluginPlantDiagramList',
         component: () => import('@/views/plugins/plant_diagram/PlantDiagramListView.vue'),
-        meta: { title: 'P&ID 画板列表' },
+        meta: {
+          title: 'P&ID 画板列表',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
+            { title: 'P&ID 画板' },
+          ],
+        },
       },
       {
         path: 'plugins/plant_diagram/:id',
         name: 'PluginPlantDiagram',
         component: () => import('@/views/plugins/plant_diagram/PlantDiagramView.vue'),
-        meta: { title: 'P&ID 画板' },
+        meta: {
+          title: 'P&ID 画板',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
+            { title: 'P&ID 画板', to: '/plugins/plant_diagram/list/EB' },
+            { title: '画板编辑' },
+          ],
+        },
       },
       {
         path: 'settings',

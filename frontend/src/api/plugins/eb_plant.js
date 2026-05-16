@@ -38,6 +38,11 @@ export function createSensorBindings(sensorIds) {
   return request.post(`${BASE}/sensor_bindings/`, { sensor_ids: sensorIds })
 }
 
+/** 为某个 sensor 追加一条不同 data_key 的 binding。payload: { sensor, data_key, tag?, area?, severity? } */
+export function createSensorFieldBinding(payload) {
+  return request.post(`${BASE}/sensor_bindings/`, payload)
+}
+
 export function updateSensorBinding(id, patch) {
   return request.patch(`${BASE}/sensor_bindings/${id}/`, patch)
 }

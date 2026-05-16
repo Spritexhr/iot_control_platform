@@ -40,7 +40,7 @@ const props = defineProps({
 const plantStore = usePlantStore()
 
 const binding = computed(() => props.data?.binding?.id || '')
-const sample = computed(() => binding.value ? plantStore.samples.get(binding.value) : null)
+const sample = computed(() => plantStore.findByBinding(binding.value))
 
 const tagSymbol = computed(() => props.data?.symbol || (sample.value?.tag?.split('-')[0] ?? ''))
 const tagType = computed(() => tagSymbol.value)

@@ -39,10 +39,16 @@ export function deleteDiagram(id) {
 }
 
 /**
- * 拉可绑定的传感器/设备清单（主模型全量）。
- * 返回 { sensors: [{id,name,type,data_fields}], devices: [{id,name,type,commands}] }
- * 位号、单位、阈值等绘制参数由节点属性面板保存到 canvas JSON。
+ * 拉可绑定的传感器/设备清单。
+ * 装置插件接管"哪些点位被纳入大屏"，本接口按 plantCode 返回该装置已绑定的点位
+ * （EB 装置走 EBPlantSensorBinding/EBPlantDeviceBinding），与大屏的点位集合一致。
+ *
+ * 返回 {
+ *   sensors: [{ id (point_id), name, tag, data_key, unit, area, type, hi_threshold, lo_threshold, severity }],
+ *   devices: [{ id, name, tag, area, type, commands }],
+ * }
  */
-export function getBindableTargets() {
-  return request.get(`${BASE}/bindable_targets/`)
+export function getBindableTargets(plantCode) {
+  const params = plantCode ? { plant_code: plantCode } : {}
+  return request.get(`${BASE}/bindable_targets/`, { params })
 }

@@ -3,13 +3,35 @@
 提供传感器和设备共用的命令发送、校验码确认等逻辑
 子类只需指定 model_class 和 id_field_name 即可复用全部功能
 """
+import json
 import logging
 import random
 import threading
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_mqtt_message(raw: Any, command_name: str) -> Optional[Dict]:
+    """把命令定义里的 mqtt_message 规范化成 dict。
+    历史数据可能把它存成了 JSON 字符串（前端编辑器直接保存了字符串）；这里兜底解析。
+    返回 dict；解析失败或类型不对返回 None（调用方 logger.error + return False）。
+    """
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            logger.error("命令 %s 的 mqtt_message 不是合法 JSON: %r", command_name, raw)
+            return None
+        if not isinstance(parsed, dict):
+            logger.error("命令 %s 的 mqtt_message 解析后不是对象: %r", command_name, parsed)
+            return None
+        return parsed
+    logger.error("命令 %s 的 mqtt_message 类型不合法 (%s): %r", command_name, type(raw).__name__, raw)
+    return None
 
 
 class BaseCommandSendService:
@@ -130,7 +152,9 @@ class BaseCommandSendService:
             return False
 
         command_info = commands[command_name]
-        mqtt_message = command_info['mqtt_message'].copy()
+        mqtt_message = _coerce_mqtt_message(command_info.get('mqtt_message'), command_name)
+        if mqtt_message is None:
+            return False
         if params:
             mqtt_message = self._apply_params_to_message(mqtt_message, params)
         return self.send_command(object_id, mqtt_message)
@@ -170,7 +194,9 @@ class BaseCommandSendService:
             return False
 
         command_info = commands[command_name]
-        mqtt_message = command_info['mqtt_message'].copy()
+        mqtt_message = _coerce_mqtt_message(command_info.get('mqtt_message'), command_name)
+        if mqtt_message is None:
+            return False
         if params:
             mqtt_message = self._apply_params_to_message(mqtt_message, params)
         mqtt_message = self._inject_check_code(mqtt_message)

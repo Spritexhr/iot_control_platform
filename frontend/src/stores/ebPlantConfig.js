@@ -7,6 +7,7 @@ import {
   listBindableSources,
   listSensorBindings,
   createSensorBindings,
+  createSensorFieldBinding,
   updateSensorBinding,
   deleteSensorBinding,
   listDeviceBindings,
@@ -53,8 +54,14 @@ export const useEBPlantConfigStore = defineStore('ebPlantConfig', () => {
   }
 
   async function importSensors(ids) {
-    if (!ids.length) return
-    await createSensorBindings(ids)
+    if (!ids.length) return { created: 0 }
+    const resp = await createSensorBindings(ids)
+    await refreshBindings()
+    return { created: Array.isArray(resp?.created) ? resp.created.length : 0 }
+  }
+
+  async function addSensorFieldBinding(payload) {
+    await createSensorFieldBinding(payload)
     await refreshBindings()
   }
 
@@ -100,6 +107,7 @@ export const useEBPlantConfigStore = defineStore('ebPlantConfig', () => {
     loadAll,
     refreshBindings,
     importSensors,
+    addSensorFieldBinding,
     importDevices,
     patchSensorBinding,
     patchDeviceBinding,

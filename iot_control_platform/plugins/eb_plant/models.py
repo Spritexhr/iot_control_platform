@@ -4,9 +4,11 @@
 设计要点
 - 插件不在主模型(Sensor/Device)上挂字段；本插件需要的"工艺位号、阈值、显示参数"
   全部独立存储在本文件定义的三张表里。
-- 通过 OneToOneField 引用主模型的 Sensor / Device。主模型删除时本插件绑定级联删除，
-  反向不耦合：主模型本身不感知本插件存在。
-- 一个传感器(或设备)在 EB 插件里最多导入一次。
+- 通过 ForeignKey/OneToOneField 引用主模型的 Sensor / Device。主模型删除时本插件
+  绑定级联删除，反向不耦合：主模型本身不感知本插件存在。
+- 传感器绑定按 (sensor, data_key) 唯一：温压一体等"多 data_key"传感器可以为不同字段
+  各建一行 binding，独立展示、独立阈值、独立严重度。
+- 设备绑定保持一对一：同一阀门只能在大屏上绑定一次。
 """
 from django.db import models
 
@@ -49,10 +51,10 @@ class EBPlantSensorBinding(models.Model):
         ("critical", "critical"),
     ]
 
-    sensor = models.OneToOneField(
+    sensor = models.ForeignKey(
         "sensors.Sensor",
         on_delete=models.CASCADE,
-        related_name="eb_binding",
+        related_name="eb_bindings",
         verbose_name="主模型传感器",
     )
 
@@ -63,7 +65,7 @@ class EBPlantSensorBinding(models.Model):
         max_length=50,
         blank=True,
         verbose_name="数据键名",
-        help_text="从 SensorData.data 取值的字段名，留空则自动取唯一字段",
+        help_text="从 SensorData.data 取值的字段名，留空表示自动取唯一字段（仅在传感器只有一个字段时有意义）",
     )
     unit = models.CharField(max_length=20, blank=True, verbose_name="单位")
 
@@ -87,9 +89,25 @@ class EBPlantSensorBinding(models.Model):
         verbose_name = "EB 传感器绑定"
         verbose_name_plural = "EB 传感器绑定"
         ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sensor", "data_key"],
+                name="uniq_eb_sensor_data_key",
+            ),
+        ]
+
+    @property
+    def point_id(self) -> str:
+        """前端实时数据流里的唯一 ID。
+        - 单字段传感器（data_key 留空）→ 用 sensor_id
+        - 多字段传感器（同 sensor 多 binding）→ 用 sensor_id::data_key 区分
+        """
+        if self.data_key:
+            return f"{self.sensor.sensor_id}::{self.data_key}"
+        return self.sensor.sensor_id
 
     def __str__(self) -> str:
-        return f"{self.tag or self.sensor.sensor_id}"
+        return f"{self.tag or self.point_id}"
 
 
 class EBPlantDeviceBinding(models.Model):
@@ -98,7 +116,7 @@ class EBPlantDeviceBinding(models.Model):
     device = models.OneToOneField(
         "devices.Device",
         on_delete=models.CASCADE,
-        related_name="eb_binding",
+        related_name="eb_device_binding",
         verbose_name="主模型设备",
     )
 

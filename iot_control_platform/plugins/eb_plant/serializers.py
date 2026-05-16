@@ -23,18 +23,22 @@ class EBPlantSensorBindingSerializer(serializers.ModelSerializer):
     sensor_name = serializers.CharField(source="sensor.name", read_only=True)
     sensor_type = serializers.SerializerMethodField()
     data_fields = serializers.SerializerMethodField()
+    point_id = serializers.CharField(read_only=True)
 
     class Meta:
         model = EBPlantSensorBinding
         fields = [
             "id", "sensor", "sensor_id", "sensor_name", "sensor_type", "data_fields",
+            "point_id",
             "tag", "area", "data_key", "unit",
             "normal_value", "hi_threshold", "lo_threshold", "severity",
             "sort_order", "is_visible",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "sensor_id", "sensor_name", "sensor_type", "data_fields", "created_at", "updated_at"]
-        extra_kwargs = {"sensor": {"write_only": True}}
+        read_only_fields = [
+            "id", "sensor_id", "sensor_name", "sensor_type", "data_fields",
+            "point_id", "created_at", "updated_at",
+        ]
 
     def get_sensor_type(self, obj):
         return obj.sensor.sensor_type.name if obj.sensor.sensor_type_id else ""
@@ -74,17 +78,20 @@ class BindableSensorSerializer(serializers.ModelSerializer):
 
     sensor_type = serializers.CharField(source="sensor_type.name", read_only=True)
     data_fields = serializers.SerializerMethodField()
-    already_bound = serializers.SerializerMethodField()
+    bound_data_keys = serializers.SerializerMethodField()
 
     class Meta:
         model = Sensor
-        fields = ["id", "sensor_id", "name", "location", "sensor_type", "data_fields", "already_bound"]
+        fields = ["id", "sensor_id", "name", "location", "sensor_type", "data_fields", "bound_data_keys"]
 
     def get_data_fields(self, obj):
         return obj.sensor_type.data_fields if obj.sensor_type_id else []
 
-    def get_already_bound(self, obj):
-        return hasattr(obj, "eb_binding")
+    def get_bound_data_keys(self, obj):
+        """已被 EB 大屏占用的 data_key 列表（空字符串表示"未选字段"那条）。
+        用于前端判断"还能不能再次导入 / 还能新增哪个字段"。
+        """
+        return list(obj.eb_bindings.values_list("data_key", flat=True))
 
 
 class BindableDeviceSerializer(serializers.ModelSerializer):
@@ -103,4 +110,4 @@ class BindableDeviceSerializer(serializers.ModelSerializer):
         return list(cmds.keys()) if isinstance(cmds, dict) else []
 
     def get_already_bound(self, obj):
-        return hasattr(obj, "eb_binding")
+        return hasattr(obj, "eb_device_binding")

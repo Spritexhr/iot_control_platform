@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from datetime import timedelta
 from .models import DeviceType, Device, DeviceStatusCollection
+from sensors.serializers import normalize_commands_payload
 
 
 class DeviceTypeSerializer(serializers.ModelSerializer):
@@ -16,6 +17,9 @@ class DeviceTypeSerializer(serializers.ModelSerializer):
             'created_at', 'device_count',
         ]
         read_only_fields = ['id', 'created_at', 'device_count']
+
+    def validate_commands(self, value):
+        return normalize_commands_payload(value)
 
     def get_device_count(self, obj):
         # 优先使用 annotate 预计算的值
