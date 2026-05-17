@@ -8,11 +8,11 @@ export function getPlantSnapshot() {
 }
 
 /**
- * SSE 流的完整 URL（无 /api 前缀的 request 实例）。
- * EventSource 不支持自定义 header，SSE 端点目前用 AllowAny。
+ * EB 大屏 WebSocket 路径（不含 host）。
+ * useWebSocket(buildWsUrl(buildPlantWsPath()), ...) 用。
  */
-export function buildPlantStreamUrl() {
-  return `/api${BASE}/stream`
+export function buildPlantWsPath() {
+  return '/ws/plugins/eb_plant/'
 }
 
 // ---------- 视图配置 ----------

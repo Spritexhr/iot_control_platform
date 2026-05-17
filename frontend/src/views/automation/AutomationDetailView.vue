@@ -269,7 +269,7 @@ class MyController:
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -281,6 +281,7 @@ import {
   launchAutomationRule,
   stopAutomationRule,
 } from '@/api/automation'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const route = useRoute()
 const router = useRouter()
@@ -433,34 +434,25 @@ async function stopPolling() {
   }
 }
 
-// 定时刷新后端状态
-let statusRefreshTimer = null
-
-function startStatusRefresh() {
-  if (statusRefreshTimer) clearInterval(statusRefreshTimer)
-  statusRefreshTimer = setInterval(async () => {
-    if (!rule.value) return
-    try {
-      const data = await getAutomationRule(rule.value.id)
-      // 如果后端状态变成了 error_stopped，且之前是 running，说明发生了后台异常
-      if (data.process_status === 'error_stopped' && rule.value.process_status === 'running') {
-        appendTerminal('error', `后台轮询异常停止: ${data.error_message || '未知错误'}`)
-      }
-      rule.value.is_launched = data.is_launched
-      rule.value.process_status = data.process_status
-      rule.value.error_message = data.error_message
-    } catch {
-      // 忽略刷新错误
-    }
-  }, 5000)
-}
-
-function stopStatusRefresh() {
-  if (statusRefreshTimer) {
-    clearInterval(statusRefreshTimer)
-    statusRefreshTimer = null
+// 实时状态推送：consumer 广播全量规则变更，按当前 rule.id 过滤
+function onRuleEvent(data) {
+  if (!rule.value || !data || data.id !== rule.value.id) return
+  // 后台调度器把 running → error_stopped 时，往终端打一条
+  if (data.process_status === 'error_stopped' && rule.value.process_status === 'running') {
+    appendTerminal('error', `后台轮询异常停止: ${data.error_message || '未知错误'}`)
   }
+  rule.value.is_launched = data.is_launched
+  rule.value.process_status = data.process_status
+  rule.value.error_message = data.error_message
+  if (data.poll_interval != null) rule.value.poll_interval = data.poll_interval
+  if (data.last_run_time) rule.value.last_run_time = data.last_run_time
+  if (data.updated_at) rule.value.updated_at = data.updated_at
 }
+
+useWebSocket(
+  () => buildWsUrl('/ws/automation/'),
+  { 'automation.rule': onRuleEvent },
+)
 
 // ==================== 设备列表 ====================
 function addDeviceRow() {
@@ -514,13 +506,9 @@ function handleTabKey(e) {
 }
 
 // ==================== 初始化 ====================
+// WS 已在 setup 顶层订阅；onScopeDispose 会在组件卸载时自动 stop
 onMounted(() => {
   fetchRule()
-  startStatusRefresh()
-})
-
-onUnmounted(() => {
-  stopStatusRefresh()
 })
 </script>
 

@@ -1,6 +1,7 @@
 {
   "name": "eb_plant",
-  "version": "0.1.0",
-  "description": "乙苯(EB)装置辅助监测大屏 - 实时点位 SSE 流 + 扰动场景下发",
-  "enabled": true
+  "version": "0.2.0",
+  "description": "乙苯(EB)装置辅助监测大屏 - 实时点位 WebSocket 流 + 扰动场景下发",
+  "enabled": true,
+  "ws_module": "plugins.eb_plant.routing"
 }

@@ -1,17 +1,18 @@
 """
-进程内最新点位值缓存 + 发布订阅广播器。
+进程内最新点位值缓存。
 
 设计要点
-- 仅在单进程内有效。多进程部署时需要换 Redis pub/sub，但单机 demo 单进程足够。
-- 写入方（插件 signal handler）调用 ingest_sensor_data(...)，更新缓存并向所有订阅队列 put。
-- 读取方（SSE 请求线程）调用 subscribe() 拿到一个 queue.Queue，循环 get 即可。
-- 队列大小有限（256），满了直接丢最旧——SSE 慢客户端不能拖垮发布方。
+- LatestValuesCache 仅在单进程内有效，存"最近一帧"，用于快照/回填。
+- 多进程下每个 worker 各自维护一份缓存，每条新样本会通过 channel layer
+  广播到所有 worker；缓存只用于 snapshot 端点和 consumer 建连首发，
+  接受短暂的"miss → 等下一帧"。
+- 写入方（插件 signal handler）调用 ingest_sensor_data(...)，更新缓存
+  并通过 services.realtime.dispatch.publish_plugin_sample 广播到 channel layer。
 - 主模型(Sensor/Device)对本模块零依赖；展示元数据由插件 binding 对象按鸭子类型传入。
 """
 from __future__ import annotations
 
 import logging
-import queue
 import threading
 import time
 from dataclasses import dataclass, field, asdict
@@ -63,48 +64,6 @@ class LatestValuesCache:
             self._values.clear()
 
 
-class Broadcaster:
-    """
-    发布-订阅广播器。
-    每个 SSE 连接 subscribe() 一次拿到独立队列，断开时 unsubscribe()。
-    """
-
-    QUEUE_MAX = 256
-
-    def __init__(self) -> None:
-        self._lock = threading.RLock()
-        self._subscribers: List[queue.Queue] = []
-
-    def subscribe(self) -> queue.Queue:
-        q: queue.Queue = queue.Queue(maxsize=self.QUEUE_MAX)
-        with self._lock:
-            self._subscribers.append(q)
-        log.debug("[realtime] 新订阅者，当前数 %d", len(self._subscribers))
-        return q
-
-    def unsubscribe(self, q: queue.Queue) -> None:
-        with self._lock:
-            try:
-                self._subscribers.remove(q)
-            except ValueError:
-                pass
-        log.debug("[realtime] 订阅者退出，剩余 %d", len(self._subscribers))
-
-    def publish(self, event: dict) -> None:
-        """非阻塞广播。队列满时丢弃该订阅者的此次消息（保留最新策略）。"""
-        with self._lock:
-            subs = list(self._subscribers)
-        for q in subs:
-            try:
-                q.put_nowait(event)
-            except queue.Full:
-                try:
-                    q.get_nowait()
-                    q.put_nowait(event)
-                except (queue.Empty, queue.Full):
-                    pass
-
-
 def classify_status(value: Optional[float], hi: Any, lo: Any, severity: str) -> str:
     """根据 binding 上的阈值判定状态。"""
     if value is None:
@@ -121,7 +80,6 @@ def classify_status(value: Optional[float], hi: Any, lo: Any, severity: str) -> 
 
 
 latest_values = LatestValuesCache()
-broadcaster = Broadcaster()
 
 
 def ingest_sensor_data(
@@ -177,5 +135,8 @@ def ingest_sensor_data(
         },
     )
     latest_values.update(sample)
-    broadcaster.publish({"type": "sample", "data": sample.to_dict()})
+    # 广播到 channel layer 的 plugins.{plugin_code} group；
+    # 延迟 import 避免顶层循环（dispatch → channels → settings 链路较长）
+    from . import dispatch
+    dispatch.publish_plugin_sample(plugin_code or "", sample.to_dict())
     return sample

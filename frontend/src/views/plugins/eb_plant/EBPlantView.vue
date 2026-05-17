@@ -9,7 +9,7 @@
       </div>
       <div class="eb-plant__status">
         <div class="eb-plant__stat">
-          <span class="eb-plant__stat-label">SSE</span>
+          <span class="eb-plant__stat-label">实时</span>
           <span class="eb-plant__stat-value" :class="`status-${sseStatus}`">{{ sseStatusLabel }}</span>
         </div>
         <div class="eb-plant__stat">
@@ -64,9 +64,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import InstrumentCard from './InstrumentCard.vue'
-import { useSSE } from '@/composables/useSSE'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 import { usePlantStore } from '@/stores/plant'
-import { buildPlantStreamUrl } from '@/api/plugins/eb_plant'
+import { buildPlantWsPath } from '@/api/plugins/eb_plant'
 
 const store = usePlantStore()
 
@@ -77,6 +77,7 @@ const sseStatusLabel = computed(() => ({
   open: '已连接',
   closed: '已断开',
   error: '异常',
+  unauthorized: '未授权',
 }[sseStatus.value] || sseStatus.value))
 
 const now = ref(Date.now())
@@ -95,14 +96,17 @@ const lastUpdateLabel = computed(() => {
   return `${diff}s 前`
 })
 
-// 1. 初始拉一次快照
+// 1. 初始拉一次快照（WS 建连后会再发一次 snapshot 全量覆盖，这里只是首屏不空白）
 store.loadSnapshot()
 
-// 2. 建立 SSE 长连接
-const { displayStatus } = useSSE(buildPlantStreamUrl(), {
-  snapshot: (data) => store.applySnapshot(data),
-  sample:   (data) => store.applySample(data),
-})
+// 2. 建立 WebSocket 长连接（连上后 consumer 会立刻发 snapshot 事件覆盖）
+const { displayStatus } = useWebSocket(
+  () => buildWsUrl(buildPlantWsPath()),
+  {
+    snapshot: (data) => store.applySnapshot(data),
+    sample:   (data) => store.applySample(data),
+  },
+)
 
 watch(displayStatus, (v) => { store.sseStatus = v }, { immediate: true })
 </script>

@@ -9,7 +9,6 @@ router.register(r"device_bindings", views.EBPlantDeviceBindingViewSet, basename=
 
 urlpatterns = [
     path("snapshot", views.snapshot, name="eb-plant-snapshot"),
-    path("stream", views.stream, name="eb-plant-stream"),
     path("config", views.config_view, name="eb-plant-config"),
     path("bindable_sources", views.bindable_sources, name="eb-plant-bindable-sources"),
 ]

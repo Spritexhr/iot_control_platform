@@ -15,6 +15,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ class PluginMeta:
     description: str    # 简短描述
     enabled: bool       # 默认是否启用（首次 sync 时写入 DB）
     path: Path          # 插件目录绝对路径
+    ws_module: Optional[str] = None   # 可选：WebSocket routing 模块路径
+                                       # 模块需 export `websocket_urlpatterns`
+                                       # 由 config/asgi.py 在启动时动态 import
 
     @property
     def app_label(self) -> str:
@@ -66,6 +70,8 @@ def discover_plugins() -> list[PluginMeta]:
             logger.warning(f"插件 {entry.name} 的 plugin.json 解析失败: {e}")
             continue
 
+        ws_module_raw = data.get("ws_module")
+        ws_module = str(ws_module_raw) if isinstance(ws_module_raw, str) and ws_module_raw else None
         plugins.append(
             PluginMeta(
                 name=str(data.get("name") or entry.name),
@@ -73,6 +79,7 @@ def discover_plugins() -> list[PluginMeta]:
                 description=str(data.get("description") or ""),
                 enabled=bool(data.get("enabled", True)),
                 path=entry,
+                ws_module=ws_module,
             )
         )
     return plugins

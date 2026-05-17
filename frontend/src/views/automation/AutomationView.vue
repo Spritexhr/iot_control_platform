@@ -173,7 +173,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
@@ -187,6 +187,7 @@ import {
   launchAutomationRule,
   stopAutomationRule,
 } from '@/api/automation'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
 const router = useRouter()
@@ -271,37 +272,28 @@ async function handleStop(rule) {
   }
 }
 
-// ==================== 定期刷新状态 ====================
-let statusRefreshTimer = null
-function startStatusRefresh() {
-  if (statusRefreshTimer) clearInterval(statusRefreshTimer)
-  statusRefreshTimer = setInterval(async () => {
-    try {
-      const params = {}
-      if (searchText.value) params.search = searchText.value
-      const data = await getAutomationRules(params)
-      const newRules = data.results || data
-      // 仅更新状态，避免覆盖用户的输入
-      newRules.forEach(newRule => {
-        const oldRule = rules.value.find(r => r.id === newRule.id)
-        if (oldRule) {
-          oldRule.is_launched = newRule.is_launched
-          oldRule.process_status = newRule.process_status
-          oldRule.error_message = newRule.error_message
-        }
-      })
-    } catch {
-      // 忽略刷新错误
-    }
-  }, 5000)
-}
-
-function stopStatusRefresh() {
-  if (statusRefreshTimer) {
-    clearInterval(statusRefreshTimer)
-    statusRefreshTimer = null
+// ==================== 实时状态推送 ====================
+// 任何规则 is_launched / process_status / error_message 变化，后端 post_save signal
+// → /ws/automation/ → 这里 patch 本地行；新增的规则 created=true，也插到列表顶部
+function onRuleEvent(data) {
+  if (!data || data.id == null) return
+  const existing = rules.value.find(r => r.id === data.id)
+  if (existing) {
+    existing.is_launched = data.is_launched
+    existing.process_status = data.process_status
+    existing.error_message = data.error_message
+    if (data.poll_interval != null) existing.poll_interval = data.poll_interval
+    if (data.updated_at) existing.updated_at = data.updated_at
+  } else if (data.created) {
+    // 别的客户端新建的规则；前端列表里没有，丢个轻量刷新拿全字段（包含 device_list 等）
+    fetchRules()
   }
 }
+
+useWebSocket(
+  () => buildWsUrl('/ws/automation/'),
+  { 'automation.rule': onRuleEvent },
+)
 
 // ==================== 手动执行 ====================
 const execLoading = ref({})
@@ -405,14 +397,10 @@ function formatTime(str) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// ==================== 初始化 / 清理 ====================
+// ==================== 初始化 ====================
+// WS 在 setup 顶层已建立；onScopeDispose 会在组件卸载时自动 stop
 onMounted(() => {
   fetchRules()
-  startStatusRefresh()
-})
-
-onUnmounted(() => {
-  stopStatusRefresh()
 })
 </script>
 

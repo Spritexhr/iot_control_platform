@@ -228,6 +228,7 @@ import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { getSensors, createSensor, deleteSensor, getSensorTypes, createSensorType, updateSensorType, deleteSensorType, reorderSensors } from '@/api/sensors'
 import SensorCard from '@/components/sensors/SensorCard.vue'
 import draggable from 'vuedraggable'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -454,6 +455,39 @@ async function handleAddSensor() {
     addSaving.value = false
   }
 }
+
+// ==================== 实时推送 ====================
+// 订阅全量传感器 channel；按 sensor_id 找到本地卡片，patch 最新值/在线状态
+function onSensorData(data) {
+  if (!data || !data.sensor_id) return
+  const row = sensors.value.find(s => s.sensor_id === data.sensor_id)
+  if (!row) return
+  const tsIso = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : null
+  row.latest_data = {
+    data: data.data,
+    timestamp: tsIso,
+    received_at: data.received_at ? new Date(data.received_at * 1000).toISOString() : tsIso,
+  }
+  // 收到数据 = 在线
+  row.is_online = true
+  row.last_seen = tsIso
+}
+
+function onSensorStatus(data) {
+  if (!data || !data.sensor_id) return
+  const row = sensors.value.find(s => s.sensor_id === data.sensor_id)
+  if (!row) return
+  row.is_online = !!data.is_online
+  if (data.last_seen) row.last_seen = new Date(data.last_seen * 1000).toISOString()
+}
+
+useWebSocket(
+  () => buildWsUrl('/ws/sensors/'),
+  {
+    'sensor.data': onSensorData,
+    'sensor.status': onSensorStatus,
+  },
+)
 
 // ==================== 初始化 ====================
 onMounted(() => {

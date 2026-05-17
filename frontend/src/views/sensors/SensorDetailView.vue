@@ -200,6 +200,7 @@ import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { getSensor, getSensorData, getSensorStatus, sendSensorCommand } from '@/api/sensors'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
 const route = useRoute()
@@ -299,8 +300,63 @@ function eventTagType(name) {
 
 function onCommandSent() {
   ElMessage.success(ls.t('common.commandSent'))
-  setTimeout(fetchSensorDetail, 1000)
+  // 命令效果由设备响应的 status 上报触发，WS 会推过来；不再轮询拉详情
 }
+
+// ==================== WebSocket 实时推送 ====================
+// 收到一条 sensor.data：刷新最新值 + 在数据表顶部插入一行
+function onSensorData(data) {
+  if (!sensor.value || data?.sensor_id !== sensor.value.sensor_id) return
+  const tsIso = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : null
+  const receivedIso = data.received_at ? new Date(data.received_at * 1000).toISOString() : tsIso
+  sensor.value.latest_data = {
+    data: data.data,
+    timestamp: tsIso,
+    received_at: receivedIso,
+  }
+  // 顶部插入；只保留最近 500 条避免无限增长
+  dataRecords.value = [
+    { data: data.data, timestamp: tsIso, received_at: receivedIso },
+    ...dataRecords.value,
+  ].slice(0, 500)
+  // 刚收到数据意味着在线
+  sensor.value.is_online = true
+  sensor.value.last_seen = tsIso
+}
+
+// 收到一条 sensor.status：同步在线状态 + 在状态表顶部插入一行
+function onSensorStatus(data) {
+  if (!sensor.value || data?.sensor_id !== sensor.value.sensor_id) return
+  const tsIso = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : null
+  const receivedIso = data.received_at ? new Date(data.received_at * 1000).toISOString() : tsIso
+  sensor.value.is_online = !!data.is_online
+  sensor.value.last_seen = data.last_seen
+    ? new Date(data.last_seen * 1000).toISOString()
+    : sensor.value.last_seen
+  statusRecords.value = [
+    {
+      data: data.status,
+      event_name: data.event,
+      timestamp: tsIso,
+      received_at: receivedIso,
+    },
+    ...statusRecords.value,
+  ].slice(0, 200)
+}
+
+// 在 setup 顶层创建 WS（autoStart:false），onScopeDispose 注册的 stop 才能在
+// 组件卸载时被正确触发。拿到 sensor_id 后再手动 start()。
+const ws = useWebSocket(
+  () => {
+    const sid = sensor.value?.sensor_id
+    return sid ? buildWsUrl(`/ws/sensors/${encodeURIComponent(sid)}/`) : ''
+  },
+  {
+    'sensor.data': onSensorData,
+    'sensor.status': onSensorStatus,
+  },
+  { autoStart: false },
+)
 
 // ==================== 初始化 ====================
 onMounted(async () => {
@@ -308,6 +364,7 @@ onMounted(async () => {
   if (sensor.value) {
     fetchDataRecords()
     fetchStatusRecords()
+    ws.start()
   }
 })
 </script>

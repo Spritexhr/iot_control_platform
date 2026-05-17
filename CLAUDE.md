@@ -56,19 +56,42 @@ npm run build
 - 通过 Django signals（如 `post_save` of `SensorData`）在 `plugins/<name>/signals.py` 注入实时数据流；`apps.py` 的 `ready()` 中 `from . import signals`
 - 插件提供"从主模型导入到自有表"的 API（参考 `plugins/eb_plant/views.py` 的 `bindable_sources` + `sensor_bindings` CRUD）
 
-### 实时数据链路
+### 实时数据链路（0.8 起：WebSocket + Redis）
+
 ```
-MQTT 消息
-  → services/sensors_service/sensor_upload_data_handlers.py（落库 SensorData，纯主模型职责）
-  → SensorData.save 触发 post_save 信号
-  → plugins/<name>/signals.py（按插件 binding 表过滤）
-  → services/realtime/latest_values.py 的 ingest_sensor_data(plugin_code, binding=...)
-  → LatestValuesCache + Broadcaster.publish (内存)
-  → /api/plugins/<name>/stream（SSE）
-  → 前端 composables/useSSE.js
+MQTT broker
+  → iot-mqtt-runner 容器（独立进程，sensors/management/commands/mqtt_runner.py）
+    paho 后台线程 → services/sensors_service/* / devices_service/* 落库
+  → 各模型 post_save 信号
+    主层 services/realtime/signals.py（SensorData / SensorStatusCollection /
+                                       DeviceStatusCollection / AutomationRule）
+    插件层 plugins/<name>/signals.py（按 binding 过滤，例如 EB）
+  → transaction.on_commit(...) → services/realtime/dispatch.publish_*
+  → async_to_sync(channel_layer.group_send) → Redis（channels_redis）
+  → backend 容器的 ASGI worker → consumer.broadcast_*
+  → 前端 useWebSocket（/ws/...）
 ```
 
-`PointSample` 字段名 `plugin_code`（非 `plant_code`），insgest 入参用 `binding` 鸭子类型对象（需有 `tag/unit/data_key/hi_threshold/lo_threshold/severity` 属性）。
+**Group 命名规则**：按"资源 × 资源ID"，不按"插件 × 事件"。
+- `sensors.{sensor_id}` / `sensors.all`
+- `devices.{device_id}` / `devices.all`
+- `automation.rules` / `system.mqtt` / `plugins.{plugin_code}`
+
+**MQTT 客户端的两种模式**（`sensors/apps.py:_is_publisher_only`）：
+- **完整模式**（`mqtt_runner` 命令或本地开发单进程）：连接 + 订阅 + 注册 handler + 绑定 publisher
+- **仅发布模式**（docker 的 backend worker，`IOT_MQTT_RUNNER=false`）：连接 + 绑定 publisher，**不订阅**——避免多 worker 重复处理消息，但保留命令下发能力
+
+**WS 端点列表**（`config/asgi.py`）：
+- `/ws/_ping/` 联调
+- `/ws/sensors/` `/ws/sensors/<id>/`
+- `/ws/devices/` `/ws/devices/<id>/`
+- `/ws/automation/`
+- `/ws/system/mqtt/`
+- `/ws/plugins/<code>/`（插件 plugin.json 加 `"ws_module"` 字段动态挂载，参考 eb_plant/routing.py）
+
+**WS 握手鉴权**：`?token=<jwt>` 查询串（浏览器 WebSocket 不支持自定义 header），`services/realtime/middleware.py` 解析；4001 = token 无效，前端 useWebSocket 收到后会触发一次 refresh 重连。
+
+**PointSample**（仅插件层用）字段名 `plugin_code`（非 `plant_code`），`ingest_sensor_data` 入参用 `binding` 鸭子类型对象（需有 `tag/unit/data_key/hi_threshold/lo_threshold/severity` 属性）。
 
 ## 前端架构
 
@@ -77,13 +100,13 @@ MQTT 消息
 - Pinia stores：`frontend/src/stores/`，命名风格 `useXxxStore`
 - 插件页面：`frontend/src/views/plugins/<name>/`
 - 插件 API：`frontend/src/api/plugins/<name>.js`
-- SSE：`frontend/src/composables/useSSE.js`，对外暴露 `status` ref（`idle/connecting/open/closed/error`）
+- WebSocket：`frontend/src/composables/useWebSocket.js`，与原 useSSE API 兼容（`status / displayStatus / start / stop`），多一个 `send()`。内置：自动重连指数退避、25s 心跳 ping/pong、token 自动附 query string、4001 close → refresh token → 重连
 
 ## 权限模型
 - DRF token 认证 + session 兼容
 - 写接口默认 `IsAuthenticated + IsAdminUser`（即 `is_staff=True`）
 - 读接口默认 `IsAuthenticated`
-- SSE 端点用 `AllowAny`（因 `EventSource` 无法附 Authorization header），生产化时换 token 查询参数
+- WebSocket 握手用 query string `?token=<jwt>` 鉴权（浏览器 WS 不支持自定义 header），后端 `JwtAuthMiddleware` 校验 SimpleJWT AccessToken
 
 ## 协作惯例
 - 用户偏好中文交流、中文代码注释

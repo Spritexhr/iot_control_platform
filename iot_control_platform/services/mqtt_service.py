@@ -225,6 +225,22 @@ class MQTTService:
         self.subscribe('iot/devices/+/status', qos=1)
         logger.info("设备状态处理器设置完成")
 
+    def _publish_system_status(self, extra: Optional[dict] = None) -> None:
+        """把当前 MQTT 连接状态推到 /ws/system/mqtt/ 订阅者。"""
+        try:
+            from services.realtime.dispatch import publish_mqtt_system
+            payload = {
+                "is_connected": bool(self.is_connected),
+                "broker": get_config("mqtt_broker", "127.0.0.1", str),
+                "port": get_config("mqtt_port", 1883, int),
+            }
+            if extra:
+                payload.update(extra)
+            publish_mqtt_system(payload)
+        except Exception as exc:
+            # 不能让推 WS 的异常影响 MQTT 回调，吞掉
+            logger.debug(f"MQTT 状态广播失败（忽略）: {exc}")
+
     def _on_connect(self, client, userdata, flags, rc):
         """MQTT连接成功回调"""
         if rc == 0:
@@ -244,6 +260,7 @@ class MQTTService:
                             logger.error(f"订阅主题失败: {topic}, 错误码: {result}")
                     except Exception as e:
                         logger.error(f"订阅主题异常: {topic}, {e}", exc_info=True)
+            self._publish_system_status()
         else:
             self.is_connected = False
             error_messages = {
@@ -255,6 +272,7 @@ class MQTTService:
             }
             error_msg = error_messages.get(rc, f"未知错误(rc={rc})")
             logger.error(f"MQTT连接失败: {error_msg}")
+            self._publish_system_status({"error": error_msg, "rc": rc})
 
     def _on_disconnect(self, client, userdata, rc):
         """
@@ -274,6 +292,7 @@ class MQTTService:
             self._reconnect_delay = min(self._reconnect_delay * 2, self.RECONNECT_MAX_DELAY)
         else:
             logger.info("MQTT正常断开")
+        self._publish_system_status({"rc": rc})
 
     def _extract_id_from_topic(self, topic: str, pattern: str) -> Optional[str]:
         """

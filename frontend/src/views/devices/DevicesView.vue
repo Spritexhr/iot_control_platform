@@ -217,6 +217,7 @@ import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType, reorderDevices } from '@/api/devices'
 import draggable from 'vuedraggable'
 import DeviceCard from '@/components/devices/DeviceCard.vue'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -439,6 +440,26 @@ async function handleAddDevice() {
     addSaving.value = false
   }
 }
+
+// ==================== 实时推送 ====================
+function onDeviceStatus(data) {
+  if (!data || !data.device_id) return
+  const row = devices.value.find(d => d.device_id === data.device_id)
+  if (!row) return
+  const tsIso = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : null
+  row.latest_data = {
+    data: data.status,
+    timestamp: tsIso,
+    received_at: data.received_at ? new Date(data.received_at * 1000).toISOString() : tsIso,
+  }
+  row.is_online = !!data.is_online
+  if (data.last_seen) row.last_seen = new Date(data.last_seen * 1000).toISOString()
+}
+
+useWebSocket(
+  () => buildWsUrl('/ws/devices/'),
+  { 'device.status': onDeviceStatus },
+)
 
 // ==================== 初始化 ====================
 onMounted(() => {

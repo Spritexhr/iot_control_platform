@@ -46,8 +46,8 @@ import DiagramEditor from './editor/DiagramEditor.vue'
 import DiagramRuntime from './runtime/DiagramRuntime.vue'
 import { useUserStore } from '@/stores/user'
 import { usePlantStore } from '@/stores/plant'
-import { useSSE } from '@/composables/useSSE'
-import { buildPlantStreamUrl } from '@/api/plugins/eb_plant'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
+import { buildPlantWsPath } from '@/api/plugins/eb_plant'
 import {
   getBindableTargets,
   getDiagram,
@@ -115,12 +115,15 @@ async function loadData() {
   }
 }
 
-// 复用 EB 的 SSE 流喂 plantStore。useSSE 内部用 onScopeDispose 自清理。
+// 复用 EB 的 WebSocket 流喂 plantStore。useWebSocket 内部用 onScopeDispose 自清理。
 plantStore.loadSnapshot()
-const { displayStatus: sseStatus } = useSSE(buildPlantStreamUrl(), {
-  snapshot: (data) => plantStore.applySnapshot(data),
-  sample:   (data) => plantStore.applySample(data),
-})
+const { displayStatus: sseStatus } = useWebSocket(
+  () => buildWsUrl(buildPlantWsPath()),
+  {
+    snapshot: (data) => plantStore.applySnapshot(data),
+    sample:   (data) => plantStore.applySample(data),
+  },
+)
 watch(sseStatus, (v) => { plantStore.sseStatus = v }, { immediate: true })
 
 onMounted(async () => {

@@ -210,6 +210,7 @@ import { ElMessage } from 'element-plus'
 import { Cpu, Monitor, SetUp, DataLine, Refresh } from '@element-plus/icons-vue'
 import { getDashboardStats } from '@/api/system'
 import { useLocaleStore } from '@/stores/locale'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const router = useRouter()
 const ls = useLocaleStore()
@@ -263,6 +264,56 @@ function isFresh(dateStr) {
   if (!dateStr) return false
   return (new Date() - new Date(dateStr)) < 300000
 }
+
+// ==================== 实时推送 ====================
+// 订阅传感器/设备两条 channel，patch 对应表格
+function onSensorData(data) {
+  if (!data || !data.sensor_id) return
+  const row = stats.recent_sensors?.find(r => r.sensor_id === data.sensor_id)
+  if (!row) return
+  row.latest_data = data.data
+  if (data.timestamp) row.latest_time = new Date(data.timestamp * 1000).toISOString()
+  row.is_online = true
+}
+
+function onSensorStatus(data) {
+  if (!data || !data.sensor_id) return
+  const row = stats.recent_sensors?.find(r => r.sensor_id === data.sensor_id)
+  if (!row) return
+  const before = row.is_online
+  row.is_online = !!data.is_online
+  if (data.last_seen) row.latest_time = new Date(data.last_seen * 1000).toISOString()
+  if (before !== row.is_online) {
+    stats.sensor_online += row.is_online ? 1 : -1
+  }
+}
+
+function onDeviceStatus(data) {
+  if (!data || !data.device_id) return
+  const row = stats.recent_devices?.find(r => r.device_id === data.device_id)
+  if (!row) return
+  const before = row.is_online
+  row.latest_data = data.status
+  if (data.timestamp) row.latest_time = new Date(data.timestamp * 1000).toISOString()
+  row.is_online = !!data.is_online
+  if (data.last_seen) row.latest_time = new Date(data.last_seen * 1000).toISOString()
+  if (before !== row.is_online) {
+    stats.device_online += row.is_online ? 1 : -1
+  }
+}
+
+useWebSocket(
+  () => buildWsUrl('/ws/sensors/'),
+  {
+    'sensor.data': onSensorData,
+    'sensor.status': onSensorStatus,
+  },
+)
+
+useWebSocket(
+  () => buildWsUrl('/ws/devices/'),
+  { 'device.status': onDeviceStatus },
+)
 
 function formatTime(str) {
   if (!str) return '--'

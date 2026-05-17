@@ -7,18 +7,15 @@
 - /api/plugins/eb_plant/sensor_bindings (CRUD)     传感器绑定
 - /api/plugins/eb_plant/device_bindings (CRUD)     设备绑定
 - GET      /api/plugins/eb_plant/snapshot          当前已绑定传感器的最新值
-- GET      /api/plugins/eb_plant/stream            SSE 实时流（仅推送绑定的传感器）
+
+实时推送由 WebSocket consumer 提供（plugins.eb_plant.consumers.EBPlantConsumer，
+URL: /ws/plugins/eb_plant/）。原 SSE 端点已在 M3 移除。
 """
 from __future__ import annotations
 
-import json
 import logging
-import queue
-import time
 
-from django.http import JsonResponse, StreamingHttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET
+from django.http import JsonResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -26,7 +23,7 @@ from rest_framework.response import Response
 
 from devices.models import Device
 from sensors.models import Sensor, SensorData
-from services.realtime.latest_values import broadcaster, ingest_sensor_data, latest_values
+from services.realtime.latest_values import ingest_sensor_data, latest_values
 
 from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSensorBinding
 from .serializers import (
@@ -40,9 +37,6 @@ from .serializers import (
 log = logging.getLogger(__name__)
 
 PLUGIN_CODE = "EB"
-
-_KEEPALIVE_SECONDS = 10
-_QUEUE_GET_TIMEOUT = 5.0
 
 
 # ---------- 配置 ----------
@@ -154,12 +148,7 @@ class EBPlantDeviceBindingViewSet(_AdminWritePermission, viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
-# ---------- 实时数据 ----------
-
-def _sse_pack(event_type: str, data: dict) -> bytes:
-    payload = json.dumps(data, ensure_ascii=False)
-    return f"event: {event_type}\ndata: {payload}\n\n".encode("utf-8")
-
+# ---------- 实时数据（snapshot 与 consumer 共用的 helper） ----------
 
 def _bound_point_ids() -> set:
     """已可见 binding 的 point_id 集合（区分同 sensor 不同 data_key）。"""
@@ -194,60 +183,6 @@ def _backfill_missing_from_db() -> None:
             )
         except Exception as exc:
             log.warning("EB 回填最近一帧失败 point_id=%s err=%s", binding.point_id, exc)
-
-
-def _event_stream():
-    """SSE 生成器：先发快照，再循环消费广播队列。"""
-    q = broadcaster.subscribe()
-    last_keepalive = time.time()
-    try:
-        _backfill_missing_from_db()
-        bound = _bound_point_ids()
-        snap = [s.to_dict() for s in latest_values.snapshot(PLUGIN_CODE) if s.sensor_id in bound]
-        yield _sse_pack("snapshot", {"plugin_code": PLUGIN_CODE, "samples": snap})
-
-        while True:
-            try:
-                event = q.get(timeout=_QUEUE_GET_TIMEOUT)
-            except queue.Empty:
-                event = None
-
-            now = time.time()
-            if event is not None:
-                data = event.get("data", {})
-                if event.get("type") == "sample" and data.get("plugin_code") == PLUGIN_CODE:
-                    if data.get("sensor_id") in bound or not bound:
-                        yield _sse_pack("sample", data)
-                        last_keepalive = now
-                elif event.get("type") == "alert":
-                    yield _sse_pack("alert", data)
-                    last_keepalive = now
-
-            if now - last_keepalive >= _KEEPALIVE_SECONDS:
-                yield b": keepalive\n\n"
-                last_keepalive = now
-                bound = _bound_point_ids()
-    except GeneratorExit:
-        pass
-    finally:
-        broadcaster.unsubscribe(q)
-
-
-@csrf_exempt
-@require_GET
-def stream(request):
-    """SSE 端点。不走 DRF 的 @api_view —— DRF 的内容协商会因为
-    EventSource 发 `Accept: text/event-stream` 而找不到 renderer 返回 406。
-    SSE 是纯流式响应，用 Django 原生 view 即可，权限层面跟 snapshot 一样靠 AllowAny。
-    """
-    response = StreamingHttpResponse(
-        _event_stream(),
-        content_type="text/event-stream",
-    )
-    response["Cache-Control"] = "no-cache"
-    response["X-Accel-Buffering"] = "no"
-    response["Connection"] = "keep-alive"
-    return response
 
 
 @api_view(["GET"])

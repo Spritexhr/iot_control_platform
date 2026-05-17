@@ -19,6 +19,22 @@ services:
       retries: 5
       start_period: 30s
 
+  redis:
+    image: docker.m.daocloud.io/library/redis:7-alpine
+    pull_policy: if_not_present
+    container_name: iot-redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./iot_control_platform
@@ -32,6 +48,10 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql
       - DB_PORT=3306
+      - REDIS_URL=redis://redis:6379/0
+      # web worker 不跑 MQTT 客户端，避免 N 个 worker 重复处理消息
+      # MQTT 由独立的 mqtt_runner service 统一处理
+      - IOT_MQTT_RUNNER=false
     command:
       - sh
       - -c
@@ -39,19 +59,46 @@ services:
         python manage.py migrate --noinput &&
         python manage.py configure --init --no-reload &&
         python manage.py collectstatic --noinput &&
-        gunicorn config.wsgi:application
+        gunicorn config.asgi:application
         --bind 0.0.0.0:8000
         --workers 2
-        --worker-class gthread
-        --threads 8
-        --timeout 0
+        --worker-class uvicorn.workers.UvicornWorker
     env_file:
       - .env
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "0.0.0.0:${ADMIN_PORT:-48081}:8000"
+    restart: unless-stopped
+
+  mqtt_runner:
+    build:
+      context: ./iot_control_platform
+      dockerfile: Dockerfile
+    container_name: iot-mqtt-runner
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DB_USE_MYSQL=true
+      - DB_NAME=${DB_NAME:-iot_platform}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - REDIS_URL=redis://redis:6379/0
+    command: ["python", "manage.py", "mqtt_runner"]
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        # 等 backend 跑完 migrate 再起，避免抢首次 schema 初始化
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -67,3 +114,4 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:

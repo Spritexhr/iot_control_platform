@@ -288,6 +288,7 @@ import {
 } from '@/api/platformConfig'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
 const userStore = useUserStore()
@@ -296,6 +297,21 @@ const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
 // ==================== MQTT 状态 ====================
 const mqttInfo = ref({ broker: '', port: '', is_connected: false })
 const mqttLoading = ref(false)
+
+// 实时订阅 broker 连/断；建连时 consumer 立刻发一次当前状态
+useWebSocket(
+  () => buildWsUrl('/ws/system/mqtt/'),
+  {
+    'system.mqtt': (data) => {
+      if (!data) return
+      mqttInfo.value = {
+        broker: data.broker ?? mqttInfo.value.broker,
+        port: data.port ?? mqttInfo.value.port,
+        is_connected: !!data.is_connected,
+      }
+    },
+  },
+)
 
 async function fetchMqttStatus() {
   mqttLoading.value = true

@@ -7,3 +7,8 @@ djangorestframework
 djangorestframework-simplejwt
 mysqlclient
 gunicorn
+channels>=4.1
+channels-redis>=4.2
+daphne>=4.1
+uvicorn[standard]>=0.30
+redis>=5.0

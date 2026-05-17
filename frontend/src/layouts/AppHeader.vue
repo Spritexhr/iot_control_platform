@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -176,9 +176,9 @@ import {
   Operation, Moon, Sunny, FullScreen, ArrowDown,
   User, Setting, Lock, SwitchButton, Brush, Check,
 } from '@element-plus/icons-vue'
-import { getMqttStatus } from '@/api/system'
 import { updateUserProfile, changePassword } from '@/api/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 defineEmits(['toggle-drawer'])
 
@@ -196,27 +196,18 @@ const breadcrumbItems = computed(() => {
 })
 const avatarText = computed(() => (userStore.username || 'U').charAt(0).toUpperCase())
 
-// ==================== MQTT 状态轮询 ====================
+// ==================== MQTT 状态实时推送 ====================
+// 订阅 /ws/system/mqtt/，建连时 consumer 立刻发一次当前状态，后续 broker 连/断会立即推
 const mqttConnected = ref(false)
-let pollTimer = null
 
-async function fetchMqttStatus() {
-  try {
-    const data = await getMqttStatus()
-    mqttConnected.value = !!data.is_connected
-  } catch {
-    mqttConnected.value = false
-  }
-}
-
-onMounted(() => {
-  fetchMqttStatus()
-  pollTimer = setInterval(fetchMqttStatus, 15000)
-})
-
-onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
-})
+useWebSocket(
+  () => buildWsUrl('/ws/system/mqtt/'),
+  {
+    'system.mqtt': (data) => {
+      mqttConnected.value = !!data?.is_connected
+    },
+  },
+)
 
 // ==================== 全屏 ====================
 function toggleFullscreen() {

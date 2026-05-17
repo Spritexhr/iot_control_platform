@@ -160,6 +160,7 @@ import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { getDevice, getDeviceStatus, sendDeviceCommand } from '@/api/devices'
+import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
 const route = useRoute()
@@ -244,17 +245,51 @@ function eventTagType(name) {
 
 function onCommandSent() {
   ElMessage.success(ls.t('common.commandSent'))
-  setTimeout(() => {
-    fetchDeviceDetail()
-    fetchStatusRecords()
-  }, 1000)
+  // 命令效果由设备响应的 status 上报驱动 WS 推送；不再轮询拉详情
 }
+
+// ==================== WebSocket 实时推送 ====================
+function onDeviceStatus(data) {
+  if (!device.value || data?.device_id !== device.value.device_id) return
+  const tsIso = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : null
+  const receivedIso = data.received_at ? new Date(data.received_at * 1000).toISOString() : tsIso
+  // 更新最新状态 + 顶部"在线"标识
+  device.value.latest_data = {
+    data: data.status,
+    timestamp: tsIso,
+    received_at: receivedIso,
+  }
+  device.value.is_online = !!data.is_online
+  if (data.last_seen) {
+    device.value.last_seen = new Date(data.last_seen * 1000).toISOString()
+  }
+  // 状态记录表顶部插入
+  statusRecords.value = [
+    {
+      data: data.status,
+      event_name: data.event,
+      timestamp: tsIso,
+      received_at: receivedIso,
+    },
+    ...statusRecords.value,
+  ].slice(0, 200)
+}
+
+const ws = useWebSocket(
+  () => {
+    const id = device.value?.device_id
+    return id ? buildWsUrl(`/ws/devices/${encodeURIComponent(id)}/`) : ''
+  },
+  { 'device.status': onDeviceStatus },
+  { autoStart: false },
+)
 
 // ==================== 初始化 ====================
 onMounted(async () => {
   await fetchDeviceDetail()
   if (device.value) {
     fetchStatusRecords()
+    ws.start()
   }
 })
 </script>

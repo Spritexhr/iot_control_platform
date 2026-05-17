@@ -48,6 +48,8 @@ ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",")] if _allowed else ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    # daphne 必须放在 staticfiles 之前，否则 runserver 不会接管 ASGI（Channels 文档明确要求）
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -55,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # 第三方应用
+    "channels",
     "corsheaders",
     "django_extensions",  # Django Extensions
     "rest_framework",
@@ -64,6 +67,7 @@ INSTALLED_APPS = [
     "sensors",
     "automation",
     "platform_settings",
+    "services.realtime.apps.RealtimeConfig",
 ]
 
 # 自动发现 plugins/ 子目录下的插件 app
@@ -106,6 +110,21 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+# Channels channel layer：跨 worker 广播必须用 Redis（InMemoryChannelLayer
+# 在 paho 后台线程 → consumer 异步线程跨线程场景下不稳定，开发期也强制 Redis）。
+_REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [_REDIS_URL],
+            "capacity": 1500,
+            "expiry": 30,
+        },
+    }
+}
 
 
 # Database
