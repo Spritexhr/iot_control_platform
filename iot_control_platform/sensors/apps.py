@@ -73,9 +73,11 @@ class SensorsConfig(AppConfig):
             subscribe: True 同时订阅 topic 注册 handler；False 仅连接 + 绑定 publisher
         """
         try:
-            # 启动前补齐缺失的默认配置，已存在的 key 不动
-            from django.core.management import call_command
-            call_command("configure", "--init", "--no-reload")
+            # configure --init 由 backend 容器启动命令负责（docker-compose.yml）。
+            # mqtt_runner 不重复执行：避免与 MySQL 启动 race 时吞掉异常导致 MQTT 永不连接。
+            if 'mqtt_runner' not in sys.argv:
+                from django.core.management import call_command
+                call_command("configure", "--init", "--no-reload")
 
             from services.mqtt_service import mqtt_service
             from services.sensors_service.sensor_command_send_service import sensor_command_send_service

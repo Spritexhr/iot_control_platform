@@ -66,6 +66,17 @@
 
 ---
 
+## 仿真（虚拟传感器/设备）
+
+| 文档 | 说明 |
+|------|------|
+| [仿真模块使用说明](simulation/simulation_guide.md) | 目录结构、环境、config.yaml + manifests 配置、run.py 启动、节点目录、波形、与后端对接、添加新节点 |
+| [仿真端到端验证教程](simulation/testing_guide.md) | L1 日志 / L2 MQTT 抓包 / L3 Django 入库 + check_code / L4 批量启动 |
+
+> 仿真代码位于仓库根目录 `simulation/`（与 Django 后端解耦）；`simulation/README.md` 仅留快速上手，详细说明以本目录为准。
+
+---
+
 ## 更新日志
 
 | 版本 | 说明 |
@@ -112,6 +123,9 @@ docs/
 ├── frontend/                    # 前端设计
 │   ├── frontend_design.md
 │   └── frontend_optimization.md
+├── simulation/                  # 仿真（虚拟传感器/设备）
+│   ├── simulation_guide.md
+│   └── testing_guide.md
 ├── design/                      # 设计
 │   └── logging.md
 └── archive/                     # 归档

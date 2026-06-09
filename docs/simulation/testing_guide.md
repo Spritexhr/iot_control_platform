@@ -1,6 +1,6 @@
-# Simulation 功能验证教程
+# 仿真模块端到端验证教程
 
-本文档介绍如何端到端验证 `simulation/` 下的虚拟传感器和设备是否正确复刻了 `hardware/wemos-d1/*.ino` 的行为。
+本文档介绍如何端到端验证 `simulation/` 下的虚拟传感器和设备是否正确复刻了 `hardware/wemos-d1/*.ino` 的行为。模块说明与节点目录见 [仿真模块使用说明](simulation_guide.md)。
 
 ---
 
@@ -10,8 +10,8 @@
 |------|------|----------|
 | conda 环境 `simulation_env` | 运行 simulator | `conda env list \| grep simulation_env` |
 | 可达的 MQTT broker | 数据中转 | `nc -zv 116.62.68.29 1883` |
-| `simulation/config.yaml` | broker 配置（地址/默认账号） | `ls simulation/config.yaml`（首次运行需 `cp config.yaml.example config.yaml` 并改 broker） |
-| `simulation/manifests/*.yaml` | 节点清单（按项目分文件） | `ls simulation/manifests/` 至少能看到 `default.yaml` |
+| `simulation/config.yaml` | broker 配置（地址/默认账号） | `ls simulation/config.yaml`（首次运行需 `cp simulation/config.yaml.example simulation/config.yaml` 并改 broker） |
+| `simulation/manifests/*.yaml` | 节点清单（按项目分文件） | `ls simulation/manifests/` 至少能看到 `default.yaml` 和 `st_plant.yaml` |
 | Django 后端（仅 L3 验证需要） | 接收 MQTT 并入库 | `python iot_control_platform/manage.py runserver` |
 
 ```bash
@@ -21,13 +21,14 @@ pip install -r simulation/requirements.txt
 
 ---
 
-## 验证策略：三层递进
+## 验证策略：四层递进
 
 | 层级 | 验证目标 | 不依赖 |
 |------|----------|--------|
 | **L1 日志验证** | simulator 进程能起、能发消息 | broker、Django |
 | **L2 MQTT 验证** | broker 收到 payload，格式正确 | Django |
 | **L3 端到端验证** | Django 入库、控制命令链路、check_code | 全链路 |
+| **L4 批量启动验证** | manifest 清单批量起多节点、优雅退出 | Django（可选） |
 
 每一层跑通后再进行下一层。
 
@@ -35,11 +36,11 @@ pip install -r simulation/requirements.txt
 
 ## L1：日志验证
 
-启动单个节点，看本地日志是否正常打印数据上报和心跳。
+启动单个节点，看本地日志是否正常打印数据上报和心跳。注意单节点脚本是 `simulation/<sensors|devices>/<module>/<module>.py` 的嵌套路径：
 
 ```bash
 # 启动虚拟温湿度传感器（采样间隔 5s，心跳间隔 15s 方便观察）
-python simulation/sensors/temp_humi_sensor.py \
+python simulation/sensors/temp_humi_sensor/temp_humi_sensor.py \
   --id DHT11-WEMOS-001 \
   --broker 116.62.68.29 \
   --sampling-interval 5 \
@@ -63,7 +64,7 @@ INFO [DHT11-WEMOS-001] → status event=heartbeat   ← 15s 后出现
 设备节点同理：
 
 ```bash
-python simulation/devices/sg90_servo.py \
+python simulation/devices/sg90_servo/sg90_servo.py \
   --id sg90_001 \
   --broker 116.62.68.29 \
   --status-report-interval 15
@@ -125,6 +126,7 @@ EOF
 - `hardware/wemos-d1/devices/SG_90/mqtt_status_form.txt`
 
 字段名和结构必须完全一致，否则 Django 那边 `_validate_message` 会拒绝。
+（节点目录里每个模块还附带了 `mqtt_data.json` / `mqtt_status.json` / `mqtt_command.json` 样例，可直接对照。）
 
 ---
 
@@ -261,7 +263,7 @@ Sensor.objects.get(sensor_id='DHT11-WEMOS-001').computed_is_online  # 应为 Fal
 python simulation/run.py
 
 # 指定其他清单 / 多份清单合并
-python simulation/run.py -m default -m eb_plant
+python simulation/run.py -m default -m st_plant
 ```
 
 预期：清单里的每个节点日志交错出现，各自独立心跳，互不干扰。启动时会先打印一行清单加载信息：
@@ -304,7 +306,7 @@ mosquitto_sub -h 116.62.68.29 -t 'iot/sensors/DHT11-WEMOS-001/#' -v &
 SUB_PID=$!
 
 # 终端 2：启动 simulator（30s 后自动停）
-timeout 30 python simulation/sensors/temp_humi_sensor.py \
+timeout 30 python simulation/sensors/temp_humi_sensor/temp_humi_sensor.py \
   --id DHT11-WEMOS-001 --broker 116.62.68.29 \
   --sampling-interval 3 --status-report-interval 10
 
