@@ -46,3 +46,8 @@ export function stopAutomationRule(id, reason = 'user', errorMessage = '') {
     error_message: errorMessage,
   })
 }
+
+/** 获取所有可关联的传感器和设备（供选择器使用） */
+export function getAvailableSources() {
+  return request.get('/automation-rules/available-sources/')
+}

@@ -8,7 +8,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [项目概述 (PROJECT_DOCUMENTATION.md)](./PROJECT_DOCUMENTATION.md) | 项目简介、快速开始、系统架构、通信协议、数据库设计、文档索引 |
+| [项目概述](./PROJECT_DOCUMENTATION.md) | 项目简介、快速开始、系统架构、通信协议、数据库设计、文档索引 |
 
 ---
 
@@ -52,8 +52,8 @@
 
 | 文档 | 说明 |
 |------|------|
-| [硬件程序设计](hardware_code/hardware_code_design.md) | MQTT 连接流程、mqtt_command_form、mqtt_data_form、mqtt_status_form |
-| [嵌入式编写指南](hardware_code/hardware_guide.md) | 符合后端规范的固件编写步骤与 checklist |
+| [硬件程序设计](hardware/hardware_code_design.md) | MQTT 连接流程、mqtt_command_form、mqtt_data_form、mqtt_status_form |
+| [嵌入式编写指南](hardware/hardware_guide.md) | 符合后端规范的固件编写步骤与 checklist |
 
 ---
 
@@ -77,30 +77,47 @@
 
 ---
 
+## 自动化规则
+
+| 文档 | 说明 |
+|------|------|
+| [示例脚本](automation/examples/sample_file.txt) | 类风格与函数风格完整示例、API 速查 |
+| [湿度告警示例](automation/examples/humidity_alert.py) | 湿度超阈值 → 设备命令（含 send_command 用法） |
+| [湿度打印示例](automation/examples/humidity_overflow_print.py) | 湿度超阈值 → 终端输出（无设备依赖，适合新手） |
+| [旋转传感器控制示例](automation/examples/rotation_sensor_control_sg90.py) | 传感器值直接映射到设备命令参数 |
+
+---
+
+## 插件
+
+| 文档 | 说明 |
+|------|------|
+| [P&ID 画板添加图标指南](plugins/plant_diagram/HOW_TO_ADD_ICONS.md) | 扩展工艺符号库（静态符号/独立组件两条路径）、三文件修改流程、常见坑位 |
+
+---
+
+## 功能方案文档
+
+| 文档 | 说明 |
+|------|------|
+| [EB 装置 IoT 监测方案](development_plans/EB装置IoT辅助监测预警系统方案.md) | EB 乙苯装置大屏的业务背景与功能设计 |
+| [P&ID 画板编辑器方案](development_plans/工厂PID画板编辑器方案.md) | plant_diagram 插件的设计方案与技术选型 |
+| [苯乙烯装置实验方案](development_plans/苯乙烯装置监测系统实验方案.md) | 实验室环境下的监测部署方案 |
+
+---
+
 ## 更新日志
 
 | 版本 | 说明 |
 |------|------|
-| [0.5 更新日志](update_notes/0.5_update_notes.md) | 插件系统（plugins 目录 + Plugin 登记 + sync 命令）、内置 data_viz 数据可视化插件 |
-| [0.4 更新日志](update_notes/0.4_update_notes.md) | BaseCommandSendService 基类重构、MQTT 自动重连、生产安全配置、健康检查端点 |
-| [0.3 更新日志](update_notes/0.3_update_notes.md) | 后台调度器、自动化规则轮询执行 |
-| [0.2 更新日志](update_notes/0.2_update_notes.md) | MQTT 服务架构、自动重连等 |
-
----
-
-## 设计文档（其他）
-
-| 文档 | 说明 |
-|------|------|
-| [日志管理方案](design/logging.md) | 日志架构、分级、实施步骤 |
-
----
-
-## 归档
-
-| 目录 | 说明 |
-|------|------|
-| [archive/coding_progress_files](archive/coding_progress_files/) | 开发过程记录、AI 编码日志、历史设计文档 |
+| [0.9 更新日志](update_notes/0.9_update_notes.md) | 自动化规则系统升级（引擎、SensorWrapper 扩展、CodeMirror 编辑器、设备选择器）；示例文件迁入 docs |
+| [0.8 更新日志](update_notes/0.8_update_notes.md) | 全平台实时化（Django Channels + Redis + WebSocket）；MQTT 客户端拆分独立进程；useWebSocket composable |
+| [0.7 更新日志](update_notes/0.7_update_notes.md) | 配置系统统一（configure 命令）；首次部署引导；系统设置页重写；Token 主动续期 |
+| [0.6 更新日志](update_notes/0.6_update_notes.md) | 在线状态显示修复；Admin 一致性整治；卡片拖拽排序 |
+| [0.5 更新日志](update_notes/0.5_update_notes.md) | 插件系统（plugins 目录 + Plugin 登记 + sync 命令）；内置 data_viz 数据可视化插件 |
+| [0.4 更新日志](update_notes/0.4_update_notes.md) | BaseCommandSendService 基类重构；MQTT 自动重连；生产安全配置；健康检查端点 |
+| [0.3 更新日志](update_notes/0.3_update_notes.md) | 后台调度器；自动化规则轮询执行 |
+| [0.2 更新日志](update_notes/0.2_update_notes.md) | MQTT 服务架构；自动重连 |
 
 ---
 
@@ -108,26 +125,45 @@
 
 ```
 docs/
-├── README.md                    # 本文件：文档索引
-├── PROJECT_DOCUMENTATION.md     # 项目主文档
-├── deployment/                  # 部署
+├── README.md                        # 本文件：文档索引
+├── PROJECT_DOCUMENTATION.md         # 项目主文档
+├── EB装置大屏使用手册.md              # EB 大屏操作手册
+├── deployment/                      # 部署
 │   ├── before_deploy.md
 │   ├── docker.md
 │   └── not_docker.md
-├── backend/                     # 后端
-│   ├── backend_design/
-│   └── backend_user_guide/
-├── hardware_code/               # 嵌入式
+├── backend/                         # 后端
+│   ├── backend_design/              # 设计文档
+│   └── backend_user_guide/          # 使用指南
+├── hardware/                        # 硬件与嵌入式
 │   ├── hardware_code_design.md
 │   └── hardware_guide.md
-├── frontend/                    # 前端设计
+├── frontend/                        # 前端设计
 │   ├── frontend_design.md
 │   └── frontend_optimization.md
-├── simulation/                  # 仿真（虚拟传感器/设备）
+├── simulation/                      # 仿真（虚拟传感器/设备）
 │   ├── simulation_guide.md
 │   └── testing_guide.md
-├── design/                      # 设计
-│   └── logging.md
-└── archive/                     # 归档
-    └── coding_progress_files/
+├── automation/                      # 自动化规则
+│   └── examples/                    # 示例脚本
+│       ├── sample_file.txt
+│       ├── humidity_alert.py
+│       ├── humidity_overflow_print.py
+│       └── rotation_sensor_control_sg90.py
+├── plugins/                         # 插件文档
+│   └── plant_diagram/
+│       └── HOW_TO_ADD_ICONS.md
+├── development_plans/               # 功能方案文档
+│   ├── EB装置IoT辅助监测预警系统方案.md
+│   ├── 工厂PID画板编辑器方案.md
+│   └── 苯乙烯装置监测系统实验方案.md
+└── update_notes/                    # 版本更新日志
+    ├── 0.9_update_notes.md
+    ├── 0.8_update_notes.md
+    ├── 0.7_update_notes.md
+    ├── 0.6_update_notes.md
+    ├── 0.5_update_notes.md
+    ├── 0.4_update_notes.md
+    ├── 0.3_update_notes.md
+    └── 0.2_update_notes.md
 ```

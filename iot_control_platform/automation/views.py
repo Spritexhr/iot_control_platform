@@ -113,6 +113,32 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
             'error_message': rule.error_message,
         })
 
+    @action(detail=False, methods=['get'], url_path='available-sources')
+    def available_sources(self, request):
+        """返回所有传感器和设备的简要信息，供前端关联设备选择器使用"""
+        from sensors.models import Sensor
+        from devices.models import Device
+
+        sensors_data = []
+        for s in Sensor.objects.select_related('sensor_type').order_by('name'):
+            fields = s.sensor_type.data_fields if s.sensor_type else []
+            sensors_data.append({
+                'id': s.sensor_id,
+                'name': s.name,
+                'data_fields': fields,
+            })
+
+        devices_data = []
+        for d in Device.objects.select_related('device_type').order_by('name'):
+            cmds = list(d.device_type.commands.keys()) if d.device_type and d.device_type.commands else []
+            devices_data.append({
+                'id': d.device_id,
+                'name': d.name,
+                'commands': cmds,
+            })
+
+        return Response({'sensors': sensors_data, 'devices': devices_data})
+
     @action(detail=True, methods=['post'], url_path='execute')
     def execute(self, request, pk=None):
         """

@@ -1,7 +1,10 @@
 """
 自动化规则引擎
-根据 sample_file 设计：脚本通过 from engine import sensors, devices 获取依赖
-支持类形式控制器（__init__ 相当于 setup，loop() 相当于 Arduino loop()）
+脚本通过 from engine import sensors, devices 获取依赖。
+
+支持两种写法：
+  1. 类风格：定义含 loop() 方法的类（引擎自动实例化并调用）
+  2. 函数风格：直接定义顶层 loop() 函数
 
 安全策略：
 - 白名单 import：仅允许导入 engine / automation.head_files 下的模块
@@ -17,8 +20,6 @@ import builtins as _bi
 logger = logging.getLogger(__name__)
 
 # 允许脚本 import 的模块白名单（前缀匹配）
-# 注意：仅添加可信模块，危险模块（如 os, subprocess, socket, sys 等）禁止引入
-# 基础白名单 + settings 中的可配置白名单
 _BASE_IMPORT_WHITELIST = ('engine', 'automation.head_files')
 
 def _get_import_whitelist():
@@ -52,7 +53,6 @@ def _make_custom_import(engine_module, real_import):
     def _custom_import(name, *args, **kwargs):
         if name == 'engine':
             return engine_module
-        # 动态获取白名单前缀匹配
         whitelist = _get_import_whitelist()
         if any(name == prefix or name.startswith(prefix + '.') for prefix in whitelist):
             return real_import(name, *args, **kwargs)
@@ -66,7 +66,8 @@ def _make_custom_import(engine_module, real_import):
 def execute_rule(rule) -> bool:
     """
     执行单条自动化规则。
-    注入 engine 模块（含 sensors、devices），查找带 loop() 的控制器类并执行一次 loop()。
+    注入 engine 模块（含 sensors、devices），先尝试找带 loop() 方法的类，
+    未找到则尝试顶层 loop() 函数。
     在受限沙箱中运行，禁用文件/进程/动态代码操作。
     """
     if not rule.script:
@@ -97,15 +98,21 @@ def execute_rule(rule) -> bool:
         script = rule.script.strip()
         exec(compile(script, f'<rule:{rule.name}>', 'exec'), namespace)
 
-        # 查找带 loop() 方法的控制器类，实例化并执行一次 loop()
+        # 优先：查找带 loop() 方法的控制器类
         controller_cls = _find_controller_class(namespace)
-        if controller_cls is None:
-            logger.warning("自动化规则 [%s] 未找到带 loop() 的控制器类", rule.name)
-            return False
+        if controller_cls is not None:
+            controller = controller_cls()
+            ret = controller.loop()
+            return bool(ret) if ret is not None else False
 
-        controller = controller_cls()
-        ret = controller.loop()
-        return bool(ret) if ret is not None else False
+        # 备选：查找顶层 loop() 函数
+        loop_fn = _find_loop_function(namespace)
+        if loop_fn is not None:
+            ret = loop_fn()
+            return bool(ret) if ret is not None else False
+
+        logger.warning("自动化规则 [%s] 未找到带 loop() 的控制器类或顶层函数", rule.name)
+        return False
 
     except ImportError as e:
         logger.error("自动化规则 [%s] 尝试导入受限模块: %s", rule.name, e)
@@ -123,4 +130,12 @@ def _find_controller_class(namespace: dict):
                 and hasattr(obj, 'loop')
                 and callable(getattr(obj, 'loop'))):
             return obj
+    return None
+
+
+def _find_loop_function(namespace: dict):
+    """从命名空间查找顶层 loop 函数（非类，非内置）"""
+    fn = namespace.get('loop')
+    if fn is not None and callable(fn) and not isinstance(fn, type):
+        return fn
     return None

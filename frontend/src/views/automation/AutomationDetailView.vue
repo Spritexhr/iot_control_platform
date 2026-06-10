@@ -71,33 +71,83 @@
               暂未关联设备，脚本中 sensors.get() / devices.get() 将返回 None
             </div>
             <div v-else class="device-list">
-              <div v-for="(item, idx) in rule.device_list" :key="idx" class="device-row">
-                <el-input
-                  v-model="item.device_id"
-                  placeholder="传感器/设备 ID"
-                  size="small"
-                  style="width: 180px"
-                  :disabled="!isSuperuser"
-                />
-                <el-select v-model="item.device_type" size="small" style="width: 120px" placeholder="类型" :disabled="!isSuperuser">
-                  <el-option label="Sensor" value="Sensor" />
-                  <el-option label="Device" value="Device" />
-                </el-select>
-                <el-input
-                  v-model="item.name"
-                  placeholder="备注名称（选填）"
-                  size="small"
-                  style="flex: 1"
-                  :disabled="!isSuperuser"
-                />
-                <el-button
-                  v-if="isSuperuser"
-                  text
-                  type="danger"
-                  size="small"
-                  :icon="Delete"
-                  @click="rule.device_list.splice(idx, 1)"
-                />
+              <div v-for="(item, idx) in rule.device_list" :key="idx" class="device-item">
+                <!-- 主行：选择器 + 类型 + 备注名 + 删除 -->
+                <div class="device-row">
+                  <el-select
+                    v-model="item.device_id"
+                    filterable
+                    clearable
+                    allow-create
+                    default-first-option
+                    placeholder="搜索或输入 ID"
+                    size="small"
+                    style="width: 210px; flex-shrink: 0"
+                    :disabled="!isSuperuser"
+                  >
+                    <template v-if="item.device_type === 'Sensor'">
+                      <el-option
+                        v-for="s in availableSources.sensors"
+                        :key="s.id"
+                        :label="`${s.id}`"
+                        :value="s.id"
+                      >
+                        <span class="opt-id">{{ s.id }}</span>
+                        <span class="opt-name">{{ s.name }}</span>
+                      </el-option>
+                    </template>
+                    <template v-else>
+                      <el-option
+                        v-for="d in availableSources.devices"
+                        :key="d.id"
+                        :label="`${d.id}`"
+                        :value="d.id"
+                      >
+                        <span class="opt-id">{{ d.id }}</span>
+                        <span class="opt-name">{{ d.name }}</span>
+                      </el-option>
+                    </template>
+                  </el-select>
+
+                  <el-select
+                    v-model="item.device_type"
+                    size="small"
+                    style="width: 105px; flex-shrink: 0"
+                    :disabled="!isSuperuser"
+                  >
+                    <el-option label="Sensor" value="Sensor" />
+                    <el-option label="Device" value="Device" />
+                  </el-select>
+
+                  <el-input
+                    v-model="item.name"
+                    placeholder="备注名（选填）"
+                    size="small"
+                    style="flex: 1"
+                    :disabled="!isSuperuser"
+                  />
+
+                  <el-button
+                    v-if="isSuperuser"
+                    text
+                    type="danger"
+                    size="small"
+                    :icon="Delete"
+                    @click="rule.device_list.splice(idx, 1)"
+                  />
+                </div>
+
+                <!-- 字段 / 命令提示行 -->
+                <div v-if="getSourceHint(item)" class="device-hint">
+                  <template v-if="item.device_type === 'Sensor'">
+                    <span class="hint-label">字段</span>
+                    <span class="hint-values">{{ getSourceHint(item).data_fields.join('  ·  ') }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="hint-label">命令</span>
+                    <span class="hint-values">{{ getSourceHint(item).commands.join('  ·  ') }}</span>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
@@ -110,7 +160,7 @@
           <span class="section-title">自动化脚本</span>
           <div class="script-hints">
             <el-tag size="small" type="info">Python</el-tag>
-            <el-tag size="small">需定义带 loop() 方法的类</el-tag>
+            <el-tag size="small">类风格或 loop() 函数均可</el-tag>
           </div>
         </div>
         <div class="iot-card__body script-editor-body">
@@ -118,23 +168,13 @@
             <el-button v-if="isSuperuser" size="small" @click="insertTemplate">插入模板</el-button>
             <span class="line-count">{{ scriptLineCount }} 行</span>
           </div>
-          <textarea
-            ref="scriptTextarea"
+          <Codemirror
             v-model="rule.script"
-            class="script-editor"
-            spellcheck="false"
-            :readonly="!isSuperuser"
-            placeholder="# 在此编写自动化脚本...
-from engine import sensors, devices
-
-class MyController:
-    def __init__(self):
-        pass
-
-    def loop(self) -> bool:
-        return False"
-            @keydown="handleTabKey"
-          ></textarea>
+            :disabled="!isSuperuser"
+            :extensions="cmExtensions"
+            :style="{ minHeight: '400px', fontSize: '13px' }"
+            class="script-codemirror"
+          />
         </div>
       </div>
 
@@ -143,7 +183,6 @@ class MyController:
         <div class="iot-card__header">
           <span class="section-title">执行控制台</span>
           <div class="poll-controls">
-            <!-- 间隔配置 -->
             <span class="poll-label">轮询间隔</span>
             <el-input-number
               v-model="pollInterval"
@@ -158,7 +197,6 @@ class MyController:
 
             <el-divider direction="vertical" />
 
-            <!-- 单次执行 -->
             <el-button
               type="success"
               size="small"
@@ -170,7 +208,6 @@ class MyController:
               单次执行
             </el-button>
 
-            <!-- 轮询启动/暂停 -->
             <el-button
               v-if="!polling"
               type="warning"
@@ -191,13 +228,10 @@ class MyController:
             </el-button>
 
             <el-divider direction="vertical" />
-
-            <!-- 清屏 -->
             <el-button size="small" text @click="clearTerminal">清屏</el-button>
           </div>
         </div>
         <div class="iot-card__body terminal-body">
-          <!-- 状态栏 -->
           <div class="terminal-status-bar">
             <div class="terminal-status-left">
               <span
@@ -212,7 +246,6 @@ class MyController:
               </span>
             </div>
           </div>
-          <!-- 终端输出 -->
           <div ref="terminalRef" class="terminal">
             <div v-if="!terminalLines.length" class="terminal-empty">
               终端就绪，点击「单次执行」或「启动轮询」开始...
@@ -243,24 +276,48 @@ class MyController:
             <h4>基本结构</h4>
             <ul>
               <li><code>from engine import sensors, devices</code> — 导入引擎注入的传感器和设备对象</li>
-              <li>定义一个带 <code>loop()</code> 方法的类，<code>__init__</code> 相当于 setup，<code>loop()</code> 相当于主循环</li>
-              <li><code>loop()</code> 返回 <code>True</code> 表示执行成功，<code>False</code> 表示未满足条件</li>
+              <li><strong>类风格</strong>：定义带 <code>loop()</code> 方法的类，引擎每次调用时自动实例化并执行一次 <code>loop()</code></li>
+              <li><strong>函数风格</strong>：直接定义顶层 <code>loop()</code> 函数，适合简单逻辑</li>
+              <li><code>loop()</code> 返回 <code>True</code> 表示执行成功，<code>False</code> 表示条件未满足</li>
+              <li>每次调用都是独立的，<code>loop()</code> 内的临时变量不会在轮询周期间保留</li>
             </ul>
           </div>
           <div class="guide-section">
             <h4>传感器 API</h4>
             <ul>
-              <li><code>sensors.get('sensor_id')</code> — 获取传感器包装对象</li>
-              <li><code>.current_state</code> — 最新 SensorData.data 字典</li>
+              <li><code>sensors.get('sensor_id')</code> — 获取传感器包装对象（未关联或不存在时返回 None）</li>
+              <li><code>.current_state</code> — 最新 SensorData.data 字典（本次 loop 内缓存）</li>
+              <li><code>.refresh()</code> — 从数据库重新读取最新状态</li>
+              <li><code>.history('field', n=10)</code> — 最近 n 条字段值列表（升序，最新在最后）</li>
+              <li><code>.average('field', minutes=5)</code> — 最近 N 分钟均值，无数据返回 None</li>
+              <li><code>.is_online</code> — 是否在线（3 分钟内有数据）</li>
             </ul>
           </div>
           <div class="guide-section">
             <h4>设备 API</h4>
             <ul>
-              <li><code>devices.get('device_id')</code> — 获取设备包装对象</li>
+              <li><code>devices.get('device_id')</code> — 获取设备包装对象（未关联或不存在时返回 None）</li>
               <li><code>.current_state</code> — 最新 DeviceStatusCollection.data 字典</li>
-              <li><code>.send_command('name', params)</code> — 发送控制命令</li>
+              <li><code>.send_command('name', params)</code> — 发送控制命令（等待确认最多 3 秒）</li>
+              <li><code>.refresh()</code> — 重新读取设备最新状态</li>
+              <li><code>.is_online</code> — 是否在线（3 分钟内有数据）</li>
             </ul>
+          </div>
+          <div class="guide-section">
+            <h4>脚本示例</h4>
+            <pre class="guide-code">from engine import sensors, devices
+
+class TempAlert:
+    def loop(self) -> bool:
+        sensor = sensors.get('DHT11-001')
+        fan = devices.get('fan_001')
+        if not sensor or not fan:
+            return False
+        avg_temp = sensor.average('temperature', minutes=5)
+        if avg_temp and avg_temp > 30:
+            fan.send_command('turn_on', {})
+            return True
+        return False</pre>
           </div>
         </div>
       </div>
@@ -274,12 +331,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, VideoPlay, VideoPause, RefreshRight, Check, Plus, Delete } from '@element-plus/icons-vue'
+import { Codemirror } from 'vue-codemirror'
+import { python } from '@codemirror/lang-python'
+import { oneDark } from '@codemirror/theme-one-dark'
 import {
   getAutomationRule,
   updateAutomationRule,
   executeAutomationRule,
   launchAutomationRule,
   stopAutomationRule,
+  getAvailableSources,
 } from '@/api/automation'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
@@ -288,6 +349,9 @@ const router = useRouter()
 const userStore = useUserStore()
 const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
+
+// CodeMirror 扩展（Python 高亮 + 暗色主题）
+const cmExtensions = [python(), oneDark]
 
 // ==================== 规则数据 ====================
 const rule = ref(null)
@@ -305,6 +369,29 @@ async function fetchRule() {
     rule.value = null
   } finally {
     pageLoading.value = false
+  }
+}
+
+// ==================== 可用传感器/设备列表 ====================
+const availableSources = ref({ sensors: [], devices: [] })
+
+async function fetchAvailableSources() {
+  try {
+    availableSources.value = await getAvailableSources()
+  } catch {
+    // 加载失败不影响主功能，选择器降级为手动输入
+  }
+}
+
+/** 根据 device_list 条目查找对应 source 信息（用于字段/命令提示） */
+function getSourceHint(item) {
+  if (!item.device_id) return null
+  if (item.device_type === 'Sensor') {
+    const s = availableSources.value.sensors.find((x) => x.id === item.device_id)
+    return s?.data_fields?.length ? s : null
+  } else {
+    const d = availableSources.value.devices.find((x) => x.id === item.device_id)
+    return d?.commands?.length ? d : null
   }
 }
 
@@ -434,10 +521,8 @@ async function stopPolling() {
   }
 }
 
-// 实时状态推送：consumer 广播全量规则变更，按当前 rule.id 过滤
 function onRuleEvent(data) {
   if (!rule.value || !data || data.id !== rule.value.id) return
-  // 后台调度器把 running → error_stopped 时，往终端打一条
   if (data.process_status === 'error_stopped' && rule.value.process_status === 'running') {
     appendTerminal('error', `后台轮询异常停止: ${data.error_message || '未知错误'}`)
   }
@@ -461,54 +546,85 @@ function addDeviceRow() {
 }
 
 // ==================== 脚本编辑器辅助 ====================
-const scriptTextarea = ref(null)
-
 const scriptLineCount = computed(() => {
   if (!rule.value?.script) return 0
   return rule.value.script.split('\n').length
 })
 
-function insertTemplate() {
-  const tpl = `from engine import sensors, devices
-
-class MyController:
-    SENSOR_ID = ''
-    DEVICE_ID = ''
-
-    def __init__(self):
-        self.sensor = sensors.get(self.SENSOR_ID)
-        self.device = devices.get(self.DEVICE_ID)
-
-    def loop(self) -> bool:
-        if not self.sensor or not self.device:
-            return False
-        state = self.sensor.current_state or {}
-        # 在此编写判断逻辑
-        # 例如: if state.get('temperature', 0) > 30:
-        #           self.device.send_command('turn_on', {})
-        #           return True
-        return False
-`
-  rule.value.script = tpl
+/** 将 device_id 转成合法的 Python 变量名 */
+function toVarName(deviceId) {
+  return deviceId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().replace(/^(\d)/, '_$1')
 }
 
-function handleTabKey(e) {
-  if (e.key === 'Tab') {
-    e.preventDefault()
-    const ta = e.target
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const val = ta.value
-    ta.value = val.substring(0, start) + '    ' + val.substring(end)
-    ta.selectionStart = ta.selectionEnd = start + 4
-    rule.value.script = ta.value
+function insertTemplate() {
+  const deviceList = rule.value?.device_list || []
+
+  if (deviceList.length === 0) {
+    rule.value.script = `from engine import sensors, devices
+
+class MyController:
+    def loop(self) -> bool:
+        # sensor = sensors.get('your-sensor-id')
+        # device = devices.get('your-device-id')
+        # if not sensor or not device:
+        #     return False
+        # state = sensor.current_state or {}
+        return False
+`
+    return
   }
+
+  const varLines = []
+  const varNames = []
+  const hintLines = []
+
+  for (const item of deviceList) {
+    if (!item.device_id) continue
+    const varName = toVarName(item.device_id)
+    const label = item.name || item.device_id
+    varNames.push(varName)
+
+    if (item.device_type === 'Sensor') {
+      varLines.push(`        ${varName} = sensors.get('${item.device_id}')  # ${label}`)
+      const src = availableSources.value.sensors.find((s) => s.id === item.device_id)
+      if (src?.data_fields?.length) {
+        hintLines.push(`        # ${item.device_id} 可用字段: ${src.data_fields.join(', ')}`)
+        hintLines.push(`        # state = ${varName}.current_state or {}`)
+      }
+    } else {
+      varLines.push(`        ${varName} = devices.get('${item.device_id}')  # ${label}`)
+      const src = availableSources.value.devices.find((d) => d.id === item.device_id)
+      if (src?.commands?.length) {
+        hintLines.push(`        # ${item.device_id} 可用命令: ${src.commands.join(', ')}`)
+        hintLines.push(`        # ${varName}.send_command('${src.commands[0]}', {})`)
+      }
+    }
+  }
+
+  const guardLine = varNames.length
+    ? `        if not ${varNames.join(' or not ')}:\n            return False\n`
+    : ''
+
+  const lines = [
+    'from engine import sensors, devices',
+    '',
+    'class MyController:',
+    '    def loop(self) -> bool:',
+    ...varLines,
+    guardLine,
+    ...hintLines,
+    '',
+    '        return False',
+    '',
+  ]
+
+  rule.value.script = lines.join('\n')
 }
 
 // ==================== 初始化 ====================
-// WS 已在 setup 顶层订阅；onScopeDispose 会在组件卸载时自动 stop
 onMounted(() => {
   fetchRule()
+  fetchAvailableSources()
 })
 </script>
 
@@ -553,13 +669,61 @@ onMounted(() => {
 .device-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.device-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .device-row {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 下拉选项内容 */
+.opt-id {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--iot-text-primary);
+  margin-right: 8px;
+}
+
+.opt-name {
+  font-size: 11px;
+  color: var(--iot-text-secondary);
+}
+
+/* 字段/命令提示行 */
+.device-hint {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: 4px;
+  font-size: 11px;
+  color: var(--iot-text-secondary);
+  line-height: 1.4;
+}
+
+.hint-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--iot-color-primary);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--iot-color-primary) 12%, transparent);
+}
+
+.hint-values {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--iot-text-secondary);
+  word-break: break-all;
 }
 
 /* 脚本编辑器 */
@@ -580,30 +744,28 @@ onMounted(() => {
   color: var(--iot-text-secondary);
 }
 
-.script-editor {
-  width: 100%;
-  min-height: 400px;
-  padding: var(--iot-spacing-lg);
-  border: none;
-  outline: none;
-  resize: vertical;
-  font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  tab-size: 4;
-  background: var(--iot-bg-page);
-  color: var(--iot-text-primary);
-  border-radius: 0 0 var(--iot-radius-base) var(--iot-radius-base);
-}
-
-.script-editor::placeholder {
-  color: var(--iot-text-secondary);
-  opacity: 0.5;
-}
-
 .script-hints {
   display: flex;
   gap: 6px;
+}
+
+/* CodeMirror 容器 */
+.script-codemirror {
+  border-radius: 0 0 var(--iot-radius-base) var(--iot-radius-base);
+  overflow: hidden;
+}
+
+/* 强制 CodeMirror 编辑区铺满 */
+:deep(.cm-editor) {
+  min-height: 400px;
+  font-family: 'Fira Code', 'Courier New', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+:deep(.cm-scroller) {
+  min-height: 400px;
+  overflow: auto;
 }
 
 /* 轮询控制 */
@@ -649,11 +811,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.terminal-status-right {
-  font-size: 11px;
-  color: var(--iot-text-secondary);
-}
-
 .terminal {
   font-family: 'Courier New', 'Consolas', monospace;
   font-size: 12px;
@@ -695,41 +852,15 @@ onMounted(() => {
   min-width: 32px;
 }
 
-.terminal-badge--success {
-  background: #a6e3a1;
-  color: #1e1e2e;
-}
+.terminal-badge--success { background: #a6e3a1; color: #1e1e2e; }
+.terminal-badge--error   { background: #f38ba8; color: #1e1e2e; }
+.terminal-badge--info    { background: #89b4fa; color: #1e1e2e; }
+.terminal-badge--warn    { background: #f9e2af; color: #1e1e2e; }
 
-.terminal-badge--error {
-  background: #f38ba8;
-  color: #1e1e2e;
-}
-
-.terminal-badge--info {
-  background: #89b4fa;
-  color: #1e1e2e;
-}
-
-.terminal-badge--warn {
-  background: #f9e2af;
-  color: #1e1e2e;
-}
-
-.terminal-msg {
-  word-break: break-all;
-}
-
-.terminal-line--success .terminal-msg {
-  color: #a6e3a1;
-}
-
-.terminal-line--error .terminal-msg {
-  color: #f38ba8;
-}
-
-.terminal-line--warn .terminal-msg {
-  color: #f9e2af;
-}
+.terminal-msg { word-break: break-all; }
+.terminal-line--success .terminal-msg { color: #a6e3a1; }
+.terminal-line--error   .terminal-msg { color: #f38ba8; }
+.terminal-line--warn    .terminal-msg { color: #f9e2af; }
 
 /* 指南 */
 .guide-body {
@@ -759,6 +890,18 @@ onMounted(() => {
   border-radius: 3px;
   font-size: 11px;
   color: var(--iot-color-primary);
+}
+
+.guide-code {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--iot-bg-page);
+  border-radius: var(--iot-radius-base);
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--iot-text-primary);
+  overflow-x: auto;
 }
 
 .empty-hint {

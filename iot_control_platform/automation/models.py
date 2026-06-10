@@ -39,11 +39,14 @@ class AutomationRule(models.Model):
         blank=True,
         verbose_name="脚本",
         help_text="""
-        Python 脚本，Arduino 风格：from engine import sensors, devices，定义带 loop() 的控制器类。
+        Python 脚本，两种写法均可：
+        1. 类风格：定义含 loop() 方法的类，引擎自动实例化并调用
+        2. 函数风格：直接定义顶层 loop() 函数
 
-        engine 由引擎注入，含 sensors、devices。控制器类 __init__ 相当于 setup()，loop() 返回 True/False。
+        from engine import sensors, devices（由引擎注入）
+        loop() 返回 True 表示执行成功，False 表示条件未满足。
 
-        参见 automation/script/sample_file.txt 完整示例。
+        完整示例参见 docs/automation/examples/sample_file.txt
         """
     )
 

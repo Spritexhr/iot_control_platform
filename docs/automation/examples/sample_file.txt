@@ -1,0 +1,68 @@
+# 自动化脚本示例
+# 通过 from engine import sensors, devices 获取传感器和设备对象
+# device_list 中配置的传感器/设备 ID 才能通过 get() 获取到
+
+# ============================
+# 写法一：类风格（推荐，逻辑可以拆分为多个方法）
+# ============================
+
+from engine import sensors, devices
+
+class TemperatureMonitor:
+    """温度监控：超过阈值时开启 LED"""
+
+    TEMP_THRESHOLD = 30.0
+    SENSOR_ID = 'DHT11-WEMOS-001'
+    LED_ID = 'SG_80_01'
+
+    def loop(self) -> bool:
+        sensor = sensors.get(self.SENSOR_ID)
+        led = devices.get(self.LED_ID)
+        if not sensor or not led:
+            return False
+
+        temp = sensor.current_state.get('temperature')
+        if temp is None:
+            return False
+
+        if float(temp) > self.TEMP_THRESHOLD:
+            led.send_command('high', {})
+            return True
+
+        return False
+
+
+# ============================
+# 写法二：函数风格（简单逻辑推荐，无需定义类）
+# ============================
+
+# from engine import sensors, devices
+#
+# def loop() -> bool:
+#     sensor = sensors.get('DHT11-WEMOS-001')
+#     led = devices.get('SG_80_01')
+#     if not sensor or not led:
+#         return False
+#     temp = sensor.current_state.get('temperature', 0)
+#     if float(temp) > 30:
+#         led.send_command('high', {})
+#         return True
+#     return False
+
+
+# ============================
+# 传感器 API 参考
+# ============================
+# sensor.current_state              — 最新 SensorData.data 字典（本次 loop 内缓存）
+# sensor.refresh()                  — 重新从 DB 读取最新状态
+# sensor.history('temperature', 10) — 最近 10 条 temperature 值（升序，最新在最后）
+# sensor.average('temperature', 5)  — 最近 5 分钟 temperature 均值，无数据返回 None
+# sensor.is_online                  — 是否在线（3 分钟内有数据上报）
+
+# ============================
+# 设备 API 参考
+# ============================
+# device.current_state              — 最新 DeviceStatusCollection.data 字典
+# device.send_command('name', {})   — 发送命令，等待确认最多 3 秒
+# device.refresh()                  — 重新从 DB 读取最新状态
+# device.is_online                  — 是否在线（3 分钟内有数据上报）
