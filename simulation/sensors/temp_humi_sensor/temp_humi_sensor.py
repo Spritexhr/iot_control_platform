@@ -19,6 +19,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 from common.waveforms import build_waveform_map
 
 log = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ DEFAULT_WAVEFORMS = {
 class TempHumiSensor(MqttNode):
     NODE_TYPE = "sensor"
     ID_FIELD = "sensor_id"
+    LABEL = "DHT11 温湿度传感器"
 
     # 与 .ino 默认值一致
     DEFAULT_SAMPLING_INTERVAL = 60
@@ -53,6 +55,25 @@ class TempHumiSensor(MqttNode):
 
     # 保留 1 位小数，与 .ino 行为一致（round(v * 10) / 10.0）
     PRECISION = 1
+
+    PARAMS_SCHEMA = [
+        ParamSpec("sampling_interval", "int", label="采样间隔(秒)",
+                  default=DEFAULT_SAMPLING_INTERVAL, min=1, max=86400),
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("waveforms", "waveform_map", label="数据波形",
+                  fields=["temperature", "humidity"], default=DEFAULT_WAVEFORMS,
+                  help="不配置则使用默认波形；可只覆盖某个字段"),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "enable", "label": "启用"},
+        {"command": "disable", "label": "禁用"},
+        {"command": "set_interval", "label": "设置采样间隔",
+         "args": [{"name": "interval", "type": "int", "min": 10, "max": 3600}]},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
+    ]
 
     def __init__(
         self,

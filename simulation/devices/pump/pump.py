@@ -20,6 +20,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 
 log = logging.getLogger(__name__)
 
@@ -27,10 +28,33 @@ log = logging.getLogger(__name__)
 class Pump(MqttNode):
     NODE_TYPE = "device"
     ID_FIELD = "device_id"
+    LABEL = "水泵 (kW，带启停渐变)"
 
     DEFAULT_STATUS_REPORT_INTERVAL = 60
     DEFAULT_MAX_POWER_KW = 15.0      # 中型水泵
     DEFAULT_RAMP_RATE_KW_PER_S = 5.0 # 每秒变化最大 5 kW，模拟启停渐变
+
+    PARAMS_SCHEMA = [
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("max_power_kw", "float", label="额定功率(kW)",
+                  default=DEFAULT_MAX_POWER_KW, min=0.1),
+        ParamSpec("ramp_rate_kw_per_s", "float", label="功率渐变速率(kW/s)",
+                  default=DEFAULT_RAMP_RATE_KW_PER_S, min=0.01,
+                  help="实际功率向目标功率渐变的最大速率，模拟电机惯性"),
+        ParamSpec("initial_power_kw", "float", label="初始功率(kW)",
+                  default=0.0, min=0),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "start", "label": "启动"},
+        {"command": "stop", "label": "停机"},
+        {"command": "set_power", "label": "设置功率",
+         "args": [{"name": "val", "type": "float", "min": 0}]},
+        {"command": "current_status", "label": "查询状态"},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
+    ]
 
     def __init__(
         self,

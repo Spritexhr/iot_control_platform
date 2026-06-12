@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT 虚拟节点模拟器</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        IoT 虚拟节点模拟器
+      </div>
+      <nav class="tabs">
+        <button v-for="t in tabs" :key="t.key"
+                :class="['tab', { active: tab === t.key }]"
+                @click="tab = t.key">{{ t.label }}</button>
+      </nav>
+      <div class="topbar-right">
+        <span :class="['conn-badge', wsStatus]">页面 {{ wsStatusText }}</span>
+        <span :class="['conn-badge', monitorConnected ? 'open' : 'closed']">
+          MQTT {{ monitorConnected ? '已连接' : '未连接' }}
+        </span>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-enter" :key="tab">
+        <manage-page v-if="tab === 'manage'"
+                     :meta="meta" :waveforms="waveformSchemas"
+                     @start-run="startRun" @refresh-live="refreshLive"></manage-page>
+        <monitor-page v-if="tab === 'monitor'"
+                      :live="live" :runs="runs" :meta="meta"
+                      :module-map="moduleMap"
+                      @stop-run="stopRun" @send-command="sendCommand"
+                      @refresh="refreshAll"></monitor-page>
+        <logs-page v-if="tab === 'logs'" :runs="runs" :log-events="logEvents"></logs-page>
+        <settings-page v-if="tab === 'settings'" @brokers-changed="refreshAll"></settings-page>
+      </div>
+    </main>
+
+    <div class="toast-wrap">
+      <div v-for="t in toasts" :key="t.id" :class="['toast', t.kind]">{{ t.text }}</div>
+    </div>
+  </div>
+
+  <script src="/static/vendor/vue.global.prod.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

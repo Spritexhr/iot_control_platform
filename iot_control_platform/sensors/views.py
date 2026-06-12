@@ -19,7 +19,7 @@ from .serializers import (
 
 class SensorTypeViewSet(viewsets.ModelViewSet):
     """传感器类型 CRUD API，创建/修改/删除仅限工作人员（is_staff）"""
-    queryset = SensorType.objects.annotate(_sensor_count=Count('sensors')).all()
+    queryset = SensorType.objects.annotate(_sensor_count=Count('sensors')).order_by('name')
     serializer_class = SensorTypeSerializer
 
     def get_permissions(self):

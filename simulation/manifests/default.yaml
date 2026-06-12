@@ -47,3 +47,20 @@ nodes:
     waveforms:
       temperature: {type: sine, min: 25, max: 55, period: 1800, jitter: 0.5}
       pressure:    {type: random_walk, start: 250, step: 2, bounds: [200, 300]}
+
+  # ───── 声明式通用节点示例：数据/状态字段全部由配置定义，无需写代码 ─────
+
+  - module: generic_sensor
+    id: GEN-WQ-001
+    sampling_interval: 20
+    status_report_interval: 60
+    fields:
+      ph:        {waveform: {type: random_walk, start: 7.0, step: 0.05, bounds: [6.0, 8.0]}, precision: 2, unit: pH}
+      turbidity: {waveform: {type: uniform, min: 1.0, max: 5.0}, precision: 1, unit: NTU}
+
+  - module: generic_device
+    id: GEN-VALVE-001
+    status_report_interval: 60
+    state_fields:
+      valve_open: {type: bool, initial: false}
+      opening:    {type: float, initial: 0, min: 0, max: 100}

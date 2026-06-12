@@ -18,6 +18,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 
 log = logging.getLogger(__name__)
 
@@ -25,10 +26,28 @@ log = logging.getLogger(__name__)
 class TouchSensorSwitch(MqttNode):
     NODE_TYPE = "sensor"
     ID_FIELD = "sensor_id"
+    LABEL = "触摸开关（事件驱动）"
 
     DEFAULT_STATUS_REPORT_INTERVAL = 120
     DEFAULT_FLIP_PERIOD_S = 15.0
     DEFAULT_INITIAL_STATE = False
+
+    PARAMS_SCHEMA = [
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("flip_period_s", "float", label="翻转周期(秒)",
+                  default=DEFAULT_FLIP_PERIOD_S, min=0.5,
+                  help="仿真侧多久自动翻转一次开关状态"),
+        ParamSpec("initial_state", "bool", label="初始状态",
+                  default=DEFAULT_INITIAL_STATE),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "enable", "label": "启用"},
+        {"command": "disable", "label": "禁用"},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
+    ]
 
     def __init__(
         self,

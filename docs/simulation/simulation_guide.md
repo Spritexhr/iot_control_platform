@@ -16,13 +16,15 @@ simulation/
 ├── requirements.txt          paho-mqtt + PyYAML
 ├── config.yaml.example       broker 配置模板（提交到 git）
 ├── config.yaml               broker 真实配置（gitignore，复制 .example 后改）
-├── run.py                    统一启动器，加载 manifests/ 下的清单
+├── run.py                    统一启动器，加载 manifests/ 下的清单（节点模块自动发现）
 ├── manifests/                节点清单目录（提交到 git，按项目分文件）
 │   ├── default.yaml          默认清单：常规测试节点
 │   └── st_plant.yaml         苯乙烯(ST)装置清单：6 路传感器 + 2 台泵
 ├── common/
 │   ├── mqtt_node.py          基类：连接/重连/订阅/心跳/check_code 回传
-│   └── waveforms.py          数据波形：sine / random_walk / uniform / constant
+│   ├── waveforms.py          数据波形 + WAVEFORM_SCHEMAS（参数元数据与校验）
+│   ├── registry.py           自动发现：扫描 sensors/ devices/ 子目录构建注册表
+│   └── schema.py             ParamSpec：节点参数 schema（manifest 校验 + webui 表单）
 ├── sensors/                  传感器节点（上报 data，可能上报 status）
 │   ├── temp_humi_sensor/
 │   ├── bmp280_temp_pressure_sensor/
@@ -30,11 +32,21 @@ simulation/
 │   ├── touch_sensor_switch/
 │   ├── radial_counting_module/
 │   ├── temp_pressure_sensor/
-│   └── flow_sensor/
-└── devices/                  设备节点（执行器，只上报 status，响应命令）
-    ├── sg90_servo/
-    ├── pin_control/
-    └── pump/
+│   ├── flow_sensor/
+│   └── generic_sensor/       ★ 声明式通用传感器：字段全由配置定义，零代码
+├── devices/                  设备节点（执行器，只上报 status，响应命令）
+│   ├── sg90_servo/
+│   ├── pin_control/
+│   ├── pump/
+│   └── generic_device/       ★ 声明式通用设备：状态字段全由配置定义
+└── webui/                    ★ 独立 Web 管理界面（FastAPI + Vue 单页，详见下文）
+    ├── server.py             API + WebSocket + 静态页托管
+    ├── db.py                 SQLite 数据层（节点配置的 source of truth）
+    ├── manifest_io.py        DB ↔ manifest YAML 双向转换
+    ├── process_manager.py    run.py 子进程启停 + 日志跟踪
+    ├── mqtt_monitor.py       MQTT 实时监控 + 节点级命令
+    ├── static/               无构建前端（vendored Vue 3）
+    └── runtime/              sqlite/临时 manifest/日志（gitignore）
 ```
 
 每个节点是一个独立目录，内含 `<module>.py`（节点实现）和若干 `mqtt_*.json`（payload 样例，对照硬件 form 文件）。
@@ -120,9 +132,14 @@ python simulation/run.py -m default -m st_plant
 
 # 也可以直接指定 yaml 路径
 python simulation/run.py -m ./my_custom_manifest.yaml
+
+# 只校验清单（不连 broker 不启动节点；CI / 改完配置先检查用）
+python simulation/run.py --check -m st_plant
 ```
 
 `Ctrl-C` 会优雅停止所有节点。
+
+启动前 `run.py` 会按各节点类声明的参数 schema **聚合校验整份清单**，任何字段类型/范围/波形参数错误都会一次性列出并定位到"哪份清单第几个节点的哪个字段"，校验不通过不启动。
 
 #### 清单的设计意图
 
@@ -176,7 +193,31 @@ python simulation/devices/pump/pump.py \
 | `pump` | pump_001 | 仅 status：`power_kw`, `target_power_kw`, `is_running` | **start/stop/set_power**/current_status/set_status_interval |
 | `flow_sensor` | FLOW-001 | `flow_rate`(L/min), `accumulated_volume`(L) | enable/disable/set_data_interval/set_status_interval/**reset_volume** |
 
-> 这份表与 `run.py` 顶部的 `REGISTRY` 字典一一对应。manifest 里 `module` 字段必须是表中的某个 key。
+### 声明式通用节点（零代码新增节点）
+
+| Module | 说明 | 关键命令 |
+|--------|------|---------|
+| `generic_sensor` | 数据字段完全由配置定义：每个字段配 `waveform` + `precision` + `unit`（仅展示）。协议 envelope 与"真"传感器一致，Django 侧无法区分 | enable/disable/set_interval/set_status_interval |
+| `generic_device` | 状态字段完全由配置定义：`type`(bool/float) + `initial` + `min/max` 限幅 | **set_state {field, val}**/current_status/set_status_interval |
+
+```yaml
+# 想模拟一个水质传感器？不用写任何 Python：
+- module: generic_sensor
+  id: GEN-WQ-001
+  sampling_interval: 20
+  fields:
+    ph:        {waveform: {type: random_walk, start: 7.0, step: 0.05, bounds: [6.0, 8.0]}, precision: 2, unit: pH}
+    turbidity: {waveform: {type: uniform, min: 1.0, max: 5.0}, precision: 1, unit: NTU}
+
+# 一个带开度的阀门：
+- module: generic_device
+  id: GEN-VALVE-001
+  state_fields:
+    valve_open: {type: bool, initial: false}
+    opening:    {type: float, initial: 0, min: 0, max: 100}
+```
+
+> 注册表由 `common/registry.py` **自动发现**（扫描 `sensors/` `devices/` 子目录，目录名 = module 名），manifest 里 `module` 字段必须是已发现的某个 key。启动日志会打印"已发现 N 个节点模块"。
 
 ---
 
@@ -237,16 +278,53 @@ python simulation/devices/pump/pump.py \
 
 ## 添加新节点
 
-1. 在 `sensors/` 或 `devices/` 下新建一个目录 `xxx/`，在其中建 `xxx.py`（并补一个空 `__init__.py`）
-2. 继承 `MqttNode`，设置 `NODE_TYPE`（`"sensor"`/`"device"`）和 `ID_FIELD`（`"sensor_id"`/`"device_id"`）；脚本顶部按现有节点的写法把 `simulation/` 加入 `sys.path`，以支持独立运行
-3. 实现：
+**先问一句：真的需要写代码吗？** 如果只是"按某种波形上报几个数据字段"或"维护几个可被命令设置的状态字段"，直接用 `generic_sensor` / `generic_device` 配置即可（见上文），**零代码**。只有需要自定义行为（如泵的功率渐变、事件驱动翻转）才写新类。
+
+写新类只需两步（注册表自动发现，**不再需要改 run.py**）：
+
+1. 在 `sensors/` 或 `devices/` 下新建目录 `xxx/`，在其中建 `xxx.py`（目录名必须 = 文件名）和空 `__init__.py`。继承 `MqttNode`，设置 `NODE_TYPE`（`"sensor"`/`"device"`）和 `ID_FIELD`（`"sensor_id"`/`"device_id"`），实现：
    - `build_status_payload()` —— 返回 status 字典
    - `handle_command(command, payload, check_code)` —— 处理控制命令；**响应命令后必须调用 `self.publish_status(event, check_code)`**，把收到的 check_code 原样回传，否则后端 `send_custom_command_with_make_sure` 会超时
    - `on_tick()` —— （可选）周期任务，比如发数据。基类的 tick 频率约 10 Hz
-4. 在 `run.py` 顶部 `from sensors.xxx.xxx import XxxClass`（设备则 `from devices.xxx.xxx import ...`），并加到 `REGISTRY` 字典
-5. 在某份 `manifests/*.yaml`（或新建一份）的 `nodes:` 里加一条 `module: xxx`
+
+   同时建议声明三个类属性（webui 表单与 manifest 校验都靠它们）：
+   - `LABEL` —— GUI 展示名
+   - `PARAMS_SCHEMA` —— 构造参数的 `ParamSpec` 列表（参考 `devices/pump/pump.py`）
+   - `SUPPORTED_COMMANDS` —— 支持的命令清单（GUI 渲染快捷按钮）
+
+2. 在某份 `manifests/*.yaml` 的 `nodes:` 里加一条 `module: xxx`（或直接在 webui 里选它建节点）。`python run.py --check -m <清单>` 验证。
 
 最简模板参考 `sensors/radial_counting_module/radial_counting_module.py`（继承 `TouchSensorSwitch`，仅几十行）。完整模板参考 `sensors/temp_humi_sensor/temp_humi_sensor.py` 或 `devices/pump/pump.py`。
+
+---
+
+## Web 管理界面（webui）
+
+`simulation/webui/` 是一个**独立的轻量 Web 服务**（FastAPI + 无构建 Vue 单页），与主平台 Django/Vue/登录体系完全无关，定位是本地开发工具。
+
+```bash
+pip install -r simulation/webui/requirements.txt      # fastapi + uvicorn
+cd simulation && uvicorn webui.server:app --port 8800
+# 浏览器打开 http://127.0.0.1:8800
+```
+
+### 功能
+
+| 页面 | 能做什么 |
+|------|---------|
+| **节点管理** | 分组（=manifest 概念）与节点 CRUD；按节点类型动态渲染参数表单；**波形参数实时预览曲线**；manifest YAML 导入/导出；"启动本组"一键拉起 |
+| **运行监控** | 运行中的 run.py 子进程（pid/时长/停止）；节点实时在线状态、最新数据/状态（来自 MQTT 订阅）；按节点类型渲染**快捷命令按钮**（enable/disable/set_angle/start/stop…） |
+| **日志** | run 子进程日志实时 tail（WebSocket 推送）+ 关键词过滤 + 历史分页 |
+| **设置** | broker profile 管理 + 实连测试 + 一键导入旧 config.yaml |
+
+### 架构要点
+
+- **SQLite 为 source of truth**（`webui/runtime/sim.db`，gitignore）：节点配置存 DB，启动时渲染成 `runtime/manifest_run_<id>.yaml` + `config_run_<id>.yaml` 再 spawn `run.py` 子进程 —— run.py 对 DB 零感知，CLI 工作流不受影响。每次启动的 manifest 快照入库，可脱离 GUI 手工复跑：
+  `python run.py --config webui/runtime/config_run_42.yaml -m webui/runtime/manifest_run_42.yaml`
+- **节点级控制走 MQTT 协议本身**：webui 内嵌一个 paho 客户端（client_id `sim-webui-<pid>`）订阅 `iot/+s/+/status` 与 `iot/sensors/+/data`，命令通过发布 control 主题下发——与 Django/真硬件完全相同的链路。注意这类控制是**运行态**的，子进程重启后恢复 DB 配置；要持久改动请编辑节点。
+- **进程恢复**：webui 重启时按 runs 表的 pid 探活，存活的 run 自动接管（继续 tail 日志、可停止），已死的标记 exited。
+- 在线判定阈值 = 该节点 `statusReportInterval × 2 + 10s`（status payload 自带间隔值）。
+- broker 密码明文存于本地 sqlite（runtime/ 已 gitignore）；本工具仅限本机/内网开发环境使用，不要公网暴露。
 
 ---
 
@@ -255,7 +333,7 @@ python simulation/devices/pump/pump.py \
 | 现象 | 可能原因 | 处理 |
 |------|---------|------|
 | `Connection refused 127.0.0.1:1883` | 单脚本没传 `--broker`，用了默认本地地址 | `--broker <你的IP>` 或改用 `run.py` 跑 |
-| `未知节点模块 'xxx'` | yaml 里 module 名拼错 / 没在 REGISTRY 注册 | 对照 [节点目录](#节点目录) 表格 |
+| `未知节点模块 'xxx'` | yaml 里 module 名拼错 / 目录名≠文件名导致自动发现失败 | 对照 [节点目录](#节点目录) 表格；看启动日志"已发现 N 个节点模块"与"跳过节点模块"警告 |
 | simulator 日志正常但后端没入库 | `sensor_id`/`device_id` 在 Django 里不存在 | admin 里建对应记录 |
 | `send_custom_command_with_make_sure` 超时 | check_code 没回传 | L2 抓包看 status payload 是否带 `check_code` 字段 |
 | 心跳很正常但没收到 data | 该节点是事件驱动（touch/h2010）或 disabled | 等状态翻转 / 发 enable 命令 |

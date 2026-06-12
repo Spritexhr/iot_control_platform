@@ -14,6 +14,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 from common.waveforms import build_waveform_map
 
 log = logging.getLogger(__name__)
@@ -39,12 +40,32 @@ DEFAULT_WAVEFORMS = {
 class BMP280TempPressureSensor(MqttNode):
     NODE_TYPE = "sensor"
     ID_FIELD = "sensor_id"
+    LABEL = "BMP280 温度气压传感器 (hPa)"
 
     DEFAULT_SAMPLING_INTERVAL = 60
     DEFAULT_STATUS_REPORT_INTERVAL = 120
 
     TEMPERATURE_PRECISION = 1
     PRESSURE_PRECISION = 2
+
+    PARAMS_SCHEMA = [
+        ParamSpec("sampling_interval", "int", label="采样间隔(秒)",
+                  default=DEFAULT_SAMPLING_INTERVAL, min=1, max=86400),
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("waveforms", "waveform_map", label="数据波形",
+                  fields=["temperature", "pressure"], default=DEFAULT_WAVEFORMS,
+                  help="pressure 单位 hPa，与 BMP280 硬件一致"),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "enable", "label": "启用"},
+        {"command": "disable", "label": "禁用"},
+        {"command": "set_interval", "label": "设置采样间隔",
+         "args": [{"name": "interval", "type": "int", "min": 10, "max": 3600}]},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
+    ]
 
     def __init__(
         self,

@@ -45,3 +45,6 @@ iot_control_platform/automation/migrations/
 
 # Simulation 真实配置（包含 broker 地址，使用 config.yaml.example 作为模板）
 simulation/config.yaml
+
+# Simulation webui 运行时数据（sqlite、渲染的临时 manifest/config、日志）
+simulation/webui/runtime/

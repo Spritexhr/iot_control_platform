@@ -5,10 +5,14 @@
 为每个节点起一个线程，每个节点有独立 MQTT client（client_id 唯一）。
 节点 .py 也可单独 `python simulation/sensors/xxx.py --id ...` 运行。
 
+节点模块由 common/registry.py 自动发现（扫描 sensors/ devices/ 子目录），
+新增节点不再需要修改本文件。
+
 用法：
   python run.py                                # 加载 manifests/default.yaml
   python run.py -m default -m eb_plant         # 同时加载多份清单
   python run.py -m ./path/to/custom.yaml       # 直接指定清单文件路径
+  python run.py --check -m default             # 只校验清单不启动
 """
 import argparse
 import logging
@@ -16,7 +20,7 @@ import os
 import signal
 import sys
 import threading
-from typing import List
+from typing import List, Tuple
 
 import yaml
 
@@ -26,34 +30,13 @@ MANIFEST_DIR = os.path.join(BASE_DIR, "manifests")
 sys.path.insert(0, BASE_DIR)
 
 from common.mqtt_node import MqttNode
-from sensors.temp_humi_sensor.temp_humi_sensor import TempHumiSensor
-from sensors.bmp280_temp_pressure_sensor.bmp280_temp_pressure_sensor import BMP280TempPressureSensor
-from sensors.temp_pressure_sensor.temp_pressure_sensor import TempPressureSensor
-from sensors.rotation_sensor.rotation_sensor import RotationSensor
-from sensors.touch_sensor_switch.touch_sensor_switch import TouchSensorSwitch
-from sensors.radial_counting_module.radial_counting_module import RadialCountingModule
-from sensors.flow_sensor.flow_sensor import FlowSensor
-from devices.sg90_servo.sg90_servo import SG90Servo
-from devices.pin_control.pin_control import PinControl
-from devices.pump.pump import Pump
+from common.registry import DISCOVERY_ERRORS, discover_registry, registry_summary
+from common.schema import validate_entry
 
 log = logging.getLogger(__name__)
 
-# 节点模块注册表：清单里 module 字段 -> 类
-REGISTRY = {
-    # 硬件复刻
-    "temp_humi_sensor": TempHumiSensor,
-    "bmp280_temp_pressure_sensor": BMP280TempPressureSensor,
-    "rotation_sensor": RotationSensor,
-    "touch_sensor_switch": TouchSensorSwitch,
-    "radial_counting_module": RadialCountingModule,
-    "sg90_servo": SG90Servo,
-    "pin_control": PinControl,
-    # 新增（无对应固件）
-    "temp_pressure_sensor": TempPressureSensor,
-    "flow_sensor": FlowSensor,
-    "pump": Pump,
-}
+# 节点模块注册表：清单里 module 字段 -> 类（自动发现，键 = 目录名）
+REGISTRY = discover_registry()
 
 
 def build_node(entry: dict, broker: dict) -> MqttNode:
@@ -101,9 +84,13 @@ def _load_manifest(path: str) -> dict:
     return data
 
 
-def collect_nodes(manifest_names: List[str]) -> List[dict]:
-    """加载并合并所有清单的 nodes。同名 (module, id) 组合检测重复并报错。"""
-    all_nodes: List[dict] = []
+def collect_nodes(manifest_names: List[str]) -> List[Tuple[str, dict]]:
+    """
+    加载并合并所有清单的 nodes，返回 [(origin, entry), ...]。
+    origin 形如 "清单 'st_plant' 第 3 个节点"，供校验错误定位。
+    同名 (module, id) 组合检测重复并报错。
+    """
+    all_nodes: List[Tuple[str, dict]] = []
     seen = {}  # (module, id) -> manifest_name
     for name in manifest_names:
         path = _resolve_manifest_path(name)
@@ -112,15 +99,57 @@ def collect_nodes(manifest_names: List[str]) -> List[dict]:
         desc = manifest.get("description", "")
         node_count = len(manifest["nodes"])
         log.info(f"加载清单: {display} ({node_count} 节点) {('- ' + desc) if desc else ''}")
-        for entry in manifest["nodes"]:
+        for i, entry in enumerate(manifest["nodes"], start=1):
             key = (entry.get("module"), entry.get("id"))
             if key in seen:
                 raise ValueError(
                     f"清单 '{display}' 与 '{seen[key]}' 包含重复节点 module={key[0]} id={key[1]}"
                 )
             seen[key] = display
-            all_nodes.append(entry)
+            all_nodes.append((f"清单 '{display}' 第 {i} 个节点", entry))
     return all_nodes
+
+
+def validate_entries(entries: List[Tuple[str, dict]]) -> bool:
+    """
+    逐节点按 PARAMS_SCHEMA 聚合校验，一次性输出所有错误。
+    返回是否全部通过（warning 不算失败）。
+    """
+    ok = True
+    for origin, entry in entries:
+        module = entry.get("module")
+        node_id = entry.get("id") or "?"
+        where = f"{origin} ({module} / {node_id})"
+
+        if not module:
+            log.error(f"✗ {where}: 缺少 module 字段")
+            ok = False
+            continue
+        if not entry.get("id"):
+            log.error(f"✗ {where}: 缺少 id 字段")
+            ok = False
+
+        cls = REGISTRY.get(module)
+        if cls is None:
+            if module in DISCOVERY_ERRORS:
+                log.error(
+                    f"✗ {where}: 模块 '{module}' 导入失败 — {DISCOVERY_ERRORS[module]}"
+                )
+            else:
+                log.error(
+                    f"✗ {where}: 未知节点模块 '{module}'，可选: {list(REGISTRY.keys())}"
+                )
+            ok = False
+            continue
+
+        errors, warnings = validate_entry(cls, entry)
+        for w in warnings:
+            log.warning(f"⚠ {where}: {w}")
+        for e in errors:
+            log.error(f"✗ {where}: {e}")
+        if errors:
+            ok = False
+    return ok
 
 
 def main():
@@ -136,12 +165,38 @@ def main():
         default=None,
         help="清单名（manifests/<name>.yaml）或文件路径，可重复指定。默认: default",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="只校验清单（不连 broker、不启动节点），校验失败退出码 1",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+    log.info(registry_summary(REGISTRY))
+
+    manifest_names = args.manifest if args.manifest else ["default"]
+    try:
+        entries = collect_nodes(manifest_names)
+    except (FileNotFoundError, ValueError) as e:
+        log.error(f"加载清单失败: {e}")
+        sys.exit(1)
+
+    if not entries:
+        log.error("清单中没有任何节点，退出")
+        sys.exit(1)
+
+    if not validate_entries(entries):
+        log.error("清单校验未通过，请修正以上错误后重试")
+        sys.exit(1)
+
+    if args.check:
+        log.info(f"✓ 校验通过：共 {len(entries)} 个节点")
+        return
 
     with open(args.config, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
@@ -158,21 +213,10 @@ def main():
             f"该段已被忽略。请将节点搬到 manifests/ 下并删除 config.yaml 的 nodes。"
         )
 
-    manifest_names = args.manifest if args.manifest else ["default"]
-    try:
-        entries = collect_nodes(manifest_names)
-    except (FileNotFoundError, ValueError) as e:
-        log.error(f"加载清单失败: {e}")
-        sys.exit(1)
-
-    if not entries:
-        log.error("清单中没有任何节点，退出")
-        sys.exit(1)
-
     nodes: List[MqttNode] = []
     threads: List[threading.Thread] = []
 
-    for entry in entries:
+    for _origin, entry in entries:
         try:
             node = build_node(entry, broker)
         except Exception as e:

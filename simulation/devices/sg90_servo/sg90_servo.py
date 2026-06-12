@@ -16,6 +16,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 
 log = logging.getLogger(__name__)
 
@@ -23,9 +24,25 @@ log = logging.getLogger(__name__)
 class SG90Servo(MqttNode):
     NODE_TYPE = "device"
     ID_FIELD = "device_id"
+    LABEL = "SG90 舵机 (0-180°)"
 
     DEFAULT_STATUS_REPORT_INTERVAL = 120
     DEFAULT_INITIAL_ANGLE = 90
+
+    PARAMS_SCHEMA = [
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("initial_angle", "int", label="初始角度(°)",
+                  default=DEFAULT_INITIAL_ANGLE, min=0, max=180),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "set_angle", "label": "设置角度",
+         "args": [{"name": "angle", "type": "int", "min": 0, "max": 180}]},
+        {"command": "current_status", "label": "查询状态"},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 10, "max": 600}]},
+    ]
 
     def __init__(
         self,

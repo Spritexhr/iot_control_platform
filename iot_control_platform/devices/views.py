@@ -18,7 +18,7 @@ from .serializers import (
 
 class DeviceTypeViewSet(viewsets.ModelViewSet):
     """设备类型 CRUD API，创建/修改/删除仅限工作人员（is_staff）"""
-    queryset = DeviceType.objects.annotate(_device_count=Count('devices')).all()
+    queryset = DeviceType.objects.annotate(_device_count=Count('devices')).order_by('name')
     serializer_class = DeviceTypeSerializer
 
     def get_permissions(self):

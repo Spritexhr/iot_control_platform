@@ -11,6 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from common.schema import ParamSpec
 from sensors.touch_sensor_switch.touch_sensor_switch import TouchSensorSwitch
 
 log = logging.getLogger(__name__)
@@ -18,7 +19,18 @@ log = logging.getLogger(__name__)
 
 class RadialCountingModule(TouchSensorSwitch):
     """H2010 光电开关：协议与触摸开关一致，单独成类便于注册和未来差异化"""
-    DEFAULT_FLIP_PERIOD_S = 8.0  # 旋转遮挡频率比触摸快一些
+    LABEL = "H2010 光电开关计数模块"
+    DEFAULT_FLIP_PERIOD_S = 8.0
+
+    # 覆写 schema：翻转周期默认值与触摸开关不同
+    PARAMS_SCHEMA = [
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=TouchSensorSwitch.DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("flip_period_s", "float", label="翻转周期(秒)",
+                  default=DEFAULT_FLIP_PERIOD_S, min=0.5,
+                  help="模拟光电开关遮挡频率"),
+        ParamSpec("initial_state", "bool", label="初始状态", default=False),
+    ]  # 旋转遮挡频率比触摸快一些
 
 
 def main():

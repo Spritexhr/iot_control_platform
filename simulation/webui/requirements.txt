@@ -1,0 +1,3 @@
+# webui 额外依赖（simulation 本体只需 paho-mqtt + PyYAML）
+fastapi
+uvicorn[standard]

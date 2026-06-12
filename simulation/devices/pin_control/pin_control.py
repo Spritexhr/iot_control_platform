@@ -20,6 +20,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from common.mqtt_node import MqttNode
+from common.schema import ParamSpec
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +33,29 @@ ALL_PIN_STEP_MS = 1000
 class PinControl(MqttNode):
     NODE_TYPE = "device"
     ID_FIELD = "device_id"
+    LABEL = "D5/D6/D7 电平控制器"
 
     DEFAULT_STATUS_REPORT_INTERVAL = 120
+
+    PARAMS_SCHEMA = [
+        ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
+                  default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
+        ParamSpec("initial_levels", "dict", label="初始电平",
+                  default={"D5": "low", "D6": "low", "D7": "low"},
+                  help='如 {D5: low, D6: high, D7: low}，电平取 high/low'),
+    ]
+
+    SUPPORTED_COMMANDS = [
+        {"command": "high", "label": "置高",
+         "args": [{"name": "pin", "type": "str", "choices": list(VALID_PINS)}]},
+        {"command": "low", "label": "置低",
+         "args": [{"name": "pin", "type": "str", "choices": list(VALID_PINS)}]},
+        {"command": "high_all", "label": "全部置高"},
+        {"command": "low_all", "label": "全部置低"},
+        {"command": "current_status", "label": "查询状态"},
+        {"command": "set_status_interval", "label": "设置心跳间隔",
+         "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
+    ]
 
     def __init__(
         self,

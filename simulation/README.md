@@ -16,4 +16,19 @@ cp simulation/config.yaml.example simulation/config.yaml   # 改 broker.host
 
 python simulation/run.py                       # 加载 manifests/default.yaml
 python simulation/run.py -m st_plant           # 苯乙烯装置清单
+python simulation/run.py --check -m default    # 只校验清单不启动
 ```
+
+## Web 管理界面（webui）
+
+不想写 YAML？用图形界面建节点、调波形（带实时预览曲线）、一键启停、看实时状态和日志：
+
+```bash
+pip install -r simulation/webui/requirements.txt
+cd simulation && uvicorn webui.server:app --port 8800
+# 浏览器打开 http://127.0.0.1:8800
+```
+
+- 节点配置存 SQLite（`webui/runtime/sim.db`，已 gitignore），可与 manifests/*.yaml 互相导入/导出
+- 启动时由 webui 渲染临时 manifest 并以子进程方式运行 run.py —— CLI 工作流不受任何影响
+- 详见 [仿真模块使用说明](../docs/simulation/simulation_guide.md) 的 webui 章节
