@@ -11,12 +11,17 @@
     },
     "set_data_interval": {
         "mqtt_message": {"command": "set_data_interval", "interval": "{val}"},
-        "description": "设置数据上报间隔（秒，10-3600）",
+        "description": "设置数据上报间隔（秒，5-3600）",
         "params": ["val"]
     },
     "set_status_interval": {
         "mqtt_message": {"command": "set_status_interval", "interval": "{val}"},
         "description": "设置状态上报间隔（秒，30-600）",
         "params": ["val"]
+    },
+    "reset_volume": {
+        "mqtt_message": {"command": "reset_volume"},
+        "description": "清零累计体积（班次/批次统计复位）",
+        "params": []
     }
 }

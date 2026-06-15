@@ -1,0 +1,42 @@
+{
+    "online": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "online",
+        "status": {"is_enabled": true, "samplingInterval": 15, "statusReportInterval": 60},
+        "timestamp": 1770733931
+    },
+    "heartbeat": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "heartbeat",
+        "status": {"is_enabled": true, "samplingInterval": 15, "statusReportInterval": 60},
+        "timestamp": 1770733931
+    },
+    "interval_updated": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "interval_updated",
+        "status": {"is_enabled": true, "samplingInterval": 10, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "status_interval_updated": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "status_interval_updated",
+        "status": {"is_enabled": true, "samplingInterval": 15, "statusReportInterval": 30},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "sensor_enabled": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "sensor_enabled",
+        "status": {"is_enabled": true, "samplingInterval": 15, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    },
+    "sensor_disabled": {
+        "sensor_id": "IND-PRESS-001",
+        "event": "sensor_disabled",
+        "status": {"is_enabled": false, "samplingInterval": 15, "statusReportInterval": 60},
+        "timestamp": 1770733931,
+        "check_code": "123456"
+    }
+}

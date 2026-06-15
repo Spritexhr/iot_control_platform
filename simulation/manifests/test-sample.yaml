@@ -1,0 +1,42 @@
+name: test-sample
+description: 测试用例
+nodes:
+- module: industrial_flow_rate_sensor
+  id: FI0101
+  waveforms:
+    flow_rate:
+      type: random_walk
+      start: 50
+      step: 1
+      bounds:
+      - 10
+      - 100
+- module: industrial_level_sensor
+  id: LI0101
+  waveforms:
+    level:
+      type: random_walk
+      start: 5
+      step: 0.05
+      bounds:
+      - 1
+      - 9
+- module: industrial_pressure_sensor
+  id: PI0101
+  waveforms:
+    pressure:
+      type: random_walk
+      start: 500
+      step: 3
+      bounds:
+      - 400
+      - 600
+- module: industrial_temperature_sensor
+  id: TI0101
+  waveforms:
+    temperature:
+      type: sine
+      min: 60
+      max: 120
+      period: 1800
+      jitter: 0.5
