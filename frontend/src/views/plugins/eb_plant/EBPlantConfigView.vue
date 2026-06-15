@@ -2,7 +2,7 @@
   <div class="eb-config">
     <header class="eb-config__header">
       <div>
-        <h1>EB 大屏 · 配置面板</h1>
+        <h1>全厂监控 · 配置面板</h1>
         <p class="eb-config__sub">从主模型导入传感器/设备到大屏，编辑显示参数</p>
       </div>
       <div class="eb-config__actions">
@@ -71,6 +71,43 @@
               <h3>已导入大屏 ({{ store.sensorBindings.length }})</h3>
             </div>
             <el-table :data="store.sensorBindings" size="small" max-height="500">
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div class="eb-config__safety">
+                    <span class="eb-config__safety-title">安全控制</span>
+                    <div class="eb-config__safety-fields">
+                      <label class="eb-config__safety-item">
+                        <span>高阈</span>
+                        <el-input-number
+                          v-model="row.hi_threshold"
+                          size="small"
+                          controls-position="right"
+                          :precision="2"
+                          placeholder="不限"
+                          @change="(v) => savePatch(row.id, { hi_threshold: v })"
+                        />
+                      </label>
+                      <label class="eb-config__safety-item">
+                        <span>低阈</span>
+                        <el-input-number
+                          v-model="row.lo_threshold"
+                          size="small"
+                          controls-position="right"
+                          :precision="2"
+                          placeholder="不限"
+                          @change="(v) => savePatch(row.id, { lo_threshold: v })"
+                        />
+                      </label>
+                      <label class="eb-config__safety-item">
+                        <span>严重度</span>
+                        <el-select v-model="row.severity" size="small" style="width: 110px" @change="(v) => savePatch(row.id, { severity: v })">
+                          <el-option v-for="lv in ['low', 'mid', 'high', 'critical']" :key="lv" :label="lv" :value="lv" />
+                        </el-select>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column label="ID" min-width="120">
                 <template #default="{ row }">{{ row.sensor_id }}</template>
               </el-table-column>
@@ -93,35 +130,6 @@
               <el-table-column label="单位" min-width="90">
                 <template #default="{ row }">
                   <el-input v-model="row.unit" size="small" @change="(v) => savePatch(row.id, { unit: v })" />
-                </template>
-              </el-table-column>
-              <el-table-column label="高阈" min-width="110">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-model="row.hi_threshold"
-                    size="small"
-                    controls-position="right"
-                    :precision="2"
-                    @change="(v) => savePatch(row.id, { hi_threshold: v })"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="低阈" min-width="110">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-model="row.lo_threshold"
-                    size="small"
-                    controls-position="right"
-                    :precision="2"
-                    @change="(v) => savePatch(row.id, { lo_threshold: v })"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="严重度" min-width="110">
-                <template #default="{ row }">
-                  <el-select v-model="row.severity" size="small" @change="(v) => savePatch(row.id, { severity: v })">
-                    <el-option v-for="lv in ['low', 'mid', 'high', 'critical']" :key="lv" :label="lv" :value="lv" />
-                  </el-select>
                 </template>
               </el-table-column>
               <el-table-column label="显示" width="70" align="center">
@@ -436,5 +444,37 @@ async function onRemoveDevice(id) {
 .eb-config__muted {
   font-size: 12px;
   color: #aaa;
+}
+
+.eb-config__safety {
+  padding: 10px 16px 10px 48px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: #f7f7f5;
+}
+
+.eb-config__safety-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.eb-config__safety-fields {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.eb-config__safety-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
 }
 </style>

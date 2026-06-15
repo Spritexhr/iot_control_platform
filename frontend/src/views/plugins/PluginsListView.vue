@@ -96,7 +96,8 @@ const toggling = ref('')
 // 已知插件的 UI 入口与展示信息
 const KNOWN_PLUGINS = {
   data_viz: { route: '/plugins/data_viz', title: '数据可视化', icon: DataLine },
-  eb_plant: { route: '/plugins/eb_plant', title: '乙苯装置大屏', icon: DataAnalysis },
+  eb_plant: { route: '/plugins/eb_plant', title: '全厂设备辅助监控大屏', icon: DataAnalysis },
+  // P&ID 画板不做独立卡片，入口收在「全厂设备辅助监控大屏」内
 }
 
 function hasUI(name) {

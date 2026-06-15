@@ -3,6 +3,7 @@
     <VueFlow
       v-model:nodes="nodes"
       v-model:edges="edges"
+      :node-types="nodeTypes"
       :default-viewport="defaultViewport"
       :nodes-draggable="false"
       :nodes-connectable="false"
@@ -13,34 +14,6 @@
     >
       <Background pattern-color="#d8d2c4" :gap="16" />
       <Controls :show-interactive="false" />
-
-      <template #node-instrument="nodeProps">
-        <InstrumentNode v-bind="nodeProps" />
-      </template>
-      <template #node-vessel="nodeProps">
-        <VesselNode v-bind="nodeProps" />
-      </template>
-      <template #node-column="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="column" />
-      </template>
-      <template #node-valve="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="valve" />
-      </template>
-      <template #node-pump="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="pump" />
-      </template>
-      <template #node-heat_exchanger="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="heat_exchanger" />
-      </template>
-      <template #node-mixer="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="mixer" />
-      </template>
-      <template #node-filter="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="filter" />
-      </template>
-      <template #node-label="nodeProps">
-        <SimpleSymbolNode v-bind="nodeProps" kind="label" />
-      </template>
     </VueFlow>
   </div>
 </template>
@@ -55,13 +28,14 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 
-import InstrumentNode from '../editor/nodes/InstrumentNode.vue'
-import VesselNode from '../editor/nodes/VesselNode.vue'
-import SimpleSymbolNode from '../editor/nodes/SimpleSymbolNode.vue'
+import { buildNodeTypes } from '../editor/nodeTypes'
 
 const props = defineProps({
   diagram: { type: Object, required: true },
 })
+
+// 节点类型映射（type -> 组件），与编辑态共用同一图元注册表
+const nodeTypes = buildNodeTypes()
 
 function edgeStyle(kind) {
   switch (kind) {

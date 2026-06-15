@@ -26,7 +26,7 @@ def on_sensor_data_saved(sender, instance: SensorData, created: bool, **kwargs):
         # 每条用 point_id (sensor_id::data_key) 区分实时点位。
         bindings = EBPlantSensorBinding.objects.filter(
             sensor_id=instance.sensor_id, is_visible=True,
-        )
+        ).select_related("sensor")
         ts = instance.timestamp.timestamp() if instance.timestamp else None
         for binding in bindings:
             ingest_sensor_data(

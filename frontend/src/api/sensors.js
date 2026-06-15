@@ -34,9 +34,14 @@ export function createSensor(data) {
   return request.post('/sensors/', data)
 }
 
-/** 更新传感器 */
+/** 更新传感器（全量 PUT） */
 export function updateSensor(deviceId, data) {
   return request.put(`/sensors/${deviceId}/`, data)
+}
+
+/** 部分更新传感器（PATCH） */
+export function patchSensor(deviceId, data) {
+  return request.patch(`/sensors/${deviceId}/`, data)
 }
 
 /** 删除传感器 */

@@ -34,9 +34,14 @@ export function createDevice(data) {
   return request.post('/devices/', data)
 }
 
-/** 更新设备 */
+/** 更新设备（全量 PUT） */
 export function updateDevice(deviceId, data) {
   return request.put(`/devices/${deviceId}/`, data)
+}
+
+/** 部分更新设备（PATCH） */
+export function patchDevice(deviceId, data) {
+  return request.patch(`/devices/${deviceId}/`, data)
 }
 
 /** 删除设备 */

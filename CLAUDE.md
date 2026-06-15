@@ -15,8 +15,40 @@
 | 主干分支 | `main`；开发分支 `beta_version` |
 
 > ⚠️ 系统 `python` 不带 Django。所有后端命令必须用绝对路径 `/Users/xhr_mac/miniconda3/envs/iot_platform_env/bin/python` 或先 `conda activate iot_platform_env`。
+>
+> ⚠️ **实际运行在 Docker（见下方「Docker 部署」），上表的 conda/SQLite 仅用于本地脱机开发。** 查/改运行中的数据、调试线上行为，一律走容器，不要查本地 `db.sqlite3`（本地库通常是空的，会误导）。
 
-## 常用命令
+## Docker 部署（实际运行环境，以此为准）
+
+通过 `docker-compose.yml` 编排，对外经 `frpc` 暴露在 `iot.gxmzucodeclub.top`。
+
+| 容器 | 镜像/角色 |
+|---|---|
+| `iot-backend` | Django ASGI（仅发布模式 MQTT，`IOT_MQTT_RUNNER=false`） |
+| `iot-mqtt-runner` | 独立 MQTT 完整模式进程（订阅+落库，`mqtt_runner` 命令） |
+| `iot-frontend` | **nginx 跑构建产物**（Dockerfile 多阶段 `npm build` → `/usr/share/nginx/html`），**非 vite dev/HMR** |
+| `iot-mysql` | **数据库 = MySQL**（不是本地 SQLite） |
+| `iot-redis` | channels 层 / 实时广播 |
+| `frpc` | 内网穿透，对外访问入口 |
+
+```bash
+# 查/改运行中的数据（务必走 backend 容器，连的是 MySQL）
+docker exec iot-backend python manage.py shell -c "..."
+docker exec iot-backend python manage.py migrate
+
+# 改前端源码后必须重建镜像才生效（nginx 服务的是构建产物，不会热更新）
+cd /Users/xhr_mac/server/iot_control_platform
+docker compose build frontend && docker compose up -d frontend
+# 验证上线：hash 变化即新产物
+docker exec iot-frontend sh -c "grep -o 'index-[A-Za-z0-9_-]*\.js' /usr/share/nginx/html/index.html"
+
+docker ps                       # 看容器状态
+docker logs iot-backend --tail 50
+```
+
+> 改前端可先在本地 `frontend/` 跑 `npm run build` 快速验证编译（本地有 node_modules），通过后再 docker 重建部署。
+
+## 本地脱机开发命令（不连 Docker 时）
 
 ```bash
 # 后端（在 iot_control_platform/iot_control_platform/ 目录）

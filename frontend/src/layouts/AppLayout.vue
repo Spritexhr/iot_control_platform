@@ -36,11 +36,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppMain from './AppMain.vue'
 
 const appStore = useAppStore()
+const userStore = useUserStore()
 const windowWidth = ref(window.innerWidth)
 
 const isMobile = computed(() => windowWidth.value < 768)
@@ -66,6 +68,10 @@ function onResize() {
 onMounted(() => {
   window.addEventListener('resize', onResize)
   onResize()
+  // 页面刷新后重新拉取用户信息，保证 isStaff 等权限判断正确
+  if (userStore.isLoggedIn && !userStore.userInfo) {
+    userStore.fetchUserInfo().catch(() => {})
+  }
 })
 
 onUnmounted(() => {

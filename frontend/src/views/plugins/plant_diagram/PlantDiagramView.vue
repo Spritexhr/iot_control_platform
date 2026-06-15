@@ -68,8 +68,9 @@ const saving = ref(false)
 
 function goBack() {
   if (dirty.value && !confirm('有未保存的修改，确定离开？')) return
-  const code = diagram.value?.plant_code || 'EB'
-  router.push(`/plugins/plant_diagram/list/${code}`)
+  // 回到该画板所属车间的列表；无 plant_code 则回通用列表
+  const code = diagram.value?.plant_code
+  router.push(code ? `/plugins/plant_diagram/list/${code}` : '/plugins/plant_diagram')
 }
 
 function toggleMode() {
@@ -107,8 +108,8 @@ async function loadData() {
   if (!id) return
   try {
     diagram.value = await getDiagram(id)
-    // 装置插件决定该画板能绑定哪些点位（EB 走 EBPlantSensorBinding 等），传 plant_code 给后端
-    targets.value = await getBindableTargets(diagram.value?.plant_code || 'EB')
+    // 后端按 plant_code 返回该画板可绑定的点位（全厂监控点位集合）
+    targets.value = await getBindableTargets(diagram.value?.plant_code || '')
   } catch (e) {
     console.error('[diagram] 加载失败', e)
     ElMessage.error('加载画板失败')
@@ -129,6 +130,13 @@ watch(sseStatus, (v) => { plantStore.sseStatus = v }, { immediate: true })
 onMounted(async () => {
   await loadData()
   if (route.query.mode === 'edit' && isStaff.value) mode.value = 'edit'
+})
+
+// 页面刷新时 userInfo 异步加载，isStaff 会从 false 变 true；补设 mode
+watch(isStaff, (val) => {
+  if (val && route.query.mode === 'edit' && mode.value !== 'edit') {
+    mode.value = 'edit'
+  }
 })
 
 // 离开前提示

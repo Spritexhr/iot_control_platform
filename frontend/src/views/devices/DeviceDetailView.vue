@@ -32,6 +32,15 @@
         <div class="iot-card detail-info-card">
           <div class="iot-card__header">
             <span class="section-title">{{ ls.t('deviceDetail.basicInfo') }}</span>
+            <div v-if="isStaff" class="info-edit-btns">
+              <template v-if="!isEditing">
+                <el-button size="small" @click="startEdit">编辑</el-button>
+              </template>
+              <template v-else>
+                <el-button size="small" type="primary" :loading="saving" @click="saveEdit">保存</el-button>
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </template>
+            </div>
           </div>
           <div class="iot-card__body">
             <div class="info-grid">
@@ -45,11 +54,18 @@
               </div>
               <div class="info-item">
                 <span class="info-item__label">{{ ls.t('common.location') }}</span>
-                <span class="info-item__value">{{ device.location || ls.t('common.unset') }}</span>
+                <span v-if="!isEditing" class="info-item__value">{{ device.location || ls.t('common.unset') }}</span>
+                <el-input v-else v-model="editForm.location" size="small" placeholder="未设置" clearable />
               </div>
               <div class="info-item">
                 <span class="info-item__label">{{ ls.t('common.description') }}</span>
-                <span class="info-item__value">{{ device.description || ls.t('common.none') }}</span>
+                <span v-if="!isEditing" class="info-item__value">{{ device.description || ls.t('common.none') }}</span>
+                <el-input v-else v-model="editForm.description" size="small" placeholder="无" clearable />
+              </div>
+              <div class="info-item info-item--full">
+                <span class="info-item__label">名称</span>
+                <span v-if="!isEditing" class="info-item__value">{{ device.name }}</span>
+                <el-input v-else v-model="editForm.name" size="small" />
               </div>
               <div class="info-item">
                 <span class="info-item__label">{{ ls.t('deviceDetail.mqttStatusTopic') }}</span>
@@ -159,7 +175,7 @@ import { ArrowLeft, Refresh } from '@element-plus/icons-vue'
 import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
-import { getDevice, getDeviceStatus, sendDeviceCommand } from '@/api/devices'
+import { getDevice, getDeviceStatus, sendDeviceCommand, patchDevice } from '@/api/devices'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
@@ -171,6 +187,44 @@ const router = useRouter()
 // ==================== 设备详情 ====================
 const device = ref(null)
 const pageLoading = ref(false)
+
+// ==================== 内联编辑 ====================
+const isEditing = ref(false)
+const saving = ref(false)
+const editForm = ref({ name: '', description: '', location: '' })
+
+function startEdit() {
+  editForm.value = {
+    name: device.value.name || '',
+    description: device.value.description || '',
+    location: device.value.location || '',
+  }
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+async function saveEdit() {
+  saving.value = true
+  try {
+    const updated = await patchDevice(device.value.device_id, {
+      name: editForm.value.name,
+      description: editForm.value.description,
+      location: editForm.value.location,
+    })
+    device.value.name = updated.name ?? editForm.value.name
+    device.value.description = updated.description ?? editForm.value.description
+    device.value.location = updated.location ?? editForm.value.location
+    isEditing.value = false
+    ElMessage.success('已保存')
+  } catch {
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
 
 const fields = computed(() => {
   return device.value?.device_type_info?.config_parameters || []
@@ -361,6 +415,15 @@ onMounted(async () => {
 .info-item__value.mono {
   font-family: 'Courier New', monospace;
   font-size: 12px;
+}
+
+.info-item--full {
+  grid-column: 1 / -1;
+}
+
+.info-edit-btns {
+  display: flex;
+  gap: 6px;
 }
 
 /* 最新状态大字 */

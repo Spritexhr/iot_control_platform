@@ -3,9 +3,9 @@
     <!-- 顶部状态栏 -->
     <header class="eb-plant__header">
       <div class="eb-plant__title">
-        <span class="eb-plant__title-tag">EB-PLANT</span>
-        <h1>乙苯装置辅助监测大屏</h1>
-        <span class="eb-plant__sub">Ethyl Benzene Process · IoT Monitoring Layer</span>
+        <span class="eb-plant__title-tag">PLANT</span>
+        <h1>全厂设备辅助监控大屏</h1>
+        <span class="eb-plant__sub">Plant-wide Equipment Monitoring · IoT Layer</span>
       </div>
       <div class="eb-plant__status">
         <div class="eb-plant__stat">
@@ -34,7 +34,7 @@
       <el-button size="small" type="primary" @click="$router.push('/plugins/eb_plant/config')">
         配置面板
       </el-button>
-      <el-button size="small" @click="$router.push('/plugins/plant_diagram/list/EB')">
+      <el-button size="small" @click="$router.push('/plugins/plant_diagram')">
         P&amp;ID 画板
       </el-button>
     </div>
@@ -45,6 +45,7 @@
         v-for="s in store.samplesList"
         :key="s.sensor_id"
         :sample="s"
+        :now="now"
       />
       <div v-if="store.samplesList.length === 0" class="eb-plant__empty">
         <p>暂无可显示的传感器。</p>

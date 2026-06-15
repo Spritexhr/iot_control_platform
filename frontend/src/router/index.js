@@ -87,10 +87,10 @@ const routes = [
         name: 'PluginEBPlant',
         component: () => import('@/views/plugins/eb_plant/EBPlantView.vue'),
         meta: {
-          title: '乙苯装置大屏',
+          title: '全厂设备辅助监控大屏',
           breadcrumb: [
             { title: '插件中心', to: '/plugins' },
-            { title: '乙苯装置大屏' },
+            { title: '全厂设备辅助监控大屏' },
           ],
         },
       },
@@ -102,14 +102,23 @@ const routes = [
           title: '配置面板',
           breadcrumb: [
             { title: '插件中心', to: '/plugins' },
-            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
+            { title: '全厂设备辅助监控大屏', to: '/plugins/eb_plant' },
             { title: '配置面板' },
           ],
         },
       },
       {
         path: 'plugins/plant_diagram',
-        redirect: '/plugins/plant_diagram/list/EB',
+        name: 'PluginPlantDiagramHome',
+        component: () => import('@/views/plugins/plant_diagram/PlantDiagramListView.vue'),
+        meta: {
+          title: 'P&ID 画板',
+          breadcrumb: [
+            { title: '插件中心', to: '/plugins' },
+            { title: '全厂设备辅助监控大屏', to: '/plugins/eb_plant' },
+            { title: 'P&ID 画板' },
+          ],
+        },
       },
       {
         path: 'plugins/plant_diagram/list/:plantCode',
@@ -119,8 +128,8 @@ const routes = [
           title: 'P&ID 画板列表',
           breadcrumb: [
             { title: '插件中心', to: '/plugins' },
-            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
-            { title: 'P&ID 画板' },
+            { title: '全厂设备辅助监控大屏', to: '/plugins/eb_plant' },
+            { title: 'P&ID 画板', to: '/plugins/plant_diagram' },
           ],
         },
       },
@@ -132,8 +141,8 @@ const routes = [
           title: 'P&ID 画板',
           breadcrumb: [
             { title: '插件中心', to: '/plugins' },
-            { title: '乙苯装置大屏', to: '/plugins/eb_plant' },
-            { title: 'P&ID 画板', to: '/plugins/plant_diagram/list/EB' },
+            { title: '全厂设备辅助监控大屏', to: '/plugins/eb_plant' },
+            { title: 'P&ID 画板', to: '/plugins/plant_diagram' },
             { title: '画板编辑' },
           ],
         },

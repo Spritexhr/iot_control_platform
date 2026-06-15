@@ -97,6 +97,10 @@ class EBPlantSensorBinding(models.Model):
         ]
 
     @property
+    def description(self) -> str:
+        return self.sensor.description if self.sensor_id else ""
+
+    @property
     def point_id(self) -> str:
         """前端实时数据流里的唯一 ID。
         - 单字段传感器（data_key 留空）→ 用 sensor_id

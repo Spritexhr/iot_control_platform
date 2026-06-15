@@ -128,6 +128,7 @@ def ingest_sensor_data(
         status=classify_status(value, hi, lo, severity),
         metadata={
             "area": getattr(binding, "area", "") or "",
+            "description": getattr(binding, "description", "") or "",
             "normal_value": getattr(binding, "normal_value", None),
             "hi_threshold": hi,
             "lo_threshold": lo,

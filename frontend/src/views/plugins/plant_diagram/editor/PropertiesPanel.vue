@@ -12,12 +12,6 @@
           <el-input v-model="local.data.label" @input="emitChange" />
         </el-form-item>
 
-        <el-form-item v-if="node.type === 'instrument'" label="符号 (ISA)">
-          <el-select v-model="local.data.symbol" filterable allow-create @change="emitChange">
-            <el-option v-for="s in symbols" :key="s" :label="s" :value="s" />
-          </el-select>
-        </el-form-item>
-
         <el-form-item label="绑定">
           <el-radio-group v-model="local.binding.kind" @change="onBindingKindChange">
             <el-radio value="none">不绑定</el-radio>
@@ -58,13 +52,6 @@
           </el-select>
         </el-form-item>
 
-        <template v-if="node.type === 'instrument'">
-          <el-form-item label="显示选项">
-            <el-checkbox v-model="local.data.show_value" @change="emitChange">显示实时值</el-checkbox>
-            <el-checkbox v-model="local.data.show_threshold" @change="emitChange">显示阈值</el-checkbox>
-          </el-form-item>
-        </template>
-
         <el-form-item label="坐标">
           <div class="props__pos">
             <el-input-number v-model="local.position.x" :step="10" controls-position="right" @change="emitChange" />
@@ -92,7 +79,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="介质">
-          <el-input v-model="local.data.medium" placeholder="例如：EB+DEB" @input="emitChange" />
+          <el-input v-model="local.data.medium" placeholder="例如：物料A+物料B" @input="emitChange" />
         </el-form-item>
         <el-form-item>
           <el-button type="danger" plain size="small" @click="$emit('delete-edge', node.id)">删除连线</el-button>
@@ -115,8 +102,6 @@ const emit = defineEmits(['update-node', 'update-edge', 'delete-node', 'delete-e
 // selection: { kind: 'node'|'edge', payload: nodeOrEdge }
 const node = computed(() => props.selection?.payload || null)
 const kind = computed(() => props.selection?.kind || null)
-
-const symbols = ['TT', 'TI', 'PT', 'PI', 'FT', 'FI', 'LT', 'LI', 'AT', 'AI']
 
 const local = reactive({
   data: {},

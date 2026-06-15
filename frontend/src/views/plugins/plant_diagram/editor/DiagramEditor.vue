@@ -6,6 +6,7 @@
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"
+        :node-types="nodeTypes"
         :default-viewport="defaultViewport"
         :snap-to-grid="true"
         :snap-grid="[10, 10]"
@@ -22,34 +23,6 @@
       >
         <Background pattern-color="#d8d2c4" :gap="16" />
         <Controls />
-
-        <template #node-instrument="nodeProps">
-          <InstrumentNode v-bind="nodeProps" />
-        </template>
-        <template #node-vessel="nodeProps">
-          <VesselNode v-bind="nodeProps" />
-        </template>
-        <template #node-column="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="column" />
-        </template>
-        <template #node-valve="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="valve" />
-        </template>
-        <template #node-pump="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="pump" />
-        </template>
-        <template #node-heat_exchanger="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="heat_exchanger" />
-        </template>
-        <template #node-mixer="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="mixer" />
-        </template>
-        <template #node-filter="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="filter" />
-        </template>
-        <template #node-label="nodeProps">
-          <SimpleSymbolNode v-bind="nodeProps" kind="label" />
-        </template>
       </VueFlow>
     </div>
 
@@ -76,9 +49,7 @@ import '@vue-flow/controls/dist/style.css'
 
 import ToolboxPanel from './ToolboxPanel.vue'
 import PropertiesPanel from './PropertiesPanel.vue'
-import InstrumentNode from './nodes/InstrumentNode.vue'
-import VesselNode from './nodes/VesselNode.vue'
-import SimpleSymbolNode from './nodes/SimpleSymbolNode.vue'
+import { buildNodeTypes } from './nodeTypes'
 
 const props = defineProps({
   diagram: { type: Object, required: true },
@@ -86,7 +57,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['change'])
 
-const { project, screenToFlowCoordinate } = useVueFlow()
+// 节点类型映射（type -> 组件），由图元注册表自动生成
+const nodeTypes = buildNodeTypes()
+
+const { project, screenToFlowCoordinate, updateNode } = useVueFlow()
 
 // ============ canvas <-> Vue Flow 互转 ============
 // canvas.nodes 形如：{ id, type, position, size, binding, data }
@@ -209,12 +183,10 @@ function clearSelection() {
 function applyNodePatch({ id, patch }) {
   const idx = nodes.value.findIndex((n) => n.id === id)
   if (idx < 0) return
-  const old = nodes.value[idx]
-  nodes.value.splice(idx, 1, {
-    ...old,
-    position: patch.position ?? old.position,
-    data: { ...old.data, ...patch.data },
-  })
+  const newData = { ...nodes.value[idx].data, ...patch.data }
+  const newPos = patch.position ?? nodes.value[idx].position
+  // updateNode 写入 Vue Flow 内部 store，节点组件立刻重渲染
+  updateNode(id, { data: newData, position: newPos })
   if (selection.value?.kind === 'node' && selection.value.payload.id === id) {
     selection.value = { kind: 'node', payload: nodes.value[idx] }
   }

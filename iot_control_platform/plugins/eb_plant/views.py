@@ -97,9 +97,11 @@ class EBPlantSensorBindingViewSet(_AdminWritePermission, viewsets.ModelViewSet):
             to_create = []
             for s in sensors:
                 fields = s.sensor_type.data_fields if s.sensor_type_id else None
-                if not (isinstance(fields, list) and fields) or len(fields) == 1:
+                if not (isinstance(fields, list) and fields):
+                    # sensor_type 未定义 data_fields → 单条空 data_key 兜底
                     fields_to_use = [""]
                 else:
+                    # 有明确字段（1 个或多个）→ 每个字段建一条 binding，data_key 用实际字段名
                     fields_to_use = list(fields)
 
                 existing = set(
