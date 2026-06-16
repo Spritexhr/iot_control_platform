@@ -112,6 +112,26 @@ export const SIMPLE_SYMBOLS = {
     label: '文本', group: '标注', defaultData: { label: '注释' },
     labelMode: 'plain',
   },
+
+  stream_inlet: {
+    label: '物流进口标签', group: '物流标签', defaultData: { label: '物流进口' },
+    size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
+    draw: [
+      { el: 'line', x1: 8, y1: 10, x2: 8, y2: 40, sw: 2.5 },
+      { el: 'line', x1: 8, y1: 25, x2: 54, y2: 25, sw: 1.5 },
+      { el: 'polygon', points: '46,13 72,25 46,37' },
+    ],
+  },
+
+  stream_outlet: {
+    label: '物流出口标签', group: '物流标签', defaultData: { label: '物流出口' },
+    size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
+    draw: [
+      { el: 'line', x1: 8, y1: 25, x2: 36, y2: 25, sw: 1.5 },
+      { el: 'polygon', points: '28,13 54,25 28,37' },
+      { el: 'line', x1: 72, y1: 10, x2: 72, y2: 40, sw: 2.5 },
+    ],
+  },
 }
 
 // 工具箱面板里仪表/容器的预览图形（这两类有专用节点组件，不在 SIMPLE_SYMBOLS）
@@ -119,13 +139,16 @@ const SPECIAL = {
   instrument: {
     label: '仪表', group: '仪表/容器',
     defaultData: { symbol: 'TT', label: '新仪表', show_value: true, show_threshold: true },
+    // 预览跟画布上的 InstrumentNode 保持一致的卡片造型（名称行 + 数值/单位行），
+    // 而不是传统 ISA 气泡符号，避免拖出来的图元跟预览长得不一样
     glyph: {
       viewBox: '0 0 40 40',
       draw: [
-        { el: 'circle', cx: 20, cy: 20, r: 16 },
-        { el: 'line', x1: 4, y1: 20, x2: 36, y2: 20, sw: 1 },
-        { el: 'text', x: 20, y: 16, text: 'TT', anchor: 'middle', size: 9 },
-        { el: 'text', x: 20, y: 30, text: '—', anchor: 'middle', size: 8 },
+        { el: 'rect', x: 2, y: 7, width: 36, height: 26, rx: 2 },
+        { el: 'line', x1: 2, y1: 17, x2: 38, y2: 17, sw: 0.6 },
+        { el: 'text', x: 20, y: 14, text: 'PT-01', anchor: 'middle', size: 6 },
+        { el: 'text', x: 13, y: 29, text: '88.2', anchor: 'middle', size: 9 },
+        { el: 'text', x: 32, y: 29, text: 'kPa', anchor: 'middle', size: 5 },
       ],
     },
   },
@@ -149,6 +172,7 @@ const ORDER = [
   'pump', 'compressor', 'mixer',
   'heat_exchanger', 'filter',
   'valve', 'label',
+  'stream_inlet', 'stream_outlet',
 ]
 
 function labelGlyph() {

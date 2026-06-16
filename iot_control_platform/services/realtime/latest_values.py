@@ -32,6 +32,10 @@ class PointSample:
     unit: str = ""
     ts: float = 0.0
     status: str = "normal"  # normal / warn_high / warn_low / alarm_high / alarm_low
+    # 在线状态：与传感器管理页同一套口径（Sensor.computed_is_online，last_seen 3 分钟内）。
+    # None 表示该点位没有对应的主模型 Sensor 可查（非鸭子类型 binding），前端按 ts 兜底判断。
+    is_online: Optional[bool] = None
+    last_seen: Optional[float] = None
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -95,7 +99,8 @@ def ingest_sensor_data(
 
     binding 是插件自有的绑定对象（鸭子类型），需具备以下属性：
       tag / unit / data_key / hi_threshold / lo_threshold / severity /
-      area (可选) / normal_value (可选)
+      area (可选) / normal_value (可选) / sensor (可选，FK 到主模型 Sensor，
+      用于按 Sensor.computed_is_online 口径算在线状态，没有就留空让前端按 ts 兜底)
     """
     tag = getattr(binding, "tag", "") or sensor_id
     unit = getattr(binding, "unit", "") or ""
@@ -103,6 +108,10 @@ def ingest_sensor_data(
     hi = getattr(binding, "hi_threshold", None)
     lo = getattr(binding, "lo_threshold", None)
     severity = getattr(binding, "severity", "mid") or "mid"
+
+    sensor = getattr(binding, "sensor", None)
+    is_online = bool(sensor.computed_is_online) if sensor is not None else None
+    last_seen = sensor.last_seen.timestamp() if sensor is not None and sensor.last_seen else None
 
     value: Optional[float] = None
     if isinstance(data, dict):
@@ -126,6 +135,8 @@ def ingest_sensor_data(
         unit=unit,
         ts=float(timestamp) if timestamp else time.time(),
         status=classify_status(value, hi, lo, severity),
+        is_online=is_online,
+        last_seen=last_seen,
         metadata={
             "area": getattr(binding, "area", "") or "",
             "description": getattr(binding, "description", "") or "",

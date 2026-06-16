@@ -12,6 +12,11 @@
       <span v-else class="instr-node__unbound">未绑定</span>
     </div>
 
+    <!-- 变量键值：绑定字段名（如 flow_rate），帮助区分多字段传感器具体取的哪个值 -->
+    <div v-if="dataKey" class="instr-node__key-row">
+      <span class="instr-node__key">{{ dataKey }}</span>
+    </div>
+
     <!-- 数值 + 单位 -->
     <div class="instr-node__value-row">
       <span class="instr-node__value">{{ displayValue }}</span>
@@ -37,6 +42,14 @@ const sample  = computed(() => plantStore.findByBinding(binding.value))
 
 const unit = computed(() => sample.value?.unit || props.data?.unit || '')
 
+// 变量键值：选传感器时 PropertiesPanel 已存进 data.dataKey；没存的老节点从
+// binding.id（point_id = sensor_id::data_key）里兜底解析
+const dataKey = computed(() => {
+  if (props.data?.dataKey) return props.data.dataKey
+  const id = binding.value
+  return id && id.includes('::') ? id.split('::')[1] : ''
+})
+
 const displayValue = computed(() => {
   const v = sample.value?.value
   if (v === null || v === undefined || Number.isNaN(v)) return '--'
@@ -46,10 +59,16 @@ const displayValue = computed(() => {
   return v.toFixed(3)
 })
 
-// 在线判断：120s 内有数据 = 在线
+// 在线判断：直接用后端算好的 is_online（口径与传感器管理页一致，Sensor.computed_is_online，
+// last_seen 3 分钟内），不在前端按 ts 重新猜一遍——避免快照还没到/缓存里 ts 偏旧时误判离线。
+// 只有 sample.is_online 为 null（没有主模型 Sensor 可查的兜底场景）才退回 ts 估算。
 const ONLINE_MS = 120_000
 const isOnline = computed(() => {
-  const ts = sample.value?.ts
+  if (!sample.value) return null
+  if (sample.value.is_online !== null && sample.value.is_online !== undefined) {
+    return sample.value.is_online
+  }
+  const ts = sample.value.ts
   if (!ts) return null
   return (Date.now() - ts * 1000) < ONLINE_MS
 })
@@ -125,6 +144,16 @@ const tooltip = computed(() => {
   color: #999;
   font-family: -apple-system, sans-serif;
   flex-shrink: 0;
+}
+
+.instr-node__key-row {
+  margin-top: -2px;
+}
+
+.instr-node__key {
+  font-size: 9px;
+  color: #aaa;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
 .instr-node__value-row {

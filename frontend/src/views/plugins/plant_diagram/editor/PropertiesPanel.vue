@@ -25,7 +25,7 @@
             v-model="local.binding.id"
             filterable
             placeholder="搜索位号 / 名称"
-            @change="emitChange"
+            @change="onSensorChange"
           >
             <el-option
               v-for="s in targets.sensors"
@@ -124,6 +124,17 @@ function onBindingKindChange() {
   emitChange()
 }
 
+// 选传感器时把它的变量键值（data_key）和单位顺带记到节点 data 上，
+// 这样仪表图元未收到实时数据前也能显示键值/单位，不必等 SSE 推送
+function onSensorChange() {
+  const target = props.targets.sensors.find((s) => s.id === local.binding.id)
+  if (target) {
+    local.data.dataKey = target.data_key || (target.id.includes('::') ? target.id.split('::')[1] : '')
+    local.data.unit = target.unit || ''
+  }
+  emitChange()
+}
+
 function emitChange() {
   if (!props.selection) return
   if (kind.value === 'node') {
@@ -146,6 +157,7 @@ function nodeTypeLabel(t) {
   return ({
     instrument: '仪表', vessel: '反应器', column: '塔', valve: '阀门', pump: '泵',
     heat_exchanger: '换热器', mixer: '混合器', filter: '过滤器', label: '文本',
+    stream_inlet: '物流进口标签', stream_outlet: '物流出口标签',
   })[t] || t
 }
 
