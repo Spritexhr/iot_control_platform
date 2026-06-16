@@ -60,7 +60,7 @@ const emit = defineEmits(['change'])
 // 节点类型映射（type -> 组件），由图元注册表自动生成
 const nodeTypes = buildNodeTypes()
 
-const { project, screenToFlowCoordinate, updateNode } = useVueFlow()
+const { project, screenToFlowCoordinate, updateNode, updateNodeInternals } = useVueFlow()
 
 // ============ canvas <-> Vue Flow 互转 ============
 // canvas.nodes 形如：{ id, type, position, size, binding, data }
@@ -187,6 +187,9 @@ function applyNodePatch({ id, patch }) {
   const newPos = patch.position ?? nodes.value[idx].position
   // updateNode 写入 Vue Flow 内部 store，节点组件立刻重渲染
   updateNode(id, { data: newData, position: newPos })
+  // 旋转/镜像后连接点的实际渲染位置变了，得让 Vue Flow 重新量一下，
+  // 否则连线还接在节点变换前的旧位置上
+  updateNodeInternals([id])
   if (selection.value?.kind === 'node' && selection.value.payload.id === id) {
     selection.value = { kind: 'node', payload: nodes.value[idx] }
   }

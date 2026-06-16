@@ -187,10 +187,30 @@ def _backfill_missing_from_db() -> None:
             log.warning("EB 回填最近一帧失败 point_id=%s err=%s", binding.point_id, exc)
 
 
+def _refresh_online_status(samples: list) -> None:
+    """
+    snapshot/建连首发用的 is_online 必须实时算，不能信缓存里冻住的旧值。
+
+    latest_values 缓存是进程级的：backend 的 worker 自己几乎不会调 ingest_sensor_data
+    （那是 mqtt_runner 进程的事），所以它本地缓存里的 PointSample.is_online 往往是很久前
+    backfill 那一刻算的，可能早就过期。这里用跟传感器管理页同一套口径（Sensor.computed_is_online）
+    现查现算覆盖一遍，避免"切页面/重连一瞬间显示旧状态，几秒后下一帧数据来了才跳回正确状态"的闪烁。
+    """
+    bindings = EBPlantSensorBinding.objects.filter(is_visible=True).select_related("sensor")
+    sensor_by_point = {b.point_id: b.sensor for b in bindings}
+    for sample in samples:
+        sensor = sensor_by_point.get(sample.get("sensor_id"))
+        if sensor is None:
+            continue
+        sample["is_online"] = bool(sensor.computed_is_online)
+        sample["last_seen"] = sensor.last_seen.timestamp() if sensor.last_seen else None
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def snapshot(request):
     _backfill_missing_from_db()
     bound = _bound_point_ids()
     samples = [s.to_dict() for s in latest_values.snapshot(PLUGIN_CODE) if s.sensor_id in bound]
+    _refresh_online_status(samples)
     return JsonResponse({"plugin_code": PLUGIN_CODE, "samples": samples})

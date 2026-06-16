@@ -110,7 +110,7 @@ export const SIMPLE_SYMBOLS = {
 
   label: {
     label: '文本', group: '标注', defaultData: { label: '注释' },
-    labelMode: 'plain',
+    labelMode: 'plain', rotatable: false, // 整个图元就是文字本身，没有独立于文字的图形可转
   },
 
   stream_inlet: {
@@ -139,6 +139,11 @@ const SPECIAL = {
   instrument: {
     label: '仪表', group: '仪表/容器',
     defaultData: { symbol: 'TT', label: '新仪表', show_value: true, show_threshold: true },
+    // 目前唯一支持绑定的图元（绑传感器实时取值）。以后要给其他图元（如阀门/泵）
+    // 加设备绑定+命令，只需在对应条目加 bindable:['device']，PropertiesPanel 会自动出现绑定 UI
+    bindable: ['sensor'],
+    // 仪表泡是纯文字/数值卡片，没有独立于文字的图形，P&ID 里也永远正向显示，不参与旋转/镜像
+    rotatable: false,
     // 预览跟画布上的 InstrumentNode 保持一致的卡片造型（名称行 + 数值/单位行），
     // 而不是传统 ISA 气泡符号，避免拖出来的图元跟预览长得不一样
     glyph: {
@@ -164,6 +169,12 @@ const SPECIAL = {
       ],
     },
   },
+}
+
+// 按 type 查图元的注册表条目（label/group/defaultData/bindable/rotatable 等），
+// instrument/vessel 在 SPECIAL，其余在 SIMPLE_SYMBOLS——给 PropertiesPanel 统一查能力用
+export function getNodeMeta(type) {
+  return SPECIAL[type] || SIMPLE_SYMBOLS[type] || null
 }
 
 // 工具箱显示顺序

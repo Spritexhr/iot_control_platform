@@ -12,15 +12,15 @@
           <el-input v-model="local.data.label" @input="emitChange" />
         </el-form-item>
 
-        <el-form-item label="绑定">
+        <el-form-item v-if="bindableKinds.length" label="绑定">
           <el-radio-group v-model="local.binding.kind" @change="onBindingKindChange">
             <el-radio value="none">不绑定</el-radio>
-            <el-radio value="sensor">传感器</el-radio>
-            <el-radio value="device">设备</el-radio>
+            <el-radio v-if="bindableKinds.includes('sensor')" value="sensor">传感器</el-radio>
+            <el-radio v-if="bindableKinds.includes('device')" value="device">设备</el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item v-if="local.binding.kind === 'sensor'" label="选择传感器">
+        <el-form-item v-if="local.binding.kind === 'sensor' && bindableKinds.includes('sensor')" label="选择传感器">
           <el-select
             v-model="local.binding.id"
             filterable
@@ -36,7 +36,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item v-if="local.binding.kind === 'device'" label="选择设备">
+        <el-form-item v-if="local.binding.kind === 'device' && bindableKinds.includes('device')" label="选择设备">
           <el-select
             v-model="local.binding.id"
             filterable
@@ -56,6 +56,26 @@
           <div class="props__pos">
             <el-input-number v-model="local.position.x" :step="10" controls-position="right" @change="emitChange" />
             <el-input-number v-model="local.position.y" :step="10" controls-position="right" @change="emitChange" />
+          </div>
+        </el-form-item>
+
+        <el-form-item v-if="rotatable" label="变换">
+          <div class="props__transform">
+            <el-button size="small" @click="rotate90">旋转 90°（{{ local.data.rotation || 0 }}°）</el-button>
+            <el-button
+              size="small"
+              :type="local.data.flipH ? 'primary' : 'default'"
+              @click="toggleFlipH"
+            >
+              水平镜像
+            </el-button>
+            <el-button
+              size="small"
+              :type="local.data.flipV ? 'primary' : 'default'"
+              @click="toggleFlipV"
+            >
+              竖直镜像
+            </el-button>
           </div>
         </el-form-item>
 
@@ -92,6 +112,8 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 
+import { getNodeMeta } from './symbols'
+
 const props = defineProps({
   selection: { type: Object, default: null },
   targets:   { type: Object, default: () => ({ sensors: [], devices: [] }) },
@@ -102,6 +124,12 @@ const emit = defineEmits(['update-node', 'update-edge', 'delete-node', 'delete-e
 // selection: { kind: 'node'|'edge', payload: nodeOrEdge }
 const node = computed(() => props.selection?.payload || null)
 const kind = computed(() => props.selection?.kind || null)
+
+// 图元能力来自注册表（symbols.js），不写死类型判断——以后给某个图元加绑定/转动能力，
+// 只需在 symbols.js 对应条目加标记，这里和模板自动跟着生效
+const meta = computed(() => getNodeMeta(node.value?.type))
+const bindableKinds = computed(() => meta.value?.bindable || [])
+const rotatable = computed(() => meta.value?.rotatable !== false)
 
 const local = reactive({
   data: {},
@@ -121,6 +149,19 @@ watch(() => props.selection, (sel) => {
 
 function onBindingKindChange() {
   if (local.binding.kind === 'none') local.binding.id = ''
+  emitChange()
+}
+
+function rotate90() {
+  local.data.rotation = ((local.data.rotation || 0) + 90) % 360
+  emitChange()
+}
+function toggleFlipH() {
+  local.data.flipH = !local.data.flipH
+  emitChange()
+}
+function toggleFlipV() {
+  local.data.flipV = !local.data.flipV
   emitChange()
 }
 
@@ -154,11 +195,7 @@ function emitChange() {
 }
 
 function nodeTypeLabel(t) {
-  return ({
-    instrument: '仪表', vessel: '反应器', column: '塔', valve: '阀门', pump: '泵',
-    heat_exchanger: '换热器', mixer: '混合器', filter: '过滤器', label: '文本',
-    stream_inlet: '物流进口标签', stream_outlet: '物流出口标签',
-  })[t] || t
+  return getNodeMeta(t)?.label || t
 }
 
 function sensorOptionLabel(s) {
@@ -205,5 +242,11 @@ function deviceOptionLabel(d) {
 
 .props__pos :deep(.el-input-number) {
   width: 100%;
+}
+
+.props__transform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 </style>

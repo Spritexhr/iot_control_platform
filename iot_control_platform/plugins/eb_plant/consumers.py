@@ -29,7 +29,7 @@ class EBPlantConsumer(_BaseAuthedConsumer):
         # 插件内部 import，不跨包污染
         from services.realtime.latest_values import latest_values
 
-        from .views import _backfill_missing_from_db, _bound_point_ids
+        from .views import _backfill_missing_from_db, _bound_point_ids, _refresh_online_status
 
         _backfill_missing_from_db()
         bound = _bound_point_ids()
@@ -38,6 +38,9 @@ class EBPlantConsumer(_BaseAuthedConsumer):
             for s in latest_values.snapshot(PLUGIN_CODE)
             if s.sensor_id in bound
         ]
+        # 跟 HTTP snapshot 端点一样：is_online 现查现算，不用缓存里冻住的旧值，
+        # 否则每次切页面重连 WS 都会先闪一下错误状态，等下一帧数据来才跳回正确值
+        _refresh_online_status(samples)
         return {"plugin_code": PLUGIN_CODE, "samples": samples}
 
     async def broadcast_plugin_sample(self, event):

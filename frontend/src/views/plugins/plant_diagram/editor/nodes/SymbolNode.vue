@@ -1,23 +1,30 @@
 <template>
   <div class="symbol-node" :class="`symbol-node--${type}`">
-    <Handle id="left"   type="source" :position="Position.Left" />
-    <Handle id="right"  type="source" :position="Position.Right" />
-    <Handle id="top"    type="source" :position="Position.Top" />
-    <Handle id="bottom" type="source" :position="Position.Bottom" />
+    <!-- 纯文本注释：本身就是文字，没有独立于文字的图形可转 -->
+    <template v-if="def && def.labelMode === 'plain'">
+      <Handle id="left"   type="source" :position="Position.Left" />
+      <Handle id="right"  type="source" :position="Position.Right" />
+      <Handle id="top"    type="source" :position="Position.Top" />
+      <Handle id="bottom" type="source" :position="Position.Bottom" />
+      <div class="symbol-node__plain-label">
+        {{ data.label || def.defaultData?.label || '注释' }}
+      </div>
+    </template>
 
-    <!-- 纯文本注释 -->
-    <div v-if="def && def.labelMode === 'plain'" class="symbol-node__plain-label">
-      {{ data.label || def.defaultData?.label || '注释' }}
-    </div>
-
-    <!-- 图形图元 -->
+    <!-- 图形图元：旋转/镜像只套在图形+连接点上，标签文字永远水平 -->
     <template v-else-if="def">
-      <SymbolGlyph
-        class="symbol-node__glyph"
-        :viewBox="def.viewBox"
-        :draw="def.draw"
-        :style="{ width: def.size.w + 'px', height: def.size.h + 'px' }"
-      />
+      <div class="symbol-node__transform" :style="transformStyle">
+        <Handle id="left"   type="source" :position="Position.Left" />
+        <Handle id="right"  type="source" :position="Position.Right" />
+        <Handle id="top"    type="source" :position="Position.Top" />
+        <Handle id="bottom" type="source" :position="Position.Bottom" />
+        <SymbolGlyph
+          class="symbol-node__glyph"
+          :viewBox="def.viewBox"
+          :draw="def.draw"
+          :style="{ width: def.size.w + 'px', height: def.size.h + 'px' }"
+        />
+      </div>
       <div v-if="def.labelMode !== 'none' && data.label" class="symbol-node__label">
         {{ data.label }}
       </div>
@@ -39,6 +46,16 @@ const props = defineProps({
 })
 
 const def = computed(() => SIMPLE_SYMBOLS[props.type] || null)
+
+// 旋转（每次 90°）+ 水平/竖直镜像：只套在图形+连接点上（不含标签文字），
+// 这样旋转后管口朝向也跟着转，符合 P&ID 里转个阀门接竖直管的习惯，文字始终保持水平可读
+const transformStyle = computed(() => {
+  const rotation = props.data?.rotation || 0
+  const sx = props.data?.flipH ? -1 : 1
+  const sy = props.data?.flipV ? -1 : 1
+  if (!rotation && sx === 1 && sy === 1) return null
+  return { transform: `rotate(${rotation}deg) scale(${sx}, ${sy})` }
+})
 </script>
 
 <style scoped>
@@ -48,6 +65,11 @@ const def = computed(() => SIMPLE_SYMBOLS[props.type] || null)
   flex-direction: column;
   align-items: center;
   gap: 2px;
+}
+
+.symbol-node__transform {
+  position: relative;
+  display: inline-flex;
 }
 
 .symbol-node__glyph {
