@@ -73,6 +73,14 @@ services:
     ports:
       - "0.0.0.0:${ADMIN_PORT:-48081}:8000"
     restart: unless-stopped
+    healthcheck:
+      # gunicorn 真正监听端口前，必须先跑完 migrate + configure --init，
+      # 用此 healthcheck 让 mqtt_runner 等到 platform_settings 配置写入后才启动
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   mqtt_runner:
     build:
@@ -97,8 +105,9 @@ services:
       redis:
         condition: service_healthy
       backend:
-        # 等 backend 跑完 migrate 再起，避免抢首次 schema 初始化
-        condition: service_started
+        # 等 backend 的 healthcheck 通过（即 migrate + configure --init 已完成、gunicorn 已监听）
+        # 才启动，避免读到 platform_settings 默认值（127.0.0.1）
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
