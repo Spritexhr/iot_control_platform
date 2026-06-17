@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P&ID 图元手绘工具（独立，与系统解耦）</title>
+<style>
+  :root { --line: #d8d2c4; --ink: #2a2a2a; --accent: #e07a3f; --bg: #faf6ef; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header p { margin: 0; font-size: 12px; color: #8a8275; }
+  .layout { display: flex; height: calc(100vh - 48px); }
+  .panel { padding: 12px; overflow-y: auto; }
+  .panel h2 { font-size: 12px; color: #8a8275; text-transform: uppercase; letter-spacing: .05em; margin: 14px 0 6px; }
+  .panel h2:first-child { margin-top: 0; }
+  .tools { width: 220px; border-right: 1px solid var(--line); }
+  .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tool-btn { padding: 8px 4px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .tool-btn.active { border-color: var(--accent); background: #fdf0e6; color: var(--accent); }
+  .stage-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #f1ece1; position: relative; }
+  #stage { background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.06); cursor: crosshair; }
+  .hint { font-size: 12px; color: #8a8275; }
+  .side { width: 360px; border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .shape-list { flex: 0 1 auto; max-height: 26%; overflow-y: auto; }
+  .shape-item { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .shape-item.sel { background: #fdf0e6; }
+  .shape-item span.tag { color: #8a8275; width: 56px; flex-shrink: 0; }
+  .shape-item .ops { margin-left: auto; display: flex; gap: 2px; }
+  .shape-item button { font-size: 11px; padding: 1px 5px; border: 1px solid var(--line); background: #fff; border-radius: 3px; cursor: pointer; }
+  .props { flex: 0 1 260px; max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); }
+  .prop-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+  .prop-row label { width: 70px; color: #8a8275; flex-shrink: 0; }
+  .prop-row input[type=text], .prop-row input[type=number] { flex: 1; border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; font-size: 12px; }
+  .prop-row input[type=color] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 4px; }
+  .export { flex: 1 1 220px; min-height: 180px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+  .export textarea { flex: 1; width: 100%; border: none; resize: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 10px; background: #1e1e1e; color: #d4d4d4; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button.primary { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px; font-size: 12px; cursor: pointer; }
+  button.ghost { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 12px; cursor: pointer; }
+  textarea.import { width: 100%; height: 70px; font-family: ui-monospace, monospace; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 6px; }
+  .grid line { stroke: #eee; stroke-width: 0.3; }
+  .axis line { stroke: #ccc; stroke-width: 0.5; }
+  .preview-shape { fill: #fff; stroke: #2a2a2a; stroke-width: 1.5; }
+  .sel-outline { fill: none; stroke: var(--accent); stroke-width: 0.6; stroke-dasharray: 2 2; pointer-events: none; }
+  small.note { color: #8a8275; display: block; margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>P&ID 图元手绘工具</h1>
+  <p>纯本地单文件，不依赖后端/前端工程，画完导出代码片段贴到 symbols.js 即可</p>
+</header>
+
+<div class="layout">
+
+  <div class="panel tools">
+    <h2>画布设置</h2>
+    <div class="prop-row"><label>viewBox W</label><input type="number" id="vbW" value="80"></div>
+    <div class="prop-row"><label>viewBox H</label><input type="number" id="vbH" value="80"></div>
+    <div class="prop-row"><label>显示缩放</label><input type="number" id="zoom" value="6"></div>
+    <div class="prop-row"><label><input type="checkbox" id="snap" checked> 整数网格吸附</label></div>
+
+    <h2>绘制工具</h2>
+    <div class="tool-grid">
+      <button class="tool-btn active" data-tool="select">选择/移动</button>
+      <button class="tool-btn" data-tool="pan">整体平移</button>
+      <button class="tool-btn" data-tool="line">直线</button>
+      <button class="tool-btn" data-tool="rect">矩形</button>
+      <button class="tool-btn" data-tool="circle">圆</button>
+      <button class="tool-btn" data-tool="ellipse">椭圆</button>
+      <button class="tool-btn" data-tool="polygon">多边形</button>
+      <button class="tool-btn" data-tool="polyline">折线</button>
+      <button class="tool-btn" data-tool="path">自由路径</button>
+      <button class="tool-btn" data-tool="text">文字</button>
+    </div>
+    <button class="ghost" id="finishBtn" style="width:100%;margin-top:6px;display:none" onclick="finishMultiPoint()">完成绘制（Enter）</button>
+    <small class="note">
+      多边形/折线：依次点击加点，点"完成绘制"按钮 / 按 Enter / 双击 结束，按 Esc 取消。<br>
+      自由路径：按住鼠标拖动绘制，松开结束。<br>
+      选择工具下可直接拖动图形；选中后也可用方向键微调（Shift 加速）。<br>
+      整体平移：拖动画布任意位置，把所有图形一起移动（相对位置/各条线形状不变），用来把画完的整个图元挪到 viewBox 里合适的位置。
+    </small>
+
+    <h2>导入已有 draw 数组</h2>
+    <textarea class="import" id="importBox" placeholder='粘贴 symbols.js 里某个图元的 draw: [ ... ] 数组（含中括号）'></textarea>
+    <button class="ghost" style="margin-top:6px;width:100%" onclick="importDraw()">解析并加载</button>
+    <small class="note">仅用于本地辅助编辑，粘贴内容须为你自己信任的代码片段。</small>
+  </div>
+
+  <div class="stage-wrap">
+    <svg id="stage"></svg>
+    <div class="hint" id="hint">点击左侧工具开始绘制</div>
+  </div>
+
+  <div class="panel side" style="padding:0">
+    <div class="panel shape-list">
+      <h2 style="margin-top:0">图层（渲染顺序，从上到下）</h2>
+      <div id="shapeList"></div>
+    </div>
+    <div class="panel props" id="propsPanel">
+      <h2 style="margin-top:0">属性</h2>
+      <div id="propsBody"><small class="note">未选中图形</small></div>
+    </div>
+    <div class="panel export">
+      <h2 style="margin-top:0">导出代码</h2>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="typeKey" placeholder="type 标识，如 pump" value="new_symbol">
+        <input type="text" id="labelText" placeholder="中文 label" value="新图元">
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="groupText" placeholder="分组，如 动设备" value="动设备">
+        <select id="labelMode"><option value="below">below</option><option value="plain">plain</option><option value="none">none</option></select>
+      </div>
+      <textarea readonly id="exportBox"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" onclick="copyExport()">复制到剪贴板</button>
+        <button class="ghost" onclick="render()">刷新预览</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DEFAULT_SW = 1.5;
+let shapes = [];        // { el, attrs:{...} }
+let selectedIdx = -1;
+let tool = 'select';
+let drawing = null;     // 临时绘制状态
+let polyPoints = [];
+let dragState = null;   // { idx, last:{x,y} } 拖动选中图形
+
+const svg = document.getElementById('stage');
+const hint = document.getElementById('hint');
+
+function vb() { return { w: +document.getElementById('vbW').value, h: +document.getElementById('vbH').value }; }
+function zoom() { return +document.getElementById('zoom').value; }
+function snapOn() { return document.getElementById('snap').checked; }
+function snap(v) { return snapOn() ? Math.round(v) : Math.round(v * 10) / 10; }
+
+document.querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    tool = b.dataset.tool;
+    polyPoints = [];
+    drawing = null;
+    document.getElementById('finishBtn').style.display = (tool === 'polygon' || tool === 'polyline') ? 'block' : 'none';
+    if (tool === 'select') hint.textContent = '点击图层或画布上的图形进行选中，可直接拖动';
+    else if (tool === 'pan') hint.textContent = '在画布任意位置拖动，整体移动所有图形（相对位置不变）';
+    else hint.textContent = `工具：${b.textContent}，在画布上拖动/点击绘制`;
+    render();
+  });
+});
+
+['vbW','vbH','zoom','snap'].forEach(id => document.getElementById(id).addEventListener('input', render));
+
+function clientToCoord(evt) {
+  const rect = svg.getBoundingClientRect();
+  const { w, h } = vb();
+  const x = (evt.clientX - rect.left) / rect.width * w;
+  const y = (evt.clientY - rect.top) / rect.height * h;
+  return { x: snap(x), y: snap(y) };
+}
+
+function setStageSize() {
+  const { w, h } = vb();
+  const z = zoom();
+  svg.setAttribute('width', w * z);
+  svg.setAttribute('height', h * z);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+}
+
+svg.addEventListener('mousedown', onDown);
+svg.addEventListener('mousemove', onMove);
+svg.addEventListener('mouseup', onUp);
+svg.addEventListener('dblclick', onDblClick);
+window.addEventListener('keydown', onKey);
+
+function onDown(evt) {
+  const p = clientToCoord(evt);
+  if (tool === 'select') {
+    const idx = hitTest(p);
+    selectedIdx = idx;
+    dragState = idx >= 0 ? { idx, last: p } : null;
+    render(); renderList(); renderProps();
+    return;
+  }
+  if (tool === 'pan') {
+    dragState = { idx: 'all', last: p };
+    return;
+  }
+  if (tool === 'line') { drawing = { el: 'line', attrs: { x1: p.x, y1: p.y, x2: p.x, y2: p.y } }; }
+  else if (tool === 'rect') { drawing = { el: 'rect', attrs: { x: p.x, y: p.y, width: 0, height: 0 }, start: p }; }
+  else if (tool === 'circle') { drawing = { el: 'circle', attrs: { cx: p.x, cy: p.y, r: 0 } }; }
+  else if (tool === 'ellipse') { drawing = { el: 'ellipse', attrs: { cx: p.x, cy: p.y, rx: 0, ry: 0 }, start: p }; }
+  else if (tool === 'path') { drawing = { el: 'path', attrs: { d: `M ${p.x} ${p.y}` } }; }
+  else if (tool === 'polygon' || tool === 'polyline') {
+    polyPoints.push(p);
+    drawing = { el: tool, attrs: { points: polyPoints.map(pt => `${pt.x},${pt.y}`).join(' ') } };
+    render();
+    return;
+  } else if (tool === 'text') {
+    const content = window.prompt('文字内容：', 'TXT');
+    if (content !== null) {
+      shapes.push({ el: 'text', attrs: { x: p.x, y: p.y, text: content, anchor: 'middle', size: 10 } });
+      selectedIdx = shapes.length - 1;
+      render(); renderList(); renderProps();
+    }
+    return;
+  }
+}
+
+function onMove(evt) {
+  if (dragState) {
+    const p = clientToCoord(evt);
+    const dx = p.x - dragState.last.x, dy = p.y - dragState.last.y;
+    if (dx !== 0 || dy !== 0) {
+      if (dragState.idx === 'all') shapes.forEach((s) => translateShape(s, dx, dy));
+      else translateShape(shapes[dragState.idx], dx, dy);
+      dragState.last = p;
+      render();
+    }
+    return;
+  }
+  if (!drawing) return;
+  const p = clientToCoord(evt);
+  if (drawing.el === 'line') { drawing.attrs.x2 = p.x; drawing.attrs.y2 = p.y; }
+  else if (drawing.el === 'rect') {
+    const s = drawing.start;
+    drawing.attrs.x = Math.min(s.x, p.x); drawing.attrs.y = Math.min(s.y, p.y);
+    drawing.attrs.width = Math.abs(p.x - s.x); drawing.attrs.height = Math.abs(p.y - s.y);
+  } else if (drawing.el === 'circle') {
+    const dx = p.x - drawing.attrs.cx, dy = p.y - drawing.attrs.cy;
+    drawing.attrs.r = snap(Math.sqrt(dx*dx + dy*dy));
+  } else if (drawing.el === 'ellipse') {
+    const s = drawing.start;
+    drawing.attrs.cx = snap((s.x + p.x) / 2); drawing.attrs.cy = snap((s.y + p.y) / 2);
+    drawing.attrs.rx = snap(Math.abs(p.x - s.x) / 2); drawing.attrs.ry = snap(Math.abs(p.y - s.y) / 2);
+  } else if (drawing.el === 'path') {
+    drawing.attrs.d += ` L ${p.x} ${p.y}`;
+  } else if (drawing.el === 'polygon' || drawing.el === 'polyline') {
+    const pts = polyPoints.map(pt => `${pt.x},${pt.y}`).join(' ') + ` ${p.x},${p.y}`;
+    drawing.attrs.points = pts;
+  }
+  render();
+}
+
+function onUp() {
+  if (dragState) { dragState = null; renderList(); renderProps(); return; }
+  if (!drawing) return;
+  if (drawing.el === 'polygon' || drawing.el === 'polyline') return; // 由完成按钮/双击/Enter 结束
+  shapes.push(drawing);
+  selectedIdx = shapes.length - 1;
+  drawing = null;
+  render(); renderList(); renderProps();
+}
+window.addEventListener('mouseup', () => { if (dragState) { dragState = null; renderList(); renderProps(); } });
+
+function finishMultiPoint() {
+  if (!(tool === 'polygon' || tool === 'polyline')) return;
+  let pts = polyPoints.slice();
+  // 双击会在同一坐标触发两次 mousedown，去掉收尾的重复点
+  if (pts.length >= 2) {
+    const a = pts[pts.length - 1], b = pts[pts.length - 2];
+    if (a.x === b.x && a.y === b.y) pts.pop();
+  }
+  if (pts.length < 2) { polyPoints = []; drawing = null; render(); return; }
+  shapes.push({ el: tool, attrs: { points: pts.map(pt => `${pt.x},${pt.y}`).join(' ') } });
+  selectedIdx = shapes.length - 1;
+  polyPoints = []; drawing = null;
+  render(); renderList(); renderProps();
+}
+
+function onDblClick() { finishMultiPoint(); }
+
+// 命中容差（viewBox 坐标单位，与缩放无关）：原来靠浏览器原生 SVG 拾取，
+// 细线/空心图形几乎只有描边像素那一条窄缝能点中，体感"拖不准"；
+// 改成距离判定后，线条/边框附近一小片范围都算命中。
+const HIT_TOLERANCE = 3;
+
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function pointInPolygon(p, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function parsePathPoints(d) {
+  const nums = (d.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+  const pts = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) pts.push({ x: nums[i], y: nums[i + 1] });
+  return pts;
+}
+
+function shapeHit(shape, p, tol) {
+  const { el, attrs: a } = shape;
+  const filled = a.fill !== 'none';
+  switch (el) {
+    case 'line':
+      return distToSegment(p, { x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }) <= tol;
+    case 'rect': {
+      const within = p.x >= a.x - tol && p.x <= a.x + a.width + tol && p.y >= a.y - tol && p.y <= a.y + a.height + tol;
+      if (!within) return false;
+      if (filled) return true;
+      return Math.abs(p.x - a.x) <= tol || Math.abs(p.x - (a.x + a.width)) <= tol
+        || Math.abs(p.y - a.y) <= tol || Math.abs(p.y - (a.y + a.height)) <= tol;
+    }
+    case 'circle': {
+      const dist = Math.hypot(p.x - a.cx, p.y - a.cy);
+      return filled ? dist <= a.r + tol : Math.abs(dist - a.r) <= tol;
+    }
+    case 'ellipse': {
+      const rx = a.rx || 1, ry = a.ry || 1;
+      const norm = Math.hypot((p.x - a.cx) / rx, (p.y - a.cy) / ry);
+      const relTol = tol / Math.max(rx, ry, 1);
+      return filled ? norm <= 1 + relTol : Math.abs(norm - 1) <= relTol;
+    }
+    case 'polygon':
+    case 'polyline': {
+      const pts = a.points.split(' ').filter(Boolean).map((pair) => {
+        const [x, y] = pair.split(',').map(Number);
+        return { x, y };
+      });
+      if (el === 'polygon' && filled && pointInPolygon(p, pts)) return true;
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (distToSegment(p, pts[i], pts[i + 1]) <= tol) return true;
+      }
+      if (el === 'polygon' && pts.length > 1 && distToSegment(p, pts[pts.length - 1], pts[0]) <= tol) return true;
+      return false;
+    }
+    case 'path': {
+      const pts = parsePathPoints(a.d);
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (distToSegment(p, pts[i], pts[i + 1]) <= tol) return true;
+      }
+      return false;
+    }
+    case 'text':
+      return Math.abs(p.x - a.x) <= 12 && Math.abs(p.y - a.y) <= 8;
+    default:
+      return false;
+  }
+}
+
+// 从最上层（最后绘制）往下找第一个命中的图形，跟视觉叠放顺序一致
+function hitTest(p) {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (shapeHit(shapes[i], p, HIT_TOLERANCE)) return i;
+  }
+  return -1;
+}
+
+function translateShape(shape, dx, dy) {
+  const { el, attrs: a } = shape;
+  if (el === 'polygon' || el === 'polyline') {
+    a.points = a.points.split(' ').map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      return `${x+dx},${y+dy}`;
+    }).join(' ');
+  } else if (el === 'path') {
+    a.d = a.d.replace(/(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)/g, (m, x, _1, y) => `${(+x)+dx} ${(+y)+dy}`);
+  } else {
+    const moveMap = {
+      line: ['x1','y1','x2','y2'], rect: ['x','y'], circle: ['cx','cy'],
+      ellipse: ['cx','cy'], text: ['x','y'],
+    };
+    (moveMap[el] || []).forEach((k, i) => { a[k] = (a[k] || 0) + (i % 2 === 0 ? dx : dy); });
+  }
+}
+
+function onKey(evt) {
+  if ((tool === 'polygon' || tool === 'polyline')) {
+    if (evt.key === 'Enter') { finishMultiPoint(); return; }
+    if (evt.key === 'Escape') { polyPoints = []; drawing = null; render(); return; }
+  }
+  if (selectedIdx < 0) return;
+  const step = evt.shiftKey ? 5 : 1;
+  if (evt.key === 'Delete' || evt.key === 'Backspace') {
+    shapes.splice(selectedIdx, 1); selectedIdx = -1;
+    render(); renderList(); renderProps();
+    evt.preventDefault();
+    return;
+  }
+  let dx = 0, dy = 0;
+  if (evt.key === 'ArrowLeft') dx = -step;
+  else if (evt.key === 'ArrowRight') dx = step;
+  else if (evt.key === 'ArrowUp') dy = -step;
+  else if (evt.key === 'ArrowDown') dy = step;
+  else return;
+  evt.preventDefault();
+  translateShape(shapes[selectedIdx], dx, dy);
+  render(); renderProps();
+}
+
+function svgAttrs(attrs, el) {
+  const out = {};
+  for (const k in attrs) {
+    if (k === 'sw') out['stroke-width'] = attrs.sw;
+    else if (k === 'text' || k === 'anchor' || k === 'size') continue;
+    else out[k] = attrs[k];
+  }
+  return out;
+}
+
+function makeEl(shape, idx) {
+  const { el, attrs } = shape;
+  const tag = el === 'text' ? 'text' : el;
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  const a = svgAttrs(attrs, el);
+  for (const k in a) node.setAttribute(k, a[k]);
+  node.setAttribute('fill', attrs.fill || (el === 'line' || el === 'path' || el === 'polyline' ? 'none' : '#fff'));
+  node.setAttribute('stroke', attrs.stroke === 'none' ? 'none' : (attrs.stroke || '#2a2a2a'));
+  if (!attrs['stroke-width'] && !attrs.sw) node.setAttribute('stroke-width', DEFAULT_SW);
+  if (el === 'text') {
+    node.textContent = attrs.text || '';
+    node.setAttribute('text-anchor', attrs.anchor || 'middle');
+    node.setAttribute('font-size', attrs.size || 10);
+    node.setAttribute('fill', attrs.fill || '#2a2a2a');
+    node.setAttribute('stroke', 'none');
+  }
+  node.dataset.idx = idx;
+  node.style.cursor = 'pointer';
+  return node;
+}
+
+function render() {
+  setStageSize();
+  svg.innerHTML = '';
+  const { w, h } = vb();
+  // 网格
+  const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  grid.classList.add('grid');
+  for (let x = 0; x <= w; x += 10) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x); l.setAttribute('y1', 0); l.setAttribute('x2', x); l.setAttribute('y2', h);
+    grid.appendChild(l);
+  }
+  for (let y = 0; y <= h; y += 10) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 0); l.setAttribute('y1', y); l.setAttribute('x2', w); l.setAttribute('y2', y);
+    grid.appendChild(l);
+  }
+  svg.appendChild(grid);
+
+  shapes.forEach((s, i) => svg.appendChild(makeEl(s, i)));
+
+  if (drawing) {
+    const tmp = makeEl(drawing, -1);
+    tmp.setAttribute('opacity', '0.6');
+    svg.appendChild(tmp);
+  }
+
+  if (selectedIdx >= 0 && shapes[selectedIdx]) {
+    const box = boundingBox(shapes[selectedIdx]);
+    if (box) {
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.classList.add('sel-outline');
+      r.setAttribute('x', box.x - 1); r.setAttribute('y', box.y - 1);
+      r.setAttribute('width', box.w + 2); r.setAttribute('height', box.h + 2);
+      svg.appendChild(r);
+    }
+  }
+  updateExport();
+}
+
+function boundingBox(shape) {
+  const a = shape.attrs;
+  switch (shape.el) {
+    case 'line': return { x: Math.min(a.x1,a.x2), y: Math.min(a.y1,a.y2), w: Math.abs(a.x2-a.x1), h: Math.abs(a.y2-a.y1) };
+    case 'rect': return { x: a.x, y: a.y, w: a.width, h: a.height };
+    case 'circle': return { x: a.cx-a.r, y: a.cy-a.r, w: a.r*2, h: a.r*2 };
+    case 'ellipse': return { x: a.cx-a.rx, y: a.cy-a.ry, w: a.rx*2, h: a.ry*2 };
+    case 'text': return { x: a.x-10, y: a.y-10, w: 20, h: 14 };
+    case 'polygon':
+    case 'polyline': {
+      const pts = a.points.split(' ').map(p => p.split(',').map(Number));
+      const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
+      return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs)-Math.min(...xs), h: Math.max(...ys)-Math.min(...ys) };
+    }
+    default: return null;
+  }
+}
+
+const ATTR_FIELDS = {
+  line: ['x1','y1','x2','y2'],
+  rect: ['x','y','width','height','rx'],
+  circle: ['cx','cy','r'],
+  ellipse: ['cx','cy','rx','ry'],
+  polygon: ['points'],
+  polyline: ['points'],
+  path: ['d'],
+  text: ['x','y','text','anchor','size'],
+};
+
+function renderList() {
+  const box = document.getElementById('shapeList');
+  box.innerHTML = '';
+  shapes.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'shape-item' + (i === selectedIdx ? ' sel' : '');
+    row.innerHTML = `<span class="tag">${s.el}</span><span>${shortDesc(s)}</span>
+      <span class="ops">
+        <button data-act="up">↑</button><button data-act="down">↓</button><button data-act="del">×</button>
+      </span>`;
+    row.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      selectedIdx = i; render(); renderList(); renderProps();
+    });
+    row.querySelector('[data-act=up]').addEventListener('click', () => { if (i>0) { [shapes[i-1],shapes[i]]=[shapes[i],shapes[i-1]]; selectedIdx=i-1; render(); renderList(); renderProps(); } });
+    row.querySelector('[data-act=down]').addEventListener('click', () => { if (i<shapes.length-1) { [shapes[i+1],shapes[i]]=[shapes[i],shapes[i+1]]; selectedIdx=i+1; render(); renderList(); renderProps(); } });
+    row.querySelector('[data-act=del]').addEventListener('click', () => { shapes.splice(i,1); if (selectedIdx>=i) selectedIdx--; render(); renderList(); renderProps(); });
+    box.appendChild(row);
+  });
+}
+
+function shortDesc(s) {
+  const fields = ATTR_FIELDS[s.el] || [];
+  return fields.slice(0,3).map(f => `${f}:${s.attrs[f] ?? ''}`).join(' ');
+}
+
+function renderProps() {
+  const body = document.getElementById('propsBody');
+  if (selectedIdx < 0 || !shapes[selectedIdx]) { body.innerHTML = '<small class="note">未选中图形</small>'; return; }
+  const s = shapes[selectedIdx];
+  const fields = ATTR_FIELDS[s.el] || [];
+  let html = '';
+  fields.forEach(f => {
+    const v = s.attrs[f] ?? '';
+    const type = (f === 'points' || f === 'd' || f === 'text' || f === 'anchor') ? 'text' : 'number';
+    html += `<div class="prop-row"><label>${f}</label><input type="${type}" data-f="${f}" value="${v}"></div>`;
+  });
+  html += `<div class="prop-row"><label>fill</label><input type="text" data-f="fill" value="${s.attrs.fill ?? ''}" placeholder="默认 #fff/none"></div>`;
+  html += `<div class="prop-row"><label>stroke</label><input type="text" data-f="stroke" value="${s.attrs.stroke ?? ''}" placeholder="默认 #2a2a2a"></div>`;
+  if (s.el !== 'text') html += `<div class="prop-row"><label>sw 线宽</label><input type="number" step="0.1" data-f="sw" value="${s.attrs.sw ?? ''}" placeholder="默认 ${DEFAULT_SW}"></div>`;
+  body.innerHTML = html;
+  body.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const f = inp.dataset.f;
+      let val = inp.value;
+      if (inp.type === 'number' && val !== '') val = +val;
+      if (val === '') delete s.attrs[f]; else s.attrs[f] = val;
+      render(); renderList();
+    });
+  });
+}
+
+function attrsToCode(s) {
+  const a = s.attrs;
+  const parts = [`el: '${s.el}'`];
+  const fields = ATTR_FIELDS[s.el] || [];
+  fields.forEach(f => {
+    if (a[f] === undefined || a[f] === '') return;
+    if (typeof a[f] === 'string' && f !== 'points' && f !== 'd') parts.push(`${f}: '${a[f]}'`);
+    else if (f === 'points' || f === 'd' || f === 'text' || f === 'anchor') parts.push(`${f}: '${a[f]}'`);
+    else parts.push(`${f}: ${a[f]}`);
+  });
+  if (a.fill) parts.push(`fill: '${a.fill}'`);
+  if (a.stroke) parts.push(`stroke: '${a.stroke}'`);
+  if (a.sw !== undefined && a.sw !== '') parts.push(`sw: ${a.sw}`);
+  return `{ ${parts.join(', ')} }`;
+}
+
+function updateExport() {
+  const type = document.getElementById('typeKey').value.trim() || 'new_symbol';
+  const label = document.getElementById('labelText').value.trim() || '新图元';
+  const group = document.getElementById('groupText').value.trim() || '未分组';
+  const labelMode = document.getElementById('labelMode').value;
+  const { w, h } = vb();
+  const drawLines = shapes.map(s => '      ' + attrsToCode(s) + ',').join('\n');
+  const code =
+`${type}: {
+  label: '${label}', group: '${group}', defaultData: { label: '${type.toUpperCase()}-1' },
+  size: { w: ${w}, h: ${h} }, viewBox: '0 0 ${w} ${h}', labelMode: '${labelMode}',
+  draw: [
+${drawLines}
+  ],
+},`;
+  document.getElementById('exportBox').value = code;
+}
+
+['typeKey','labelText','groupText','labelMode'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateExport));
+
+function copyExport() {
+  const box = document.getElementById('exportBox');
+  box.select();
+  navigator.clipboard.writeText(box.value).then(() => {
+    hint.textContent = '已复制到剪贴板，可直接粘贴进 symbols.js 的 SIMPLE_SYMBOLS 里';
+  }).catch(() => document.execCommand('copy'));
+}
+
+function importDraw() {
+  const raw = document.getElementById('importBox').value.trim();
+  if (!raw) return;
+  try {
+    // 仅供本地信任输入解析：把 draw 数组文本当 JS 表达式求值
+    const arr = Function('"use strict"; return (' + (raw.startsWith('[') ? raw : raw.replace(/^draw\s*:\s*/, '')) + ')')();
+    if (!Array.isArray(arr)) throw new Error('不是数组');
+    shapes = arr.map(s => ({ el: s.el, attrs: { ...s } }));
+    shapes.forEach(s => delete s.attrs.el);
+    selectedIdx = -1;
+    render(); renderList(); renderProps();
+    hint.textContent = `已导入 ${shapes.length} 个图形`;
+  } catch (e) {
+    alert('解析失败，请确认粘贴的是合法的 draw 数组内容：\n' + e.message);
+  }
+}
+
+render(); renderList(); renderProps();
+</script>
+
+</body>
+</html>

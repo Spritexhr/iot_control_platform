@@ -11,13 +11,13 @@
       </div>
     </template>
 
-    <!-- 图形图元：旋转/镜像只套在图形+连接点上，标签文字永远水平 -->
+    <!-- 图形图元：旋转/镜像只作用于图形，4个连接点固定在四边不随图形转动 -->
     <template v-else-if="def">
+      <Handle id="left"   type="source" :position="Position.Left" />
+      <Handle id="right"  type="source" :position="Position.Right" />
+      <Handle id="top"    type="source" :position="Position.Top" />
+      <Handle id="bottom" type="source" :position="Position.Bottom" />
       <div class="symbol-node__transform" :style="transformStyle">
-        <Handle id="left"   type="source" :position="Position.Left" />
-        <Handle id="right"  type="source" :position="Position.Right" />
-        <Handle id="top"    type="source" :position="Position.Top" />
-        <Handle id="bottom" type="source" :position="Position.Bottom" />
         <SymbolGlyph
           class="symbol-node__glyph"
           :viewBox="def.viewBox"

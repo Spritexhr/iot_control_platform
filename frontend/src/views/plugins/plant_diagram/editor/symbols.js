@@ -19,6 +19,20 @@
 
 // labelMode: 'below' 图形下方小标签 | 'plain' 纯文本注释块 | 'none' 不显示
 export const SIMPLE_SYMBOLS = {
+  vessel: {
+    label: '反应器', group: '仪表/容器', defaultData: { label: '反应器' },
+    size: { w: 56, h: 94 }, viewBox: '0 0 56 94', labelMode: 'below',
+    draw: [
+      { el: 'ellipse', cx: 28, cy: 32, rx: 22, ry: 7 },
+      { el: 'line', x1: 6, y1: 32, x2: 6, y2: 83 },
+      { el: 'line', x1: 50, y1: 32, x2: 50, y2: 83 },
+      { el: 'ellipse', cx: 28, cy: 83, rx: 22, ry: 7 },
+      { el: 'circle', cx: 28, cy: 8, r: 5 },
+      { el: 'line', x1: 28, y1: 13, x2: 28, y2: 61 },
+      { el: 'polyline', points: '21,67 21,55 34,66 34,54' },
+    ],
+  },
+
   valve: {
     label: '阀门', group: '管路', defaultData: { label: 'FCV' },
     size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
@@ -44,13 +58,19 @@ export const SIMPLE_SYMBOLS = {
 
   pump: {
     label: '泵', group: '动设备', defaultData: { label: 'P-1' },
-    size: { w: 70, h: 60 }, viewBox: '0 0 70 60', labelMode: 'below',
+    size: { w: 70, h: 80 }, viewBox: '0 0 70 80', labelMode: 'below',
     draw: [
-      { el: 'circle', cx: 35, cy: 35, r: 22 },
-      { el: 'line', x1: 35, y1: 13, x2: 62, y2: 6, sw: 1.5 },
-      { el: 'polygon', points: '35,35 22,28 22,42', fill: '#2a2a2a', stroke: 'none' },
+      { el: 'circle', cx: 40, cy: 40, r: 20 },
+      { el: 'line', x1: 28, y1: 57, x2: 19, y2: 69 },
+      { el: 'line', x1: 53, y1: 56, x2: 63, y2: 70 },
+      { el: 'line', x1: 20, y1: 69, x2: 62, y2: 69 },
+      { el: 'line', x1: 6, y1: 40, x2: 40, y2: 40 },
+      { el: 'line', x1: 60, y1: 40, x2: 60, y2: 10 },
+      { el: 'polyline', points: '37,36 41,40 37,44' },
+      { el: 'polyline', points: '56,15 60,10 64,15' },
     ],
   },
+
 
   compressor: {
     label: '压缩机', group: '动设备', defaultData: { label: 'C-1' },
@@ -62,13 +82,17 @@ export const SIMPLE_SYMBOLS = {
 
   mixer: {
     label: '混合器', group: '动设备', defaultData: { label: 'MIX' },
-    size: { w: 70, h: 60 }, viewBox: '0 0 70 60', labelMode: 'below',
+    size: { w: 76, h: 48 }, viewBox: '0 0 76 48', labelMode: 'below',
     draw: [
-      { el: 'circle', cx: 35, cy: 30, r: 22 },
-      { el: 'line', x1: 35, y1: 8, x2: 35, y2: 52, sw: 1.2 },
-      { el: 'line', x1: 13, y1: 30, x2: 57, y2: 30, sw: 1.2 },
-      { el: 'line', x1: 19, y1: 14, x2: 51, y2: 46, sw: 1 },
-      { el: 'line', x1: 51, y1: 14, x2: 19, y2: 46, sw: 1 },
+      { el: 'rect', x: 9, y: 16, width: 58, height: 16 },
+      { el: 'rect', x: 18, y: 7, width: 12, height: 9 },
+      { el: 'line', x1: 9, y1: 9, x2: 9, y2: 39 },
+      { el: 'line', x1: 67, y1: 9, x2: 67, y2: 39 },
+      { el: 'line', x1: 18, y1: 16, x2: 18, y2: 32 },
+      { el: 'line', x1: 28, y1: 16, x2: 28, y2: 32 },
+      { el: 'line', x1: 38, y1: 16, x2: 38, y2: 32 },
+      { el: 'line', x1: 48, y1: 16, x2: 48, y2: 32 },
+      { el: 'line', x1: 58, y1: 16, x2: 58, y2: 32 },
     ],
   },
 
@@ -115,26 +139,22 @@ export const SIMPLE_SYMBOLS = {
 
   stream_inlet: {
     label: '物流进口标签', group: '物流标签', defaultData: { label: '物流进口' },
-    size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
+    size: { w: 56, h: 25 }, viewBox: '0 0 56 25', labelMode: 'below',
     draw: [
-      { el: 'line', x1: 8, y1: 10, x2: 8, y2: 40, sw: 2.5 },
-      { el: 'line', x1: 8, y1: 25, x2: 54, y2: 25, sw: 1.5 },
-      { el: 'polygon', points: '46,13 72,25 46,37' },
+        { el: 'polygon', points: '8,6 40,6 47,12 40,18 8,18' },
     ],
   },
 
   stream_outlet: {
     label: '物流出口标签', group: '物流标签', defaultData: { label: '物流出口' },
-    size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
+    size: { w: 56, h: 25 }, viewBox: '0 0 56 25', labelMode: 'below',
     draw: [
-      { el: 'line', x1: 8, y1: 25, x2: 36, y2: 25, sw: 1.5 },
-      { el: 'polygon', points: '28,13 54,25 28,37' },
-      { el: 'line', x1: 72, y1: 10, x2: 72, y2: 40, sw: 2.5 },
+        { el: 'polygon', points: '47,6 47,18 17,18 9,12 18,6' },
     ],
   },
 }
 
-// 工具箱面板里仪表/容器的预览图形（这两类有专用节点组件，不在 SIMPLE_SYMBOLS）
+// instrument 有专用节点组件（传感器绑定 + 实时取值），不在 SIMPLE_SYMBOLS
 const SPECIAL = {
   instrument: {
     label: '仪表', group: '仪表/容器',
@@ -157,22 +177,9 @@ const SPECIAL = {
       ],
     },
   },
-  vessel: {
-    label: '反应器', group: '仪表/容器',
-    defaultData: { label: '反应器', shape: 'cstr' },
-    glyph: {
-      viewBox: '0 0 40 44',
-      draw: [
-        { el: 'rect', x: 8, y: 12, width: 24, height: 20 },
-        { el: 'ellipse', cx: 20, cy: 12, rx: 12, ry: 5 },
-        { el: 'ellipse', cx: 20, cy: 32, rx: 12, ry: 5 },
-      ],
-    },
-  },
 }
 
-// 按 type 查图元的注册表条目（label/group/defaultData/bindable/rotatable 等），
-// instrument/vessel 在 SPECIAL，其余在 SIMPLE_SYMBOLS——给 PropertiesPanel 统一查能力用
+// 按 type 查图元的注册表条目（label/group/defaultData/bindable/rotatable 等）
 export function getNodeMeta(type) {
   return SPECIAL[type] || SIMPLE_SYMBOLS[type] || null
 }
