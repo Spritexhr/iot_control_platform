@@ -2,9 +2,14 @@ import request from '../index'
 
 const BASE = '/plugins/eb_plant'
 
-/** 取大屏当前已绑定传感器的快照 */
+/** 取大屏当前实时快照（传感器最新值 + 设备最新状态） */
 export function getPlantSnapshot() {
   return request.get(`${BASE}/snapshot`)
+}
+
+/** 取大屏骨架：有序工段，每段挂传感器/设备绑定（含静态元信息） */
+export function getPlantLayout() {
+  return request.get(`${BASE}/layout`)
 }
 
 /**
@@ -66,4 +71,26 @@ export function updateDeviceBinding(id, patch) {
 
 export function deleteDeviceBinding(id) {
   return request.delete(`${BASE}/device_bindings/${id}/`)
+}
+
+// ---------- 工段（栏目） ----------
+export function listSections() {
+  return request.get(`${BASE}/sections/`)
+}
+
+export function createSection(payload) {
+  return request.post(`${BASE}/sections/`, payload)
+}
+
+export function updateSection(id, patch) {
+  return request.patch(`${BASE}/sections/${id}/`, patch)
+}
+
+export function deleteSection(id) {
+  return request.delete(`${BASE}/sections/${id}/`)
+}
+
+/** 按 section id 数组批量写显示顺序 */
+export function reorderSections(order) {
+  return request.post(`${BASE}/sections/reorder/`, { order })
 }

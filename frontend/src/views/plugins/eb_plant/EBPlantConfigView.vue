@@ -12,6 +12,42 @@
     </header>
 
     <el-tabs v-model="activeTab" class="eb-config__tabs">
+      <!-- ============ 工段管理 ============ -->
+      <el-tab-pane label="工段" name="sections">
+        <div class="eb-config__panel">
+          <section class="eb-config__col">
+            <div class="eb-config__col-head">
+              <h3>工段（栏目）</h3>
+              <el-button size="small" type="primary" @click="onAddSection">新建工段</el-button>
+            </div>
+            <p class="eb-config__hint">
+              工段决定大屏上的分块与顺序。删除工段不会删除绑定——其下传感器/设备会落到大屏末尾的「未分组」。
+            </p>
+            <el-table :data="store.sections" size="small" max-height="500">
+              <el-table-column label="顺序" width="100" align="center">
+                <template #default="{ $index }">
+                  <el-button size="small" link :disabled="$index === 0" @click="moveSection($index, -1)">↑</el-button>
+                  <el-button size="small" link :disabled="$index === store.sections.length - 1" @click="moveSection($index, 1)">↓</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column label="名称" min-width="220">
+                <template #default="{ row }">
+                  <el-input v-model="row.name" size="small" @change="(v) => onRenameSection(row.id, v)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="100" align="center">
+                <template #default="{ row }">
+                  <el-button size="small" type="danger" link @click="onRemoveSection(row.id)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <p v-if="store.sections.length === 0" class="eb-config__empty-hint">
+              还没有工段，点「新建工段」开始建立分组；之后在「传感器」「设备」里把点位指派到工段。
+            </p>
+          </section>
+        </div>
+      </el-tab-pane>
+
       <!-- ============ 传感器绑定 ============ -->
       <el-tab-pane label="传感器" name="sensors">
         <div class="eb-config__panel">
@@ -116,9 +152,18 @@
                   <el-input v-model="row.tag" size="small" @change="(v) => savePatch(row.id, { tag: v })" />
                 </template>
               </el-table-column>
-              <el-table-column label="区域" min-width="110">
+              <el-table-column label="工段" min-width="150">
                 <template #default="{ row }">
-                  <el-input v-model="row.area" size="small" @change="(v) => savePatch(row.id, { area: v })" />
+                  <el-select
+                    v-model="row.section"
+                    size="small"
+                    clearable
+                    placeholder="未分组"
+                    style="width: 100%"
+                    @change="(v) => savePatch(row.id, { section: v ?? null })"
+                  >
+                    <el-option v-for="sec in store.sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+                  </el-select>
                 </template>
               </el-table-column>
               <el-table-column label="data_key" min-width="130">
@@ -202,9 +247,18 @@
                   <el-input v-model="row.tag" size="small" @change="(v) => savePatchDevice(row.id, { tag: v })" />
                 </template>
               </el-table-column>
-              <el-table-column label="区域" min-width="140">
+              <el-table-column label="工段" min-width="150">
                 <template #default="{ row }">
-                  <el-input v-model="row.area" size="small" @change="(v) => savePatchDevice(row.id, { area: v })" />
+                  <el-select
+                    v-model="row.section"
+                    size="small"
+                    clearable
+                    placeholder="未分组"
+                    style="width: 100%"
+                    @change="(v) => savePatchDevice(row.id, { section: v ?? null })"
+                  >
+                    <el-option v-for="sec in store.sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+                  </el-select>
                 </template>
               </el-table-column>
               <el-table-column label="显示" width="80" align="center">
@@ -366,6 +420,62 @@ async function onRemoveDevice(id) {
     ElMessage.success('已移除')
   } catch (e) {
     ElMessage.error('移除失败: ' + (e?.message || e))
+  }
+}
+
+// ---------- 工段管理 ----------
+async function onAddSection() {
+  try {
+    const { value } = await ElMessageBox.prompt('工段名称', '新建工段', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputValidator: (v) => (v && v.trim() ? true : '名称不能为空'),
+    })
+    await store.addSection(value.trim())
+    ElMessage.success('已创建工段')
+  } catch (e) {
+    if (e === 'cancel' || e === 'close') return
+    ElMessage.error('创建失败: ' + (e?.message || e))
+  }
+}
+
+async function onRenameSection(id, name) {
+  if (!name || !name.trim()) {
+    ElMessage.warning('名称不能为空')
+    await store.reloadSections()
+    return
+  }
+  try {
+    await store.renameSection(id, name.trim())
+  } catch (e) {
+    ElMessage.error('改名失败: ' + (e?.message || e))
+  }
+}
+
+async function onRemoveSection(id) {
+  try {
+    await ElMessageBox.confirm('删除该工段？其下传感器/设备会落到「未分组」。', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await store.removeSection(id)
+    ElMessage.success('已删除')
+  } catch (e) {
+    if (e === 'cancel' || e === 'close') return
+    ElMessage.error('删除失败: ' + (e?.message || e))
+  }
+}
+
+async function moveSection(index, dir) {
+  const ids = store.sections.map((s) => s.id)
+  const j = index + dir
+  if (j < 0 || j >= ids.length) return
+  ;[ids[index], ids[j]] = [ids[j], ids[index]]
+  try {
+    await store.saveSectionOrder(ids)
+  } catch (e) {
+    ElMessage.error('排序失败: ' + (e?.message || e))
   }
 }
 </script>

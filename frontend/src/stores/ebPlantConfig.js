@@ -14,7 +14,16 @@ import {
   createDeviceBindings,
   updateDeviceBinding,
   deleteDeviceBinding,
+  listSections,
+  createSection,
+  updateSection,
+  deleteSection,
+  reorderSections,
 } from '@/api/plugins/eb_plant'
+
+function unwrapList(resp) {
+  return Array.isArray(resp) ? resp : resp?.results || []
+}
 
 /**
  * EB 大屏配置 store：负责"挑设备/传感器 → 写入插件表"的状态。
@@ -26,31 +35,65 @@ export const useEBPlantConfigStore = defineStore('ebPlantConfig', () => {
   const bindableDevices = ref([])
   const sensorBindings = ref([])
   const deviceBindings = ref([])
+  const sections = ref([])
 
   async function loadAll() {
-    const [cfg, sources, sBindings, dBindings] = await Promise.all([
+    const [cfg, sources, sBindings, dBindings, secs] = await Promise.all([
       getEBConfig(),
       listBindableSources(),
       listSensorBindings(),
       listDeviceBindings(),
+      listSections(),
     ])
     config.value = cfg
     bindableSensors.value = sources.sensors || []
     bindableDevices.value = sources.devices || []
-    sensorBindings.value = Array.isArray(sBindings) ? sBindings : sBindings.results || []
-    deviceBindings.value = Array.isArray(dBindings) ? dBindings : dBindings.results || []
+    sensorBindings.value = unwrapList(sBindings)
+    deviceBindings.value = unwrapList(dBindings)
+    sections.value = unwrapList(secs)
   }
 
   async function refreshBindings() {
-    const [sources, sBindings, dBindings] = await Promise.all([
+    const [sources, sBindings, dBindings, secs] = await Promise.all([
       listBindableSources(),
       listSensorBindings(),
       listDeviceBindings(),
+      listSections(),
     ])
     bindableSensors.value = sources.sensors || []
     bindableDevices.value = sources.devices || []
-    sensorBindings.value = Array.isArray(sBindings) ? sBindings : sBindings.results || []
-    deviceBindings.value = Array.isArray(dBindings) ? dBindings : dBindings.results || []
+    sensorBindings.value = unwrapList(sBindings)
+    deviceBindings.value = unwrapList(dBindings)
+    sections.value = unwrapList(secs)
+  }
+
+  // ---------- 工段 ----------
+  async function reloadSections() {
+    sections.value = unwrapList(await listSections())
+  }
+
+  async function addSection(name) {
+    const created = await createSection({ name, sort_order: sections.value.length })
+    await reloadSections()
+    return created
+  }
+
+  async function renameSection(id, name) {
+    await updateSection(id, { name })
+    const idx = sections.value.findIndex((s) => s.id === id)
+    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], name }
+  }
+
+  async function removeSection(id) {
+    await deleteSection(id)
+    await reloadSections()
+    // 绑定的 section 在后端被 SET_NULL，刷新绑定让 UI 同步
+    await refreshBindings()
+  }
+
+  async function saveSectionOrder(orderedIds) {
+    await reorderSections(orderedIds)
+    await reloadSections()
   }
 
   async function importSensors(ids) {
@@ -104,6 +147,7 @@ export const useEBPlantConfigStore = defineStore('ebPlantConfig', () => {
     bindableDevices,
     sensorBindings,
     deviceBindings,
+    sections,
     loadAll,
     refreshBindings,
     importSensors,
@@ -114,5 +158,10 @@ export const useEBPlantConfigStore = defineStore('ebPlantConfig', () => {
     removeSensorBinding,
     removeDeviceBinding,
     saveViewSettings,
+    reloadSections,
+    addSection,
+    renameSection,
+    removeSection,
+    saveSectionOrder,
   }
 })

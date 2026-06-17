@@ -17,7 +17,7 @@ import logging
 
 from django.http import JsonResponse
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
@@ -25,12 +25,13 @@ from devices.models import Device
 from sensors.models import Sensor, SensorData
 from services.realtime.latest_values import ingest_sensor_data, latest_values
 
-from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSensorBinding
+from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSection, EBPlantSensorBinding
 from .serializers import (
     BindableDeviceSerializer,
     BindableSensorSerializer,
     EBPlantConfigSerializer,
     EBPlantDeviceBindingSerializer,
+    EBPlantSectionSerializer,
     EBPlantSensorBindingSerializer,
 )
 
@@ -150,6 +151,23 @@ class EBPlantDeviceBindingViewSet(_AdminWritePermission, viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
+class EBPlantSectionViewSet(_AdminWritePermission, viewsets.ModelViewSet):
+    """大屏工段（栏目）CRUD。读 IsAuthenticated，写 IsAdminUser。"""
+
+    queryset = EBPlantSection.objects.all()
+    serializer_class = EBPlantSectionSerializer
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsAdminUser])
+    def reorder(self, request):
+        """按传入的 section id 顺序批量写 sort_order。body: {"order": [id, id, ...]}"""
+        order = request.data.get("order", [])
+        if not isinstance(order, list):
+            return Response({"detail": "order 必须是 id 列表"}, status=status.HTTP_400_BAD_REQUEST)
+        for idx, sec_id in enumerate(order):
+            EBPlantSection.objects.filter(id=sec_id).update(sort_order=idx)
+        return Response({"ok": True})
+
+
 # ---------- 实时数据（snapshot 与 consumer 共用的 helper） ----------
 
 def _bound_point_ids() -> set:
@@ -206,6 +224,83 @@ def _refresh_online_status(samples: list) -> None:
         sample["last_seen"] = sensor.last_seen.timestamp() if sensor.last_seen else None
 
 
+def _device_states() -> list:
+    """已可见设备绑定的当前状态：取主模型最近一条 DeviceStatusCollection + 实时在线判定。
+    在线状态用 Device.computed_is_online 现查现算（跟设备管理页同口径）。"""
+    bindings = (
+        EBPlantDeviceBinding.objects.filter(is_visible=True)
+        .select_related("device", "device__device_type")
+    )
+    states = []
+    for b in bindings:
+        device = b.device
+        last = device.status_records.order_by("-timestamp").first()
+        states.append({
+            "device_id": device.device_id,
+            "name": device.name,
+            "tag": b.tag or device.device_id,
+            "status": (last.data if last and isinstance(last.data, dict) else {}),
+            "event": (last.event_name if last else ""),
+            "is_online": bool(device.computed_is_online),
+            "last_seen": device.last_seen.timestamp() if device.last_seen else None,
+            "ts": last.timestamp.timestamp() if (last and last.timestamp) else None,
+        })
+    return states
+
+
+def _build_layout() -> dict:
+    """大屏骨架：有序工段，每段挂它的传感器/设备绑定（含静态元信息），
+    未归属 section 的绑定统一落到末尾「未分组」段。"""
+    from collections import defaultdict
+
+    sensor_bindings = (
+        EBPlantSensorBinding.objects.filter(is_visible=True)
+        .select_related("sensor", "sensor__sensor_type", "section")
+    )
+    device_bindings = (
+        EBPlantDeviceBinding.objects.filter(is_visible=True)
+        .select_related("device", "device__device_type", "section")
+    )
+    s_data = EBPlantSensorBindingSerializer(sensor_bindings, many=True).data
+    d_data = EBPlantDeviceBindingSerializer(device_bindings, many=True).data
+
+    s_by_sec = defaultdict(list)
+    for it in s_data:
+        s_by_sec[it.get("section")].append(it)
+    d_by_sec = defaultdict(list)
+    for it in d_data:
+        d_by_sec[it.get("section")].append(it)
+
+    sections = []
+    for sec in EBPlantSection.objects.all():
+        sections.append({
+            "id": sec.id,
+            "name": sec.name,
+            "sort_order": sec.sort_order,
+            "sensors": s_by_sec.get(sec.id, []),
+            "devices": d_by_sec.get(sec.id, []),
+        })
+
+    unassigned_sensors = s_by_sec.get(None, [])
+    unassigned_devices = d_by_sec.get(None, [])
+    if unassigned_sensors or unassigned_devices:
+        sections.append({
+            "id": None,
+            "name": "未分组",
+            "sort_order": 10 ** 9,
+            "sensors": unassigned_sensors,
+            "devices": unassigned_devices,
+        })
+
+    return {"plugin_code": PLUGIN_CODE, "sections": sections}
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def layout(request):
+    return Response(_build_layout())
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def snapshot(request):
@@ -213,4 +308,8 @@ def snapshot(request):
     bound = _bound_point_ids()
     samples = [s.to_dict() for s in latest_values.snapshot(PLUGIN_CODE) if s.sensor_id in bound]
     _refresh_online_status(samples)
-    return JsonResponse({"plugin_code": PLUGIN_CODE, "samples": samples})
+    return JsonResponse({
+        "plugin_code": PLUGIN_CODE,
+        "samples": samples,
+        "devices": _device_states(),
+    })

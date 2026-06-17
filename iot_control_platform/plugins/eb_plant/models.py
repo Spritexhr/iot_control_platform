@@ -13,6 +13,25 @@
 from django.db import models
 
 
+class EBPlantSection(models.Model):
+    """大屏工段（栏目）。用户手动建立多个工段，每个传感器/设备绑定归属一个工段；
+    未归属（section 为空）的绑定在大屏上统一落到「未分组」末尾段。"""
+
+    name = models.CharField(max_length=50, verbose_name="工段名", help_text="如 反应工段 / 精馏工段")
+    sort_order = models.IntegerField(default=0, db_index=True, verbose_name="显示顺序")
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "EB 大屏工段"
+        verbose_name_plural = "EB 大屏工段"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class EBPlantConfig(models.Model):
     """大屏全局视图配置（单例式，name='default' 唯一一条）。"""
 
@@ -56,6 +75,16 @@ class EBPlantSensorBinding(models.Model):
         on_delete=models.CASCADE,
         related_name="eb_bindings",
         verbose_name="主模型传感器",
+    )
+
+    section = models.ForeignKey(
+        EBPlantSection,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sensor_bindings",
+        verbose_name="所属工段",
+        help_text="留空表示未分组（大屏归到末尾「未分组」段）",
     )
 
     tag = models.CharField(max_length=50, blank=True, verbose_name="仪表位号", help_text="如 TT-101")
@@ -122,6 +151,16 @@ class EBPlantDeviceBinding(models.Model):
         on_delete=models.CASCADE,
         related_name="eb_device_binding",
         verbose_name="主模型设备",
+    )
+
+    section = models.ForeignKey(
+        EBPlantSection,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="device_bindings",
+        verbose_name="所属工段",
+        help_text="留空表示未分组（大屏归到末尾「未分组」段）",
     )
 
     tag = models.CharField(max_length=50, blank=True, verbose_name="设备位号", help_text="如 P-101")

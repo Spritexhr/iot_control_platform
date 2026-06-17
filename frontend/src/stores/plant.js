@@ -1,16 +1,23 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { getPlantSnapshot } from '@/api/plugins/eb_plant'
+import { getPlantSnapshot, getPlantLayout } from '@/api/plugins/eb_plant'
 
 /**
  * EB 装置实时数据 store。
- * - samples: Map<sensor_id, sample>,sample 字段见后端 PointSample.to_dict()
- * - SSE 推 sample 事件 → applySample 更新单点
- * - 初始化或重连后用 applySnapshot 全量刷新
+ * - samples: Map<sensor_id, sample>，sample 字段见后端 PointSample.to_dict()
+ * - devices: Map<device_id, state>，设备最新状态（status dict / is_online / last_seen）
+ * - layout:  按工段分组的骨架（含每段的传感器/设备绑定静态元信息）
+ *
+ * 数据流：
+ * - 骨架 applyLayout 拉一次（配置变更后重拉）
+ * - 实时值首帧 applySnapshot（HTTP + WS 建连各发一次，含 samples + devices）
+ * - 增量：applySample（传感器单点）/ applyDeviceStatus（设备单点）
  */
 export const usePlantStore = defineStore('plant', () => {
   const samples = ref(new Map())
+  const devices = ref(new Map())
+  const layout = ref({ sections: [] })
   const lastUpdateTs = ref(0)
   const sseStatus = ref('idle')
 
@@ -21,6 +28,14 @@ export const usePlantStore = defineStore('plant', () => {
       next.set(s.sensor_id, s)
     }
     samples.value = next
+
+    const dList = payload?.devices || []
+    const dNext = new Map()
+    for (const d of dList) {
+      if (d && d.device_id) dNext.set(d.device_id, d)
+    }
+    devices.value = dNext
+
     lastUpdateTs.value = Date.now()
   }
 
@@ -32,6 +47,32 @@ export const usePlantStore = defineStore('plant', () => {
     lastUpdateTs.value = Date.now()
   }
 
+  /**
+   * 设备状态增量。WS device.status payload 字段：
+   * {device_id, event, status, timestamp, received_at, is_online, last_seen}
+   * 合并到已有 state（保留 snapshot/layout 来的 name/tag），ts 用 timestamp。
+   */
+  function applyDeviceStatus(payload) {
+    if (!payload || !payload.device_id) return
+    const m = new Map(devices.value)
+    const prev = m.get(payload.device_id) || {}
+    m.set(payload.device_id, {
+      ...prev,
+      device_id: payload.device_id,
+      status: payload.status ?? prev.status ?? {},
+      event: payload.event ?? prev.event ?? '',
+      is_online: payload.is_online,
+      last_seen: payload.last_seen ?? prev.last_seen ?? null,
+      ts: payload.timestamp ?? prev.ts ?? null,
+    })
+    devices.value = m
+    lastUpdateTs.value = Date.now()
+  }
+
+  function applyLayout(payload) {
+    layout.value = payload && Array.isArray(payload.sections) ? payload : { sections: [] }
+  }
+
   async function loadSnapshot() {
     try {
       const data = await getPlantSnapshot()
@@ -41,7 +82,17 @@ export const usePlantStore = defineStore('plant', () => {
     }
   }
 
+  async function loadLayout() {
+    try {
+      const data = await getPlantLayout()
+      applyLayout(data)
+    } catch (e) {
+      console.error('[plant] 加载布局失败', e)
+    }
+  }
+
   const samplesList = computed(() => Array.from(samples.value.values()))
+  const devicesList = computed(() => Array.from(devices.value.values()))
 
   const alarmCount = computed(() => {
     let n = 0
@@ -70,15 +121,27 @@ export const usePlantStore = defineStore('plant', () => {
     return null
   }
 
+  function findDevice(deviceId) {
+    if (!deviceId) return null
+    return devices.value.get(deviceId) || null
+  }
+
   return {
     samples,
     samplesList,
+    devices,
+    devicesList,
+    layout,
     lastUpdateTs,
     sseStatus,
     alarmCount,
     applySnapshot,
     applySample,
+    applyDeviceStatus,
+    applyLayout,
     loadSnapshot,
+    loadLayout,
     findByBinding,
+    findDevice,
   }
 })

@@ -32,6 +32,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 
 const props = defineProps({
   commands: { type: Object, default: () => ({}) },
@@ -60,6 +61,20 @@ watch(() => props.commands, () => {
 
 async function handleSend(entry) {
   const cmdName = entry.name
+  // 标记为危险的命令（info.confirm=true）：先二次确认，确认后以 make_sure 下发（等设备回执）
+  const needConfirm = !!entry.info.confirm
+  if (needConfirm) {
+    try {
+      await ElMessageBox.confirm(
+        `确认对设备下发命令「${entry.info.description || cmdName}」？`,
+        '危险命令确认',
+        { type: 'warning', confirmButtonText: '确认下发', cancelButtonText: '取消' },
+      )
+    } catch {
+      return // 用户取消
+    }
+  }
+
   loadingMap.value[cmdName] = true
   resultMap.value[cmdName] = undefined
 
@@ -72,7 +87,7 @@ async function handleSend(entry) {
   }
 
   try {
-    const res = await props.sendFn(props.deviceId, cmdName, params, false)
+    const res = await props.sendFn(props.deviceId, cmdName, params, needConfirm)
     if (res.success || res.data?.success) {
       resultMap.value[cmdName] = true
       emit('command-sent', { command: cmdName, params })

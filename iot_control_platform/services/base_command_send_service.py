@@ -125,8 +125,20 @@ class BaseCommandSendService:
         return result
 
     @staticmethod
+    def _strip_check_code(msg: dict) -> dict:
+        """普通命令不携带 check_code。
+
+        check_code 是服务层独占的「确认执行」校验码，只应由 _inject_check_code
+        在 make_sure 模式下动态注入，绝不能来自命令模板。历史模板里残留的
+        check_code（如占位的 "123456"）在这里一律剔除，避免误导设备/日志。
+        """
+        if 'check_code' not in msg:
+            return msg
+        return {k: v for k, v in msg.items() if k != 'check_code'}
+
+    @staticmethod
     def _inject_check_code(msg: dict) -> dict:
-        """发送命令时自动注入 6 位随机 check_code"""
+        """make_sure 模式下注入 6 位随机 check_code（覆盖模板里任何残留值）"""
         msg = msg.copy()
         msg['check_code'] = str(random.randint(100000, 999999))
         return msg
@@ -157,6 +169,8 @@ class BaseCommandSendService:
             return False
         if params:
             mqtt_message = self._apply_params_to_message(mqtt_message, params)
+        # 普通命令：直接下发，不带校验码（确认执行请走 with_make_sure）
+        mqtt_message = self._strip_check_code(mqtt_message)
         return self.send_command(object_id, mqtt_message)
 
     def send_custom_command_with_make_sure(

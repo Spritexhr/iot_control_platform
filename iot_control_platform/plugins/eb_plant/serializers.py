@@ -6,7 +6,34 @@ from rest_framework import serializers
 from devices.models import Device
 from sensors.models import Sensor
 
-from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSensorBinding
+from .models import EBPlantConfig, EBPlantDeviceBinding, EBPlantSection, EBPlantSensorBinding
+
+
+def public_command_schema(device) -> dict:
+    """把 DeviceType.commands 转成大屏前端 CommandPanel 需要的精简 schema：
+    {name: {description, params, confirm?}}，剥掉内部的 mqtt_message。
+    confirm=true 的命令前端会二次确认并以 make_sure 下发。"""
+    if not device.device_type_id:
+        return {}
+    cmds = device.device_type.commands or {}
+    if not isinstance(cmds, dict):
+        return {}
+    schema = {}
+    for name, info in cmds.items():
+        info = info if isinstance(info, dict) else {}
+        schema[name] = {
+            "description": info.get("description", ""),
+            "params": info.get("params", []),
+            "confirm": bool(info.get("confirm", False)),
+        }
+    return schema
+
+
+class EBPlantSectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EBPlantSection
+        fields = ["id", "name", "sort_order", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class EBPlantConfigSerializer(serializers.ModelSerializer):
@@ -24,12 +51,14 @@ class EBPlantSensorBindingSerializer(serializers.ModelSerializer):
     sensor_type = serializers.SerializerMethodField()
     data_fields = serializers.SerializerMethodField()
     point_id = serializers.CharField(read_only=True)
+    section_name = serializers.CharField(source="section.name", read_only=True, default="")
 
     class Meta:
         model = EBPlantSensorBinding
         fields = [
             "id", "sensor", "sensor_id", "sensor_name", "sensor_type", "data_fields",
             "point_id",
+            "section", "section_name",
             "tag", "area", "data_key", "unit",
             "normal_value", "hi_threshold", "lo_threshold", "severity",
             "sort_order", "is_visible",
@@ -37,7 +66,7 @@ class EBPlantSensorBindingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id", "sensor_id", "sensor_name", "sensor_type", "data_fields",
-            "point_id", "created_at", "updated_at",
+            "point_id", "section_name", "created_at", "updated_at",
         ]
 
     def get_sensor_type(self, obj):
@@ -52,25 +81,25 @@ class EBPlantDeviceBindingSerializer(serializers.ModelSerializer):
     device_name = serializers.CharField(source="device.name", read_only=True)
     device_type = serializers.SerializerMethodField()
     commands = serializers.SerializerMethodField()
+    section_name = serializers.CharField(source="section.name", read_only=True, default="")
 
     class Meta:
         model = EBPlantDeviceBinding
         fields = [
             "id", "device", "device_id", "device_name", "device_type", "commands",
+            "section", "section_name",
             "tag", "area", "sort_order", "is_visible",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "device_id", "device_name", "device_type", "commands", "created_at", "updated_at"]
+        read_only_fields = ["id", "device_id", "device_name", "device_type", "commands", "section_name", "created_at", "updated_at"]
         extra_kwargs = {"device": {"write_only": True}}
 
     def get_device_type(self, obj):
         return obj.device.device_type.name if obj.device.device_type_id else ""
 
     def get_commands(self, obj):
-        if not obj.device.device_type_id:
-            return []
-        cmds = obj.device.device_type.commands or {}
-        return list(cmds.keys()) if isinstance(cmds, dict) else []
+        """完整命令 schema：{name: {description, params, confirm}}，供大屏 CommandPanel 渲染。"""
+        return public_command_schema(obj.device)
 
 
 class BindableSensorSerializer(serializers.ModelSerializer):
