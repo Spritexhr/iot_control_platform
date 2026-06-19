@@ -86,18 +86,22 @@ def classify_status(value: Optional[float], hi: Any, lo: Any, severity: str) -> 
 latest_values = LatestValuesCache()
 
 
-def ingest_sensor_data(
+def build_point_sample(
     sensor_id: str,
     data: dict,
     timestamp: Optional[float],
     *,
     plugin_code: str,
     binding: Any,
-) -> Optional[PointSample]:
+) -> PointSample:
     """
-    把一次传感器数据上报转成 PointSample 写入缓存并广播。
+    把一次传感器数据上报转成 PointSample（纯构造，不入缓存、不广播）。
 
-    binding 是插件自有的绑定对象（鸭子类型），需具备以下属性：
+    供两类调用方复用：
+      - ingest_sensor_data（插件层，如 EB）：构造后写全局缓存 + 广播到 plugins.{code}
+      - projects 层：构造后走自己的缓存/广播（projects.{id}），避免与插件共享全局缓存互相覆盖
+
+    binding 是调用方自有的绑定对象（鸭子类型），需具备以下属性：
       tag / unit / data_key / hi_threshold / lo_threshold / severity /
       area (可选) / normal_value (可选) / sensor (可选，FK 到主模型 Sensor，
       用于按 Sensor.computed_is_online 口径算在线状态，没有就留空让前端按 ts 兜底)
@@ -145,6 +149,25 @@ def ingest_sensor_data(
             "lo_threshold": lo,
             "severity": severity,
         },
+    )
+    return sample
+
+
+def ingest_sensor_data(
+    sensor_id: str,
+    data: dict,
+    timestamp: Optional[float],
+    *,
+    plugin_code: str,
+    binding: Any,
+) -> Optional[PointSample]:
+    """
+    构造 PointSample → 写全局缓存 → 广播到 plugins.{plugin_code} group。
+    插件层（如 EB）使用；projects 层不走此函数（用 build_point_sample + 自有缓存/广播，
+    避免与插件共享全局缓存按 point_id 互相覆盖）。
+    """
+    sample = build_point_sample(
+        sensor_id, data, timestamp, plugin_code=plugin_code, binding=binding,
     )
     latest_values.update(sample)
     # 广播到 channel layer 的 plugins.{plugin_code} group；

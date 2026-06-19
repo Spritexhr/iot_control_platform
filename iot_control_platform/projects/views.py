@@ -1,0 +1,301 @@
+"""
+projects（项目/场景）API。
+
+资源路由（平铺 + ?project= 过滤，与现有 eb_plant 风格一致）：
+- /api/projects/                       项目 CRUD
+- /api/projects/<pk>/layout/           项目展示骨架（分区 + 成员静态元信息）
+- /api/projects/<pk>/snapshot/         项目当前实时值（现查 DB，不依赖进程缓存）
+- /api/projects/<pk>/bindable_sources/ 可导入到本项目的全量传感器/设备
+- /api/project_sections/?project=      分区 CRUD（含 reorder）
+- /api/project_sensor_members/?project= 传感器成员 CRUD（含批量导入）
+- /api/project_device_members/?project= 设备成员 CRUD（含批量导入）
+- /api/project_views/?project=         视图 CRUD
+
+实时增量推送由 WebSocket consumer 提供（projects.consumers.ProjectStreamConsumer，
+URL: /ws/projects/<project_id>/）。
+"""
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
+
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+
+from devices.models import Device
+from sensors.models import Sensor, SensorData
+from services.realtime.latest_values import build_point_sample
+
+from .models import (
+    Project,
+    ProjectDeviceMember,
+    ProjectSection,
+    ProjectSensorMember,
+    ProjectView,
+)
+from .serializers import (
+    BindableDeviceSerializer,
+    BindableSensorSerializer,
+    ProjectDeviceMemberSerializer,
+    ProjectSectionSerializer,
+    ProjectSensorMemberSerializer,
+    ProjectSerializer,
+    ProjectViewSerializer,
+)
+
+log = logging.getLogger(__name__)
+
+
+# ---------- 权限 ----------
+
+class _AdminWritePermission:
+    """读用 IsAuthenticated，写用 IsAdminUser（与 eb_plant 一致）。"""
+
+    _write_actions = ("create", "update", "partial_update", "destroy", "reorder")
+
+    def get_permissions(self):
+        if self.action in self._write_actions:
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated()]
+
+
+# ---------- 实时聚合 helper（snapshot/consumer 共用） ----------
+
+def _sensor_sample(member: ProjectSensorMember, project_code: str) -> dict:
+    """从主模型最近一条 SensorData 现查，构造点位样本（结构与 PointSample.to_dict 对齐）。
+    无历史数据时返回 value=None 的占位样本，前端显示「--」。"""
+    last = (
+        SensorData.objects.filter(sensor_id=member.sensor_id)
+        .order_by("-timestamp")
+        .first()
+    )
+    ts = last.timestamp.timestamp() if (last and last.timestamp) else None
+    data = last.data if (last and isinstance(last.data, dict)) else {}
+    sample = build_point_sample(
+        member.point_id, data, ts, plugin_code=project_code, binding=member,
+    )
+    return sample.to_dict()
+
+
+def _device_state(member: ProjectDeviceMember) -> dict:
+    """单个设备成员的当前状态：主模型最近一条 DeviceStatusCollection + 实时在线判定
+    （Device.computed_is_online，跟设备管理页同口径）。"""
+    device = member.device
+    last = device.status_records.order_by("-timestamp").first()
+    return {
+        "device_id": device.device_id,
+        "name": device.name,
+        "tag": member.tag or device.device_id,
+        "status": (last.data if last and isinstance(last.data, dict) else {}),
+        "event": (last.event_name if last else ""),
+        "is_online": bool(device.computed_is_online),
+        "last_seen": device.last_seen.timestamp() if device.last_seen else None,
+        "ts": last.timestamp.timestamp() if (last and last.timestamp) else None,
+    }
+
+
+def _build_layout(project: Project) -> dict:
+    """展示骨架：有序分区，每段挂它的传感器/设备成员（静态元信息），
+    未归属 section 的成员统一落到末尾「未分组」段。"""
+    sensor_members = (
+        project.sensor_members.filter(is_visible=True)
+        .select_related("sensor", "sensor__sensor_type", "section")
+    )
+    device_members = (
+        project.device_members.filter(is_visible=True)
+        .select_related("device", "device__device_type", "section")
+    )
+    s_data = ProjectSensorMemberSerializer(sensor_members, many=True).data
+    d_data = ProjectDeviceMemberSerializer(device_members, many=True).data
+
+    s_by_sec = defaultdict(list)
+    for it in s_data:
+        s_by_sec[it.get("section")].append(it)
+    d_by_sec = defaultdict(list)
+    for it in d_data:
+        d_by_sec[it.get("section")].append(it)
+
+    sections = []
+    for sec in project.sections.all():
+        sections.append({
+            "id": sec.id,
+            "name": sec.name,
+            "sort_order": sec.sort_order,
+            "sensors": s_by_sec.get(sec.id, []),
+            "devices": d_by_sec.get(sec.id, []),
+        })
+
+    unassigned_sensors = s_by_sec.get(None, [])
+    unassigned_devices = d_by_sec.get(None, [])
+    if unassigned_sensors or unassigned_devices:
+        sections.append({
+            "id": None,
+            "name": "未分组",
+            "sort_order": 10 ** 9,
+            "sensors": unassigned_sensors,
+            "devices": unassigned_devices,
+        })
+
+    return {
+        "project_id": project.id,
+        "project_code": project.code,
+        "name": project.name,
+        "scene_type": project.scene_type,
+        "view_settings": project.view_settings or {},
+        "sections": sections,
+    }
+
+
+def build_project_snapshot(project: Project) -> dict:
+    """项目当前实时快照：所有可见成员的最新值（现查 DB）。consumer 建连首发也复用此函数。"""
+    sensor_members = (
+        project.sensor_members.filter(is_visible=True)
+        .select_related("sensor", "sensor__sensor_type")
+    )
+    device_members = (
+        project.device_members.filter(is_visible=True)
+        .select_related("device", "device__device_type")
+    )
+    samples = [_sensor_sample(m, project.code) for m in sensor_members]
+    devices = [_device_state(m) for m in device_members]
+    return {
+        "project_id": project.id,
+        "project_code": project.code,
+        "samples": samples,
+        "devices": devices,
+    }
+
+
+# ---------- 项目 ----------
+
+class ProjectViewSet(_AdminWritePermission, viewsets.ModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(created_by=user)
+
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def layout(self, request, pk=None):
+        return Response(_build_layout(self.get_object()))
+
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def snapshot(self, request, pk=None):
+        return Response(build_project_snapshot(self.get_object()))
+
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def bindable_sources(self, request, pk=None):
+        project = self.get_object()
+        sensors_qs = Sensor.objects.select_related("sensor_type").order_by("sort_order", "sensor_id")
+        devices_qs = Device.objects.select_related("device_type").order_by("sort_order", "device_id")
+        ctx = {"project_id": project.id}
+        return Response({
+            "sensors": BindableSensorSerializer(sensors_qs, many=True, context=ctx).data,
+            "devices": BindableDeviceSerializer(devices_qs, many=True, context=ctx).data,
+        })
+
+
+# ---------- 子资源（平铺 + ?project= 过滤） ----------
+
+class _ProjectScopedViewSet(_AdminWritePermission, viewsets.ModelViewSet):
+    """按 ?project=<id> 过滤的子资源基类。"""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        pid = self.request.query_params.get("project")
+        if pid:
+            qs = qs.filter(project_id=pid)
+        return qs
+
+
+class ProjectSectionViewSet(_ProjectScopedViewSet):
+    queryset = ProjectSection.objects.all()
+    serializer_class = ProjectSectionSerializer
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsAdminUser])
+    def reorder(self, request):
+        """按传入的 section id 顺序批量写 sort_order。body: {"order": [id, id, ...]}"""
+        order = request.data.get("order", [])
+        if not isinstance(order, list):
+            return Response({"detail": "order 必须是 id 列表"}, status=status.HTTP_400_BAD_REQUEST)
+        for idx, sec_id in enumerate(order):
+            ProjectSection.objects.filter(id=sec_id).update(sort_order=idx)
+        return Response({"ok": True})
+
+
+class ProjectSensorMemberViewSet(_ProjectScopedViewSet):
+    queryset = ProjectSensorMember.objects.select_related("sensor", "sensor__sensor_type", "section").all()
+    serializer_class = ProjectSensorMemberSerializer
+
+    def create(self, request, *args, **kwargs):
+        """单条或批量导入：
+        - 传 project + sensor_ids=[...] 走批量，按各 sensor 的 sensor_type.data_fields 拆分：
+          多字段 → 每字段一条（data_key=field、tag=sensorId-field）；单字段/无元数据 → 一条 data_key=""。
+          (project, sensor, data_key) 已存在的跳过；UniqueConstraint + ignore_conflicts 兜底并发。
+        - 否则走标准 create（用于「+字段」单条新增）。
+        """
+        sensor_ids = request.data.get("sensor_ids")
+        project_id = request.data.get("project")
+        if isinstance(sensor_ids, list):
+            if not project_id:
+                return Response({"detail": "批量导入需指定 project"}, status=status.HTTP_400_BAD_REQUEST)
+            sensors = Sensor.objects.filter(id__in=sensor_ids).select_related("sensor_type")
+            to_create = []
+            for s in sensors:
+                fields = s.sensor_type.data_fields if s.sensor_type_id else None
+                fields_to_use = list(fields) if (isinstance(fields, list) and fields) else [""]
+                existing = set(
+                    ProjectSensorMember.objects.filter(project_id=project_id, sensor=s)
+                    .values_list("data_key", flat=True)
+                )
+                for f in fields_to_use:
+                    if f in existing:
+                        continue
+                    tag = (f"{s.sensor_id}-{f}" if f else s.sensor_id)[:50]
+                    to_create.append(ProjectSensorMember(project_id=project_id, sensor=s, data_key=f, tag=tag))
+
+            ProjectSensorMember.objects.bulk_create(to_create, ignore_conflicts=True)
+            created_keys = {(b.sensor_id, b.data_key) for b in to_create}
+            if created_keys:
+                created_qs = ProjectSensorMember.objects.filter(
+                    project_id=project_id, sensor_id__in={k[0] for k in created_keys}
+                ).select_related("sensor", "sensor__sensor_type")
+                created_qs = [b for b in created_qs if (b.sensor_id, b.data_key) in created_keys]
+            else:
+                created_qs = []
+            data = ProjectSensorMemberSerializer(created_qs, many=True).data
+            return Response({"created": data}, status=status.HTTP_201_CREATED)
+        return super().create(request, *args, **kwargs)
+
+
+class ProjectDeviceMemberViewSet(_ProjectScopedViewSet):
+    queryset = ProjectDeviceMember.objects.select_related("device", "device__device_type", "section").all()
+    serializer_class = ProjectDeviceMemberSerializer
+
+    def create(self, request, *args, **kwargs):
+        device_ids = request.data.get("device_ids")
+        project_id = request.data.get("project")
+        if isinstance(device_ids, list):
+            if not project_id:
+                return Response({"detail": "批量导入需指定 project"}, status=status.HTTP_400_BAD_REQUEST)
+            existing = set(
+                ProjectDeviceMember.objects.filter(project_id=project_id, device_id__in=device_ids)
+                .values_list("device_id", flat=True)
+            )
+            created = []
+            for d in Device.objects.filter(id__in=device_ids):
+                if d.id in existing:
+                    continue
+                b = ProjectDeviceMember.objects.create(project_id=project_id, device=d, tag=d.device_id)
+                created.append(b)
+            data = ProjectDeviceMemberSerializer(created, many=True).data
+            return Response({"created": data, "skipped": len(existing)}, status=status.HTTP_201_CREATED)
+        return super().create(request, *args, **kwargs)
+
+
+class ProjectViewViewSet(_ProjectScopedViewSet):
+    queryset = ProjectView.objects.all()
+    serializer_class = ProjectViewSerializer

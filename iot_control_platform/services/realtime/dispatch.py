@@ -63,6 +63,10 @@ def g_plugin(plugin_code: str) -> str:
     return f"plugins.{plugin_code}"
 
 
+def g_project(project_id) -> str:
+    return f"projects.{project_id}"
+
+
 # ---- 同步桥 ----
 def _safe_send(group: str, message: Dict[str, Any]) -> None:
     layer = get_channel_layer()
@@ -106,4 +110,13 @@ def publish_plugin_sample(plugin_code: str, sample: dict) -> None:
     _safe_send(
         g_plugin(plugin_code),
         {"type": "broadcast.plugin.sample", "payload": sample},
+    )
+
+
+def publish_project_sample(project_id, sample: dict) -> None:
+    """项目（场景）层传感器采样流，广播到 projects.{id} group。
+    Consumer 内对应 broadcast_project_sample handler。"""
+    _safe_send(
+        g_project(project_id),
+        {"type": "broadcast.project.sample", "payload": sample},
     )

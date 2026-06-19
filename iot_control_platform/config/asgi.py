@@ -20,6 +20,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
 from django.urls import path  # noqa: E402
 
 from plugins import discover_plugins, enabled_plugin_names  # noqa: E402
+from projects.consumers import ProjectStreamConsumer  # noqa: E402
 from services.realtime import consumers as core  # noqa: E402
 from services.realtime.middleware import JwtAuthMiddleware  # noqa: E402
 
@@ -33,6 +34,7 @@ websocket_urlpatterns = [
     path("ws/devices/<str:device_id>/", core.DeviceStreamConsumer.as_asgi()),
     path("ws/automation/", core.AutomationConsumer.as_asgi()),
     path("ws/system/mqtt/", core.MqttSystemConsumer.as_asgi()),
+    path("ws/projects/<int:project_id>/", ProjectStreamConsumer.as_asgi()),
 ]
 
 # 动态挂载已启用插件的 WS 路由（与 config/urls.py 的 HTTP 路由发现机制对称）

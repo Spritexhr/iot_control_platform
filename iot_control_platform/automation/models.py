@@ -27,6 +27,15 @@ class AutomationRule(models.Model):
     # ========== 基本信息 ==========
     name = models.CharField(max_length=100, verbose_name="规则名称")
     description = models.TextField(blank=True, verbose_name="规则描述")
+    project = models.ForeignKey(
+        "projects.Project",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="automation_rules",
+        verbose_name="所属项目",
+        help_text="留空表示全局规则（不归属任何项目）",
+    )
     script_id = models.CharField(
         max_length=50,
         unique=True,

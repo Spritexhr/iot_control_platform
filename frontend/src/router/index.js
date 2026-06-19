@@ -65,6 +65,24 @@ const routes = [
         meta: { title: '规则详情' },
       },
       {
+        path: 'projects',
+        name: 'Projects',
+        component: () => import('@/views/projects/ProjectsListView.vue'),
+        meta: { title: '项目/场景' },
+      },
+      {
+        path: 'projects/:id',
+        name: 'ProjectWorkspace',
+        component: () => import('@/views/projects/ProjectWorkspace.vue'),
+        meta: { title: '项目工作台' },
+      },
+      {
+        path: 'projects/:id/config',
+        name: 'ProjectConfig',
+        component: () => import('@/views/projects/ProjectConfigView.vue'),
+        meta: { title: '项目配置' },
+      },
+      {
         path: 'plugins',
         name: 'Plugins',
         component: () => import('@/views/plugins/PluginsListView.vue'),
