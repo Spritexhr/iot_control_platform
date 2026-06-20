@@ -491,5 +491,26 @@ async function onDelete(p) {
   display: flex;
   justify-content: center;
 }
+
+:deep(.create-project-dialog) {
+  margin: 5vh auto !important;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+
+  .el-dialog__header {
+    flex-shrink: 0;
+  }
+
+  .el-dialog__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px !important;
+  }
+
+  .el-dialog__footer {
+    flex-shrink: 0;
+  }
+}
 </style>
 

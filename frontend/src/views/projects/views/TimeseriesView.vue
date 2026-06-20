@@ -243,7 +243,7 @@ function renderChart() {
       top: 0,
       textStyle: { color: textClr }
     },
-    grid: { left: 50, right: 30, top: 45, bottom: 65 },
+    grid: { left: 40, right: 40, top: 65, bottom: 85, containLabel: true },
     xAxis: { 
       type: 'time', 
       axisLabel: { hideOverlap: true, color: textClr },
@@ -292,6 +292,7 @@ async function saveDefault() {
 }
 
 let themeObserver = null
+let resizeObserver = null
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   
@@ -302,6 +303,16 @@ onMounted(() => {
     }
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  
+  // 观察图表容器尺寸变化（解决在隐藏 tab 切换时 ECharts 宽度坍塌的经典 Bug）
+  if (chartEl.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (chartEl.value.clientWidth > 0) {
+        handleResize()
+      }
+    })
+    resizeObserver.observe(chartEl.value)
+  }
   
   // 从 config 恢复默认选择
   const cfg = props.view.config || {}
@@ -317,6 +328,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   if (themeObserver) {
     themeObserver.disconnect()
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
   }
   chartInstance?.dispose()
   chartInstance = null
