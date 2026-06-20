@@ -85,14 +85,15 @@ onUnmounted(() => { if (tickTimer) clearInterval(tickTimer) })
 .card-dash {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--iot-spacing-lg);
 }
 
 .cd-section {
-  background: #ffffff;
-  border: 1px solid #d8d6cc;
-  border-radius: 6px;
-  padding: 14px 16px 16px;
+  background: var(--iot-bg-card);
+  border: 1px solid var(--iot-border-color-light);
+  border-radius: var(--iot-radius-lg);
+  box-shadow: var(--iot-shadow-sm);
+  padding: var(--iot-spacing-md) var(--iot-spacing-lg) var(--iot-spacing-lg);
 }
 
 .cd-section__head {
@@ -101,50 +102,49 @@ onUnmounted(() => { if (tickTimer) clearInterval(tickTimer) })
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #e6e4da;
+  margin-bottom: var(--iot-spacing-md);
+  border-bottom: 1px solid var(--iot-border-color-light);
 }
 
 .cd-section__name {
-  font-size: 15px;
+  font-size: var(--iot-font-size-md);
   font-weight: 600;
-  color: #2a2a2a;
+  color: var(--iot-text-primary);
 }
 
 .cd-section__count {
-  font-size: 11px;
-  color: #999;
-  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
 }
 
 .cd-subsection + .cd-subsection {
-  margin-top: 14px;
+  margin-top: var(--iot-spacing-md);
 }
 
 .cd-subsection__title {
-  font-size: 11px;
-  letter-spacing: 1px;
-  color: #8a8a82;
-  margin-bottom: 8px;
+  font-size: var(--iot-font-size-xs);
+  letter-spacing: 0.5px;
+  color: var(--iot-text-secondary);
+  margin-bottom: var(--iot-spacing-sm);
   padding-left: 6px;
-  border-left: 3px solid #c9b89a;
+  border-left: 3px solid var(--iot-color-primary);
 }
 
 .card-dash__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--iot-spacing-md);
   align-items: start;
 }
 
 .card-dash__empty {
   text-align: center;
   padding: 60px 20px;
-  color: #888;
-  font-size: 14px;
-  border: 1px dashed #aaa;
-  background: #ffffff;
-  border-radius: 6px;
+  color: var(--iot-text-secondary);
+  font-size: var(--iot-font-size-base);
+  border: 1px dashed var(--iot-border-color);
+  background: var(--iot-bg-card);
+  border-radius: var(--iot-radius-lg);
 }
 
 .card-dash__empty-hint {

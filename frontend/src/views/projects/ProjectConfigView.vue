@@ -1,9 +1,12 @@
 <template>
   <div class="pc">
-    <header class="pc__head">
-      <el-button link @click="$router.push(`/projects/${projectId}`)">← 返回工作台</el-button>
-      <h1>配置：{{ project?.name || '' }} <small>{{ project?.code }}</small></h1>
-    </header>
+    <div class="iot-page-header">
+      <div>
+        <h1 class="iot-page-title">配置：{{ project?.name || '' }}</h1>
+        <p class="iot-page-subtitle">代号 {{ project?.code }} · 分区 / 成员 / 视图管理</p>
+      </div>
+      <el-button :icon="ArrowLeft" @click="$router.push(`/projects/${projectId}`)">返回工作台</el-button>
+    </div>
 
     <el-tabs v-model="tab" class="pc__tabs">
       <!-- ============ 分区 ============ -->
@@ -162,6 +165,7 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 
 import {
   getProject,
@@ -293,28 +297,19 @@ async function removeView(row) {
 
 <style scoped lang="scss">
 .pc {
-  padding: 24px;
-}
-
-.pc__head {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 12px;
-
-  h1 { font-size: 20px; margin: 0; }
-  small { font-size: 12px; color: #999; font-family: 'JetBrains Mono', monospace; }
+  padding: 0;
 }
 
 .pc__row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--iot-spacing-sm);
+  flex-wrap: wrap;
 }
 
 .pc__hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #999;
+  margin-top: var(--iot-spacing-sm);
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
 }
 </style>

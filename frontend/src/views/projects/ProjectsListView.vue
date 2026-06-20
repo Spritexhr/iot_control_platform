@@ -1,41 +1,43 @@
 <template>
-  <div class="pl">
-    <div class="pl__head">
+  <div class="projects-list-view">
+    <div class="iot-page-header">
       <div>
-        <h1 class="pl__title">项目 / 场景</h1>
-        <p class="pl__sub">一个项目 = 装置（传感器/设备）+ 控制（自动化规则）+ 展示（多视图）</p>
+        <h1 class="iot-page-title">项目 / 场景</h1>
+        <p class="iot-page-subtitle">一个项目 = 装置（传感器 / 设备）+ 控制（自动化规则）+ 展示（多视图）</p>
       </div>
-      <el-button v-if="isStaff" type="primary" @click="openCreate">新建项目</el-button>
+      <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openCreate">新建项目</el-button>
     </div>
 
-    <div v-loading="loading" class="pl__grid">
-      <div
-        v-for="p in projects"
-        :key="p.id"
-        class="pl-card"
-        @click="$router.push(`/projects/${p.id}`)"
-      >
-        <div class="pl-card__top">
-          <span class="pl-card__code">{{ p.code }}</span>
-          <span class="pl-card__scene">{{ sceneLabel(p.scene_type) }}</span>
-        </div>
-        <h3 class="pl-card__name">{{ p.name }}</h3>
-        <p class="pl-card__desc">{{ p.description || '—' }}</p>
-        <div class="pl-card__stats">
-          <span>{{ p.sensor_count }} 传感器</span>
-          <span>{{ p.device_count }} 设备</span>
-          <span>{{ p.section_count }} 分区</span>
-          <span>{{ p.view_count }} 视图</span>
-        </div>
-        <div class="pl-card__actions" @click.stop>
-          <el-button size="small" @click="$router.push(`/projects/${p.id}`)">进入</el-button>
-          <el-button v-if="isStaff" size="small" @click="$router.push(`/projects/${p.id}/config`)">配置</el-button>
-          <el-button v-if="isStaff" size="small" type="danger" plain @click="onDelete(p)">删除</el-button>
+    <div v-loading="loading">
+      <div v-if="projects.length" class="iot-grid iot-grid--cards">
+        <div
+          v-for="p in projects"
+          :key="p.id"
+          class="iot-card iot-card--hover project-card"
+          @click="$router.push(`/projects/${p.id}`)"
+        >
+          <div class="project-card__top">
+            <span class="project-card__code">{{ p.code }}</span>
+            <el-tag size="small" effect="plain" round>{{ sceneLabel(p.scene_type) }}</el-tag>
+          </div>
+          <h3 class="project-card__name">{{ p.name }}</h3>
+          <p class="project-card__desc">{{ p.description || '—' }}</p>
+          <div class="project-card__stats">
+            <span>{{ p.sensor_count }} 传感器</span>
+            <span>{{ p.device_count }} 设备</span>
+            <span>{{ p.section_count }} 分区</span>
+            <span>{{ p.view_count }} 视图</span>
+          </div>
+          <div class="project-card__actions" @click.stop>
+            <el-button size="small" @click="$router.push(`/projects/${p.id}`)">进入</el-button>
+            <el-button v-if="isStaff" size="small" @click="$router.push(`/projects/${p.id}/config`)">配置</el-button>
+            <el-button v-if="isStaff" size="small" type="danger" plain @click="onDelete(p)">删除</el-button>
+          </div>
         </div>
       </div>
 
-      <div v-if="!loading && projects.length === 0" class="pl__empty">
-        暂无项目。{{ isStaff ? '点击右上角「新建项目」开始。' : '请联系管理员创建。' }}
+      <div v-else class="iot-card empty-card">
+        <el-empty :description="loading ? '加载中…' : (isStaff ? '暂无项目，点击右上角「新建项目」开始' : '暂无项目，请联系管理员创建')" />
       </div>
     </div>
 
@@ -70,6 +72,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 import { listProjects, createProject, deleteProject } from '@/api/projects'
 import { useUserStore } from '@/stores/user'
@@ -125,7 +128,7 @@ async function submitCreate() {
 
 async function onDelete(p) {
   try {
-    await ElMessageBox.confirm(`确认删除项目「${p.name}」？其分区、成员、视图将一并删除（不影响主模型传感器/设备）。`, '删除项目', { type: 'warning' })
+    await ElMessageBox.confirm(`确认删除项目「${p.name}」？其分区、成员、视图将一并删除（不影响主模型传感器 / 设备）。`, '删除项目', { type: 'warning' })
   } catch { return }
   try {
     await deleteProject(p.id)
@@ -138,108 +141,64 @@ async function onDelete(p) {
 </script>
 
 <style scoped lang="scss">
-.pl {
-  padding: 24px;
+.projects-list-view {
+  padding: 0;
 }
 
-.pl__head {
+.project-card {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-
-.pl__title {
-  font-size: 22px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.pl__sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #8a8a82;
-}
-
-.pl__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-  min-height: 120px;
-}
-
-.pl-card {
-  background: #fff;
-  border: 1px solid #e3e0d6;
-  border-radius: 8px;
-  padding: 16px;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--iot-spacing-lg);
   cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s;
-
-  &:hover {
-    border-color: #d97757;
-    box-shadow: 0 4px 16px rgba(217, 119, 87, 0.12);
-  }
 }
 
-.pl-card__top {
+.project-card__top {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.pl-card__code {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+.project-card__code {
+  font-family: var(--iot-font-mono, ui-monospace, 'SFMono-Regular', monospace);
+  font-size: var(--iot-font-size-sm);
   font-weight: 600;
-  color: #d97757;
+  color: var(--iot-color-primary);
 }
 
-.pl-card__scene {
-  font-size: 11px;
-  color: #999;
-  background: #f4f3ee;
-  padding: 1px 8px;
-  border-radius: 10px;
+.project-card__name {
+  font-size: var(--iot-font-size-md);
+  font-weight: 600;
+  color: var(--iot-text-primary);
+  margin: 4px 0 0;
 }
 
-.pl-card__name {
-  font-size: 16px;
-  margin: 10px 0 4px;
-}
-
-.pl-card__desc {
-  font-size: 12px;
-  color: #999;
-  margin: 0 0 12px;
-  white-space: nowrap;
+.project-card__desc {
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-secondary);
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.pl-card__stats {
+.project-card__stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  font-size: 11px;
-  color: #777;
-  font-family: 'JetBrains Mono', monospace;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0eee6;
+  gap: 12px;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
+  padding-bottom: var(--iot-spacing-md);
+  border-bottom: 1px solid var(--iot-border-color-light);
 }
 
-.pl-card__actions {
+.project-card__actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
-.pl__empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 60px;
-  color: #999;
-  border: 1px dashed #ccc;
-  border-radius: 8px;
+.empty-card {
+  padding: 48px 0;
 }
 </style>

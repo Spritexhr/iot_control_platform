@@ -37,6 +37,13 @@ export function buildProjectWsPath(id) {
   return `/ws/projects/${id}/`
 }
 
+/** 某数据源时间窗历史序列（timeseries 视图用）。kind=sensor|device，sourceId=sensor_id/device_id */
+export function getProjectSeries(id, { kind, sourceId, start, end, limit } = {}) {
+  return request.get(`${BASE}/${id}/series/`, {
+    params: { kind, source_id: sourceId, start, end, limit },
+  })
+}
+
 // ==================== 分区 ====================
 export function listSections(projectId) {
   return request.get('/project_sections/', { params: { project: projectId } })

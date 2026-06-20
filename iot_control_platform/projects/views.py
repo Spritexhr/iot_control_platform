@@ -18,14 +18,17 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from datetime import timedelta
 
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
-from devices.models import Device
-from sensors.models import Sensor, SensorData
+from devices.models import Device, DeviceStatusCollection
+from sensors.models import Sensor, SensorData, SensorStatusCollection
 from services.realtime.latest_values import build_point_sample
 
 from .models import (
@@ -46,6 +49,32 @@ from .serializers import (
 )
 
 log = logging.getLogger(__name__)
+
+# 时序查询：单次返回上限，避免一次性把大量行扔给前端图表
+DEFAULT_SERIES_LIMIT = 2000
+MAX_SERIES_LIMIT = 10000
+
+
+def _parse_dt(value, default):
+    if not value:
+        return default
+    dt = parse_datetime(value)
+    if dt is None:
+        return default
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    return dt
+
+
+def _truncate_window(qs, limit):
+    """时间窗内行数超 limit 时仅保留最近 limit 条，按时间升序返回。"""
+    total = qs.count()
+    if total > limit:
+        rows = list(qs.order_by("-timestamp")[:limit])
+        rows.reverse()
+    else:
+        rows = list(qs.order_by("timestamp"))
+    return rows, total
 
 
 # ---------- 权限 ----------
@@ -195,6 +224,69 @@ class ProjectViewSet(_AdminWritePermission, viewsets.ModelViewSet):
         return Response({
             "sensors": BindableSensorSerializer(sensors_qs, many=True, context=ctx).data,
             "devices": BindableDeviceSerializer(devices_qs, many=True, context=ctx).data,
+        })
+
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def series(self, request, pk=None):
+        """某数据源在时间窗内的时序数据（供 timeseries 视图用，逻辑同 data_viz）。
+        Query: kind=sensor|device, source_id, start, end, limit"""
+        kind = (request.GET.get("kind") or "").lower()
+        source_id = request.GET.get("source_id") or ""
+        if kind not in ("sensor", "device") or not source_id:
+            return Response({"detail": "kind 必须为 sensor 或 device，且 source_id 必填"}, status=400)
+
+        now = timezone.now()
+        end = _parse_dt(request.GET.get("end"), now)
+        start = _parse_dt(request.GET.get("start"), end - timedelta(hours=24))
+        if start >= end:
+            return Response({"detail": "start 必须早于 end"}, status=400)
+        try:
+            limit = int(request.GET.get("limit") or DEFAULT_SERIES_LIMIT)
+        except ValueError:
+            limit = DEFAULT_SERIES_LIMIT
+        limit = max(1, min(limit, MAX_SERIES_LIMIT))
+
+        if kind == "sensor":
+            try:
+                sensor = Sensor.objects.select_related("sensor_type").get(sensor_id=source_id)
+            except Sensor.DoesNotExist:
+                return Response({"detail": f"传感器 {source_id} 不存在"}, status=404)
+            rows, total = _truncate_window(
+                SensorData.objects.filter(sensor=sensor, timestamp__gte=start, timestamp__lte=end), limit,
+            )
+            points = [{"t": r.timestamp.isoformat(), "data": r.data} for r in rows]
+            events = [
+                {"t": e.timestamp.isoformat(), "event": e.event_name, "data": e.data}
+                for e in SensorStatusCollection.objects.filter(
+                    sensor=sensor, timestamp__gte=start, timestamp__lte=end,
+                ).order_by("timestamp")[:limit]
+            ]
+            return Response({
+                "kind": "sensor", "source_id": sensor.sensor_id, "name": sensor.name,
+                "type": sensor.sensor_type.name if sensor.sensor_type_id else "",
+                "fields": sensor.sensor_type.data_fields if sensor.sensor_type_id else [],
+                "start": start.isoformat(), "end": end.isoformat(),
+                "points": points, "count": total, "truncated": total > limit, "events": events,
+            })
+
+        try:
+            device = Device.objects.select_related("device_type").get(device_id=source_id)
+        except Device.DoesNotExist:
+            return Response({"detail": f"设备 {source_id} 不存在"}, status=404)
+        rows, total = _truncate_window(
+            DeviceStatusCollection.objects.filter(device=device, timestamp__gte=start, timestamp__lte=end), limit,
+        )
+        points = [{"t": r.timestamp.isoformat(), "data": r.data, "event": r.event_name} for r in rows]
+        events = [
+            {"t": r.timestamp.isoformat(), "event": r.event_name, "data": r.data}
+            for r in rows if r.event_name
+        ]
+        return Response({
+            "kind": "device", "source_id": device.device_id, "name": device.name,
+            "type": device.device_type.name if device.device_type_id else "",
+            "fields": device.device_type.config_parameters if device.device_type_id else [],
+            "start": start.isoformat(), "end": end.isoformat(),
+            "points": points, "count": total, "truncated": total > limit, "events": events,
         })
 
 

@@ -1,20 +1,20 @@
 <template>
   <div class="pw">
-    <header class="pw__header">
+    <div class="iot-page-header pw__header">
       <div class="pw__title">
-        <el-button link class="pw__back" @click="$router.push('/projects')">← 项目</el-button>
-        <span class="pw__tag">{{ sceneLabel }}</span>
-        <h1>{{ project?.name || '加载中…' }}</h1>
+        <el-button text :icon="ArrowLeft" @click="$router.push('/projects')">项目</el-button>
+        <h1 class="iot-page-title pw__name">{{ project?.name || '加载中…' }}</h1>
         <span class="pw__code">{{ project?.code }}</span>
+        <el-tag size="small" effect="plain" round>{{ sceneLabel }}</el-tag>
       </div>
       <div class="pw__status">
         <span class="pw__stat"><i>实时</i><b :class="`ws-${store.wsStatus}`">{{ wsLabel }}</b></span>
         <span class="pw__stat"><i>点位</i><b>{{ pointCount }}</b></span>
         <span class="pw__stat"><i>报警</i><b :class="{ 'is-alert': store.alarmCount > 0 }">{{ store.alarmCount }}</b></span>
         <span class="pw__stat"><i>更新</i><b>{{ lastUpdateLabel }}</b></span>
-        <el-button size="small" type="primary" @click="$router.push(`/projects/${projectId}/config`)">配置</el-button>
+        <el-button size="small" type="primary" :icon="Setting" @click="$router.push(`/projects/${projectId}/config`)">配置</el-button>
       </div>
-    </header>
+    </div>
 
     <el-tabs v-model="activeView" class="pw__tabs">
       <el-tab-pane
@@ -30,6 +30,12 @@
           :can-edit="isStaff"
           @saved="onViewSaved"
         />
+        <TimeseriesView
+          v-else-if="t.type === 'timeseries' && t.view"
+          :view="t.view"
+          :can-edit="isStaff"
+          @saved="onViewSaved"
+        />
         <div v-else class="pw__placeholder">{{ placeholderLabel(t.type) }}</div>
       </el-tab-pane>
     </el-tabs>
@@ -39,9 +45,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 
 import CardDashboard from './views/CardDashboard.vue'
 import DiagramView from './views/DiagramView.vue'
+import TimeseriesView from './views/TimeseriesView.vue'
 import { getProject, listViews, buildProjectWsPath } from '@/api/projects'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 import { useProjectStore } from '@/stores/project'
@@ -133,83 +141,64 @@ watch(displayStatus, (v) => { store.wsStatus = v }, { immediate: true })
 
 <style scoped lang="scss">
 .pw {
-  min-height: calc(100vh - 64px);
-  background: #f4f3ee;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
-  background-size: 24px 24px;
-  padding: 20px 24px;
-  color: #2a2a2a;
+  padding: 0;
 }
 
 .pw__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-bottom: 14px;
-  border-bottom: 2px solid #2a2a2a;
-  margin-bottom: 12px;
+  align-items: flex-start;
 }
 
 .pw__title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
 }
 
-.pw__back { font-size: 12px; }
-
-.pw__tag {
-  padding: 2px 8px;
-  background: #2a2a2a;
-  color: #fafaf7;
-  font-size: 11px;
-  letter-spacing: 1px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.pw__title h1 {
-  font-size: 20px;
-  font-weight: 600;
+.pw__name {
   margin: 0;
 }
 
 .pw__code {
-  font-size: 12px;
-  color: #888;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--iot-font-mono, ui-monospace, 'SFMono-Regular', monospace);
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-secondary);
 }
 
 .pw__status {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--iot-spacing-md);
 }
 
 .pw__stat {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  i { font-style: normal; font-size: 10px; color: #888; letter-spacing: 1px; }
+
+  i {
+    font-style: normal;
+    font-size: 10px;
+    color: var(--iot-text-secondary);
+    letter-spacing: 0.5px;
+  }
   b {
-    font-size: 15px;
-    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--iot-font-size-md);
+    color: var(--iot-text-primary);
     font-variant-numeric: tabular-nums;
-    &.is-alert { color: #c0392b; }
-    &.ws-open { color: #2e7d4f; }
-    &.ws-error, &.ws-closed, &.ws-unauthorized { color: #c0392b; }
-    &.ws-connecting { color: #b07a16; }
+
+    &.is-alert { color: var(--iot-color-danger); }
+    &.ws-open { color: var(--iot-color-success); }
+    &.ws-error, &.ws-closed, &.ws-unauthorized { color: var(--iot-color-danger); }
+    &.ws-connecting { color: var(--iot-color-warning); }
   }
 }
 
 .pw__placeholder {
   padding: 60px 20px;
   text-align: center;
-  color: #999;
-  font-size: 14px;
-  border: 1px dashed #bbb;
-  background: #fff;
-  border-radius: 6px;
+  color: var(--iot-text-secondary);
+  border: 1px dashed var(--iot-border-color);
+  background: var(--iot-bg-card);
+  border-radius: var(--iot-radius-lg);
 }
 </style>

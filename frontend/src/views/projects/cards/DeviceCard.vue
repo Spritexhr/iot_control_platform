@@ -115,18 +115,15 @@ function onCommandFailed({ command }) {
   flex-direction: column;
   gap: 6px;
   padding: 12px 14px;
-  background: #f3f6fb;
-  border: 1px solid #2a3a55;
-  border-left: 3px solid #2a3a55;
-  border-radius: 4px;
-  transition: background-color 0.2s, border-color 0.2s;
-  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  background: var(--iot-bg-card);
+  border: 1px solid var(--iot-border-color);
+  border-left: 3px solid var(--iot-color-primary);
+  border-radius: var(--iot-radius-base);
+  transition: background-color var(--iot-transition-fast), border-color var(--iot-transition-fast);
 }
 
 .dev-card--offline {
-  background: #f6f6f4;
-  border-color: #999;
-  border-left-color: #999;
+  border-left-color: var(--iot-text-placeholder);
 }
 
 .dev-card__header {
@@ -138,18 +135,17 @@ function onCommandFailed({ command }) {
 .dev-card__badge {
   font-size: 9px;
   letter-spacing: 1px;
-  padding: 1px 5px;
-  background: #2a3a55;
-  color: #f3f6fb;
-  border-radius: 3px;
+  padding: 1px 6px;
+  background: var(--iot-color-primary-bg);
+  color: var(--iot-color-primary);
+  border-radius: var(--iot-radius-sm);
   flex-shrink: 0;
 }
 
 .dev-card__name {
-  font-size: 12px;
-  color: #2a3a55;
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-primary);
   font-weight: 600;
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -158,15 +154,14 @@ function onCommandFailed({ command }) {
 }
 
 .dev-card__online {
-  font-size: 10px;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
-  padding: 1px 6px;
-  border-radius: 10px;
+  font-size: var(--iot-font-size-xs);
+  padding: 1px 8px;
+  border-radius: 20px;
   flex-shrink: 0;
 
-  &--on { background: #e6f4ea; color: #2e7d4f; }
-  &--off { background: #fdecea; color: #c0392b; }
-  &--unknown { background: #f0f0f0; color: #999; }
+  &--on { background: var(--iot-color-success-bg); color: var(--iot-color-success); }
+  &--off { background: var(--iot-color-danger-bg); color: var(--iot-color-danger); }
+  &--unknown { background: rgba(139, 123, 107, 0.10); color: var(--iot-text-secondary); }
 }
 
 .dev-card__status {
@@ -176,9 +171,8 @@ function onCommandFailed({ command }) {
 }
 
 .dev-card__status-empty {
-  font-size: 11px;
-  color: #aaa;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-placeholder);
 }
 
 .dev-card__status-row {
@@ -189,42 +183,39 @@ function onCommandFailed({ command }) {
 }
 
 .dev-card__status-key {
-  font-size: 11px;
-  color: #6b7896;
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .dev-card__status-val {
-  font-size: 14px;
+  font-size: var(--iot-font-size-base);
   font-weight: 600;
-  color: #1f2a44;
+  color: var(--iot-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
 .dev-card__pill {
-  font-size: 11px;
+  font-size: var(--iot-font-size-xs);
   padding: 1px 8px;
-  border-radius: 10px;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
+  border-radius: 20px;
 
-  &--on { background: #e6f4ea; color: #2e7d4f; }
-  &--off { background: #eceff4; color: #8a93a6; }
+  &--on { background: var(--iot-color-success-bg); color: var(--iot-color-success); }
+  &--off { background: rgba(139, 123, 107, 0.10); color: var(--iot-text-secondary); }
 }
 
 .dev-card__commands {
   margin-top: 4px;
   padding-top: 6px;
-  border-top: 1px dashed #c7d0e0;
+  border-top: 1px dashed var(--iot-border-color-light);
 }
 
 .dev-card__commands-title {
-  font-size: 10px;
+  font-size: var(--iot-font-size-xs);
   letter-spacing: 0.5px;
-  color: #8a93a6;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
+  color: var(--iot-text-secondary);
   margin-bottom: 2px;
 }
 </style>

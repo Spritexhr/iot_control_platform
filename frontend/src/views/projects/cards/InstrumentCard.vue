@@ -71,11 +71,10 @@ const title = computed(() => {
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  background: #fafaf7;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  transition: background-color 0.2s, border-color 0.2s;
-  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  background: var(--iot-bg-card);
+  border: 1px solid var(--iot-border-color);
+  border-radius: var(--iot-radius-base);
+  transition: background-color var(--iot-transition-fast), border-color var(--iot-transition-fast);
 }
 
 .instr-card__header {
@@ -86,9 +85,8 @@ const title = computed(() => {
 }
 
 .instr-card__name {
-  font-size: 12px;
-  color: #555;
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: var(--iot-font-size-sm);
+  color: var(--iot-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,21 +95,19 @@ const title = computed(() => {
 }
 
 .instr-card__online {
-  font-size: 10px;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
-  padding: 1px 6px;
-  border-radius: 10px;
+  font-size: var(--iot-font-size-xs);
+  padding: 1px 8px;
+  border-radius: 20px;
   flex-shrink: 0;
 
-  &--on      { background: #e6f4ea; color: #2e7d4f; }
-  &--off     { background: #fdecea; color: #c0392b; }
-  &--unknown { background: #f0f0f0; color: #999; }
+  &--on      { background: var(--iot-color-success-bg); color: var(--iot-color-success); }
+  &--off     { background: var(--iot-color-danger-bg); color: var(--iot-color-danger); }
+  &--unknown { background: rgba(139, 123, 107, 0.10); color: var(--iot-text-secondary); }
 }
 
 .instr-card__desc {
-  font-size: 11px;
-  color: #888;
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -125,31 +121,31 @@ const title = computed(() => {
 }
 
 .instr-card__value {
-  font-size: 24px;
+  font-size: var(--iot-font-size-xl);
   font-weight: 600;
-  color: #2a2a2a;
+  color: var(--iot-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
 .instr-card__unit {
-  font-size: 12px;
-  color: #888;
+  font-size: var(--iot-font-size-xs);
+  color: var(--iot-text-secondary);
 }
 
 .instr-card--warn {
-  background: #fef9e7;
-  border-color: #c9a227;
+  background: var(--iot-color-warning-bg);
+  border-color: var(--iot-color-warning);
 }
 
 .instr-card--alarm {
-  background: #fdecea;
-  border-color: #d14b3b;
+  background: var(--iot-color-danger-bg);
+  border-color: var(--iot-color-danger);
   animation: alarm-pulse 1.2s ease-in-out infinite;
-  .instr-card__value { color: #c0392b; }
+  .instr-card__value { color: var(--iot-color-danger); }
 }
 
 @keyframes alarm-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(209, 75, 59, 0); }
-  50%      { box-shadow: 0 0 0 4px rgba(209, 75, 59, 0.2); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 74, 58, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(201, 74, 58, 0.2); }
 }
 </style>

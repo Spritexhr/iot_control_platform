@@ -13,6 +13,14 @@
       </div>
     </div>
 
+    <el-alert type="warning" show-icon :closable="false" class="migrate-tip">
+      <template #title>
+        展示类扩展（大屏 / P&amp;ID / 时序）正逐步被平台原生
+        <el-link type="primary" :underline="false" @click="router.push('/projects')">「项目 / 场景」</el-link>
+        取代，新场景建议直接在项目中创建。
+      </template>
+    </el-alert>
+
     <div v-loading="loading">
       <div v-if="plugins.length" class="iot-grid iot-grid--cards">
         <div v-for="p in plugins" :key="p.name" class="iot-card plugin-card">
@@ -21,7 +29,10 @@
               <el-icon :size="24"><component :is="iconFor(p.name)" /></el-icon>
             </div>
             <div class="plugin-card__title-block">
-              <div class="plugin-card__title">{{ titleFor(p.name) }}</div>
+              <div class="plugin-card__title">
+                {{ titleFor(p.name) }}
+                <el-tag v-if="isDeprecated(p.name)" type="warning" size="small" effect="plain">建议迁移</el-tag>
+              </div>
               <div class="plugin-card__name">{{ p.name }} · v{{ p.version || '0.0.0' }}</div>
             </div>
             <el-tag :type="p.enabled ? 'success' : 'info'" size="small">
@@ -95,13 +106,16 @@ const toggling = ref('')
 
 // 已知插件的 UI 入口与展示信息
 const KNOWN_PLUGINS = {
-  data_viz: { route: '/plugins/data_viz', title: '数据可视化', icon: DataLine },
-  eb_plant: { route: '/plugins/eb_plant', title: '全厂设备辅助监控大屏', icon: DataAnalysis },
+  data_viz: { route: '/plugins/data_viz', title: '数据可视化', icon: DataLine, deprecated: true },
+  eb_plant: { route: '/plugins/eb_plant', title: '全厂设备辅助监控大屏', icon: DataAnalysis, deprecated: true },
   // P&ID 画板不做独立卡片，入口收在「全厂设备辅助监控大屏」内
 }
 
 function hasUI(name) {
   return name in KNOWN_PLUGINS
+}
+function isDeprecated(name) {
+  return !!KNOWN_PLUGINS[name]?.deprecated
 }
 function iconFor(name) {
   return KNOWN_PLUGINS[name]?.icon || Box

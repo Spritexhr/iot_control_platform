@@ -91,36 +91,37 @@ async function save() {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .dv {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 230px);
   min-height: 480px;
-  border: 1px solid #d8d6cc;
-  border-radius: 6px;
+  border: 1px solid var(--iot-border-color-light);
+  border-radius: var(--iot-radius-lg);
+  box-shadow: var(--iot-shadow-sm);
   overflow: hidden;
-  background: #fff;
+  background: var(--iot-bg-card);
 }
 
 .dv__bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e6e4da;
+  padding: var(--iot-spacing-sm) var(--iot-spacing-md);
+  border-bottom: 1px solid var(--iot-border-color-light);
   flex-shrink: 0;
 }
 
 .dv__name {
-  font-size: 13px;
+  font-size: var(--iot-font-size-sm);
   font-weight: 600;
-  color: #2a2a2a;
+  color: var(--iot-text-primary);
 }
 
 .dv__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--iot-spacing-sm);
 }
 </style>
