@@ -1,66 +1,76 @@
 <template>
   <div class="ts">
     <div class="ts__bar">
-      <el-select v-model="selectedSource" placeholder="选择数据源" style="width: 240px" @change="onSourceChange">
-        <el-option-group label="传感器">
-          <el-option
-            v-for="s in sourceOptions.sensors"
-            :key="`sensor:${s.id}`"
-            :label="`${s.name} (${s.id})`"
-            :value="`sensor:${s.id}`"
-          />
-        </el-option-group>
-        <el-option-group label="设备">
-          <el-option
-            v-for="d in sourceOptions.devices"
-            :key="`device:${d.id}`"
-            :label="`${d.name} (${d.id})`"
-            :value="`device:${d.id}`"
-          />
-        </el-option-group>
-      </el-select>
+      <div class="ts__selectors">
+        <el-select v-model="selectedSource" placeholder="选择数据源" style="width: 240px" class="ts__select" @change="onSourceChange">
+          <el-option-group label="传感器">
+            <el-option
+              v-for="s in sourceOptions.sensors"
+              :key="`sensor:${s.id}`"
+              :label="`${s.name} (${s.id})`"
+              :value="`sensor:${s.id}`"
+            />
+          </el-option-group>
+          <el-option-group label="设备">
+            <el-option
+              v-for="d in sourceOptions.devices"
+              :key="`device:${d.id}`"
+              :label="`${d.name} (${d.id})`"
+              :value="`device:${d.id}`"
+            />
+          </el-option-group>
+        </el-select>
 
-      <el-select
-        v-model="selectedFields"
-        multiple
-        collapse-tags
-        collapse-tags-tooltip
-        placeholder="选择字段"
-        style="width: 220px"
-        :disabled="!availableFields.length"
-      >
-        <el-option v-for="f in availableFields" :key="f" :label="f" :value="f" />
-      </el-select>
+        <el-select
+          v-model="selectedFields"
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          placeholder="选择监测指标"
+          style="width: 220px"
+          class="ts__select"
+          :disabled="!availableFields.length"
+        >
+          <el-option v-for="f in availableFields" :key="f" :label="f" :value="f" />
+        </el-select>
 
-      <el-select v-model="quickRange" style="width: 120px" @change="onQuickRangeChange">
-        <el-option label="近 1 小时" :value="1" />
-        <el-option label="近 6 小时" :value="6" />
-        <el-option label="近 24 小时" :value="24" />
-        <el-option label="近 7 天" :value="168" />
-        <el-option label="自定义" value="custom" />
-      </el-select>
+        <el-select v-model="quickRange" style="width: 120px" class="ts__select" @change="onQuickRangeChange">
+          <el-option label="近 1 小时" :value="1" />
+          <el-option label="近 6 小时" :value="6" />
+          <el-option label="近 24 小时" :value="24" />
+          <el-option label="近 7 天" :value="168" />
+          <el-option label="自定义时间" value="custom" />
+        </el-select>
 
-      <el-date-picker
-        v-if="quickRange === 'custom'"
-        v-model="customRange"
-        type="datetimerange"
-        range-separator="至"
-        start-placeholder="开始"
-        end-placeholder="结束"
-        format="YYYY-MM-DD HH:mm"
-        value-format="YYYY-MM-DDTHH:mm:ss"
-        style="width: 340px"
-      />
+        <el-date-picker
+          v-if="quickRange === 'custom'"
+          v-model="customRange"
+          type="datetimerange"
+          range-separator="至"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          format="YYYY-MM-DD HH:mm"
+          value-format="YYYY-MM-DDTHH:mm:ss"
+          style="width: 340px"
+          class="ts__picker"
+        />
+      </div>
 
-      <el-button :loading="loading" size="small" @click="fetchSeries">刷新</el-button>
-      <el-button v-if="canEdit" size="small" type="primary" plain :loading="saving" @click="saveDefault">
-        保存为默认
-      </el-button>
+      <div class="ts__actions">
+        <el-button :loading="loading" size="small" @click="fetchSeries">查询刷新</el-button>
+        <el-button v-if="canEdit" size="small" type="primary" plain :loading="saving" @click="saveDefault">
+          保存为默认视图
+        </el-button>
+      </div>
     </div>
 
     <div v-loading="loading" class="ts__chart-wrap">
-      <div v-if="!selectedSource" class="ts__empty">请选择一个数据源</div>
-      <div v-else-if="!hasPoints && !loading" class="ts__empty">当前时间窗内无数据</div>
+      <div v-if="!selectedSource" class="ts__empty">
+        <el-empty description="请在上方选择一个点位数据源开始监测" />
+      </div>
+      <div v-else-if="!hasPoints && !loading" class="ts__empty">
+        <el-empty description="当前时间窗口内暂无历史遥测数据" />
+      </div>
       <div v-show="hasPoints" ref="chartEl" class="ts__chart" />
     </div>
   </div>
@@ -75,14 +85,14 @@ import { getProjectSeries, updateView } from '@/api/projects'
 import { useProjectStore } from '@/stores/project'
 
 const props = defineProps({
-  view: { type: Object, required: true },     // ProjectView: { id, config:{source,fields,quickRange} }
+  view: { type: Object, required: true },
   canEdit: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved'])
 
 const store = useProjectStore()
 
-const selectedSource = ref('')   // "sensor:ID" / "device:ID"
+const selectedSource = ref('')
 const selectedFields = ref([])
 const quickRange = ref(24)
 const customRange = ref([])
@@ -94,10 +104,8 @@ const chartEl = ref(null)
 let chartInstance = null
 
 const hasPoints = computed(() => (seriesData.value.points || []).length > 0)
-// 可选字段以 series 响应里的 fields 为准（设备字段来自 config_parameters，不在 layout 里）
 const availableFields = computed(() => seriesData.value.fields || [])
 
-// 数据源 = 本项目成员（按 sensor_id / device_id 去重）
 const sourceOptions = computed(() => {
   const sensors = new Map()
   const devices = new Map()
@@ -141,7 +149,6 @@ async function fetchSeries() {
       kind, sourceId, start: range.start, end: range.end,
     })
     seriesData.value = res
-    // 首次/换源后默认选前 2 个字段
     if (!selectedFields.value.length) {
       selectedFields.value = (res.fields || []).slice(0, 2)
     }
@@ -164,17 +171,37 @@ function coerceNumber(v) {
 function renderChart() {
   if (!chartEl.value) return
   if (!chartInstance) chartInstance = echarts.init(chartEl.value)
+  
+  const isDark = document.documentElement.classList.contains('dark')
+  const textClr = isDark ? '#C8BCB0' : '#4A4035'
+  const splitLineClr = isDark ? '#2D2924' : '#EDE8E0'
+  
   const points = seriesData.value.points || []
   const events = seriesData.value.events || []
   const fields = selectedFields.value.length ? selectedFields.value : availableFields.value.slice(0, 2)
 
-  const series = fields.map((field) => ({
+  // 优雅的曲线调色板
+  const lineColors = ['#D97757', '#4CAF82', '#D4A017', '#C94A3A', '#8B7B6B', '#3b82f6', '#8b5cf6']
+
+  const series = fields.map((field, idx) => ({
     name: field,
     type: 'line',
     smooth: true,
     showSymbol: points.length < 200,
     connectNulls: false,
     sampling: 'lttb',
+    itemStyle: {
+      color: lineColors[idx % lineColors.length]
+    },
+    lineStyle: {
+      width: 2.5
+    },
+    areaStyle: {
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: lineColors[idx % lineColors.length] + '22' },
+        { offset: 1, color: lineColors[idx % lineColors.length] + '00' }
+      ])
+    },
     data: points.map((p) => [p.t, coerceNumber(p.data?.[field])]),
   }))
 
@@ -184,22 +211,62 @@ function renderChart() {
       markLine: {
         symbol: 'none',
         silent: true,
-        lineStyle: { color: 'rgba(255, 159, 64, 0.6)', type: 'dashed' },
+        lineStyle: { color: isDark ? 'rgba(232, 136, 90, 0.4)' : 'rgba(217, 119, 87, 0.4)', type: 'dashed' },
         data: events.slice(0, 50).map((e) => ({
           xAxis: e.t,
-          label: { formatter: e.event || '', position: 'end', fontSize: 10 },
+          label: { 
+            formatter: e.event || '', 
+            position: 'end', 
+            fontSize: 9,
+            color: textClr
+          },
         })),
       },
     }
   }
 
   chartInstance.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: fields, top: 0 },
-    grid: { left: 50, right: 30, top: 40, bottom: 60 },
-    xAxis: { type: 'time', axisLabel: { hideOverlap: true } },
-    yAxis: { type: 'value', scale: true },
-    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 24, bottom: 10 }],
+    backgroundColor: 'transparent',
+    textStyle: {
+      fontFamily: 'inherit',
+      color: textClr
+    },
+    tooltip: { 
+      trigger: 'axis', 
+      axisPointer: { type: 'cross', label: { backgroundColor: '#8B7B6B' } },
+      backgroundColor: isDark ? '#2D2924' : '#FDFCFB',
+      borderColor: isDark ? '#3D352D' : '#DDD5C8',
+      textStyle: { color: textClr }
+    },
+    legend: { 
+      data: fields, 
+      top: 0,
+      textStyle: { color: textClr }
+    },
+    grid: { left: 50, right: 30, top: 45, bottom: 65 },
+    xAxis: { 
+      type: 'time', 
+      axisLabel: { hideOverlap: true, color: textClr },
+      splitLine: { show: true, lineStyle: { color: splitLineClr } }
+    },
+    yAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLabel: { color: textClr },
+      splitLine: { show: true, lineStyle: { color: splitLineClr } }
+    },
+    dataZoom: [
+      { type: 'inside' }, 
+      { 
+        type: 'slider', 
+        height: 20, 
+        bottom: 10,
+        textStyle: { color: textClr },
+        borderColor: splitLineClr,
+        fillerColor: isDark ? 'rgba(232, 136, 90, 0.15)' : 'rgba(217, 119, 87, 0.1)',
+        handleStyle: { color: '#8B7B6B' }
+      }
+    ],
     series,
   }, { notMerge: true })
 }
@@ -224,8 +291,18 @@ async function saveDefault() {
   }
 }
 
+let themeObserver = null
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+  
+  // 观察暗色模式切换重新载入图表
+  themeObserver = new MutationObserver(() => {
+    if (chartInstance && hasPoints.value) {
+      renderChart()
+    }
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  
   // 从 config 恢复默认选择
   const cfg = props.view.config || {}
   if (cfg.source) {
@@ -238,6 +315,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (themeObserver) {
+    themeObserver.disconnect()
+  }
   chartInstance?.dispose()
   chartInstance = null
 })
@@ -255,20 +335,36 @@ watch(selectedFields, () => {
   border: 1px solid var(--iot-border-color-light);
   border-radius: var(--iot-radius-lg);
   box-shadow: var(--iot-shadow-sm);
-  padding: var(--iot-spacing-md);
+  padding: var(--iot-spacing-lg);
+  animation: iot-fade-in 0.4s ease forwards;
 }
 
 .ts__bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--iot-spacing-sm);
+  justify-content: space-between;
   align-items: center;
   margin-bottom: var(--iot-spacing-md);
+  flex-wrap: wrap;
+  gap: var(--iot-spacing-md);
+}
+
+.ts__selectors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ts__actions {
+  display: flex;
+  gap: 8px;
 }
 
 .ts__chart-wrap {
   position: relative;
   min-height: 480px;
+  border-top: 1px solid var(--iot-border-color-light);
+  padding-top: var(--iot-spacing-md);
 }
 
 .ts__chart {
@@ -285,4 +381,27 @@ watch(selectedFields, () => {
   color: var(--iot-text-placeholder);
   font-size: var(--iot-font-size-base);
 }
+
+@media screen and (max-width: 767px) {
+  .ts__bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ts__selectors {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    
+    .ts__select, .ts__picker {
+      width: 100% !important;
+    }
+  }
+
+  .ts__actions {
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+}
 </style>
+
