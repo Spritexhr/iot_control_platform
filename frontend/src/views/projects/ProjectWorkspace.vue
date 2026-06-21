@@ -28,10 +28,10 @@
         <div class="monitor-divider"></div>
         <div class="monitor-item">
           <span class="monitor-item__label">触发报警</span>
-          <span 
-            class="monitor-item__value font-mono" 
-            :class="{ 'is-alert': store.alarmCount > 0 }"
-          >{{ store.alarmCount }}</span>
+          <span
+            class="monitor-item__value font-mono"
+            :class="{ 'is-alert': roomAlarmCount > 0 }"
+          >{{ roomAlarmCount }}</span>
         </div>
         <div class="monitor-divider"></div>
         <div class="monitor-item">
@@ -51,8 +51,16 @@
       </div>
     </div>
 
-    <!-- 视图切换标签页 -->
-    <el-tabs v-model="activeView" class="pw__tabs segmented-tabs">
+    <!-- 房间(分区)导航 -->
+    <div v-if="rooms.length" class="pw-room-nav">
+      <el-icon class="pw-room-nav__icon"><House /></el-icon>
+      <el-radio-group v-model="activeRoomId" class="pw-room-radio">
+        <el-radio-button v-for="r in rooms" :key="r.id" :value="r.id">{{ r.name }}</el-radio-button>
+      </el-radio-group>
+    </div>
+
+    <!-- 当前房间的视图切换标签页 -->
+    <el-tabs v-if="activeRoomId != null" v-model="activeView" class="pw__tabs segmented-tabs">
       <el-tab-pane
         v-for="t in viewTabs"
         :key="t.key"
@@ -64,10 +72,10 @@
             <span>{{ t.label }}</span>
           </span>
         </template>
-        
+
         <transition name="fade" mode="out-in">
           <div :key="t.key" class="tab-content-wrap">
-            <CardDashboard v-if="t.type === 'card'" />
+            <CardDashboard v-if="t.type === 'card'" :section-id="activeRoomId" />
             <DiagramView
               v-else-if="t.type === 'diagram' && t.view"
               :view="t.view"
@@ -85,19 +93,26 @@
         </transition>
       </el-tab-pane>
     </el-tabs>
+
+    <div v-else class="pw__placeholder">
+      该项目还没有房间（分区）。请到
+      <el-link type="primary" :underline="false" @click="$router.push(`/projects/${projectId}/config`)">配置页</el-link>
+      新建房间并导入传感器 / 设备。
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { 
-  ArrowLeft, 
-  Setting, 
-  Grid, 
-  Share, 
-  TrendCharts, 
-  Monitor 
+import {
+  ArrowLeft,
+  Setting,
+  Grid,
+  Share,
+  TrendCharts,
+  Monitor,
+  House
 } from '@element-plus/icons-vue'
 
 import CardDashboard from './views/CardDashboard.vue'
@@ -116,9 +131,15 @@ const userStore = useUserStore()
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 const project = ref(null)
 const views = ref([])
-const activeView = ref('__default__')
+const activeRoomId = ref(null)
+const activeView = ref('')
 
 store.reset(projectId)
+
+// 房间列表来自 layout（含成员），房间优先导航
+const rooms = computed(() => store.layout?.sections || [])
+const activeRoom = computed(() => rooms.value.find((r) => r.id === activeRoomId.value) || null)
+const activeRoomViews = computed(() => views.value.filter((v) => v.section === activeRoomId.value))
 
 const SCENE_LABELS = { industrial: '工业装置', smart_home: '智能家居', custom: '自定义' }
 const sceneLabel = computed(() => SCENE_LABELS[project.value?.scene_type] || '场景')
@@ -136,16 +157,28 @@ function getViewIcon(type) {
   return Monitor
 }
 
-// 视图 tab：无视图时给一个默认卡片大屏，保证开箱可看
+// 当前房间的视图 tab：无视图时给一个默认卡片大屏，保证开箱可看
 const viewTabs = computed(() => {
-  if (views.value.length === 0) {
-    return [{ key: '__default__', label: '卡片大屏', type: 'card', view: null }]
+  if (activeRoomId.value == null) return []
+  if (activeRoomViews.value.length === 0) {
+    return [{ key: `room-${activeRoomId.value}-default`, label: '卡片大屏', type: 'card', view: null }]
   }
-  return views.value.map((v) => ({ key: String(v.id), label: v.name, type: v.view_type, view: v }))
+  return activeRoomViews.value.map((v) => ({ key: String(v.id), label: v.name, type: v.view_type, view: v }))
 })
 
+// 选中当前房间的默认视图（is_default 优先，否则第一个；无视图则落到默认卡片）
+function selectDefaultView() {
+  const rv = activeRoomViews.value
+  if (rv.length === 0) {
+    activeView.value = `room-${activeRoomId.value}-default`
+    return
+  }
+  const def = rv.find((v) => v.is_default) || rv[0]
+  activeView.value = String(def.id)
+}
+watch(activeRoomId, () => { selectDefaultView() })
+
 function placeholderLabel(type) {
-  if (type === 'timeseries') return '时序趋势视图将在阶段 3 上线'
   return '该视图类型暂未实现'
 }
 
@@ -154,12 +187,23 @@ function onViewSaved({ id, config }) {
   if (v) v.config = config
 }
 
-const pointCount = computed(() =>
-  (store.layout?.sections || []).reduce(
-    (n, sec) => n + (sec.sensors?.length || 0) + (sec.devices?.length || 0),
-    0,
-  ),
-)
+// 点位数量 = 当前房间的传感器 + 设备
+const pointCount = computed(() => {
+  const r = activeRoom.value
+  return r ? (r.sensors?.length || 0) + (r.devices?.length || 0) : 0
+})
+
+// 触发报警 = 当前房间内非 normal 状态的传感器数
+const roomAlarmCount = computed(() => {
+  const r = activeRoom.value
+  if (!r) return 0
+  let n = 0
+  for (const s of r.sensors || []) {
+    const live = store.findByBinding(s.point_id)
+    if (live && live.status && live.status !== 'normal') n++
+  }
+  return n
+})
 
 const WS_LABELS = {
   idle: '未连接', connecting: '连接中', open: '已连接',
@@ -181,16 +225,17 @@ async function init() {
   } catch (e) {
     console.error('[project] 加载项目失败', e)
   }
-  store.loadLayout(projectId)
-  store.loadSnapshot(projectId)
   try {
     const data = await listViews(projectId)
     views.value = data.results || data || []
-    const def = views.value.find((v) => v.is_default) || views.value[0]
-    if (def) activeView.value = String(def.id)
   } catch (e) {
     console.error('[project] 加载视图失败', e)
   }
+  // 等 layout 就绪后再定房间：默认视图所在房间 > 第一个房间
+  await Promise.all([store.loadLayout(projectId), store.loadSnapshot(projectId)])
+  const defView = views.value.find((v) => v.is_default)
+  activeRoomId.value = defView ? defView.section : (rooms.value[0]?.id ?? null)
+  selectDefaultView()
 }
 init()
 
@@ -357,6 +402,42 @@ watch(displayStatus, (v) => { store.wsStatus = v }, { immediate: true })
   &.ws-open { color: var(--iot-color-success); }
   &.ws-connecting { color: var(--iot-color-warning); }
   &.ws-error, &.ws-closed { color: var(--iot-color-danger); }
+}
+
+/* 房间导航 */
+.pw-room-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--iot-spacing-md);
+  flex-wrap: wrap;
+
+  &__icon {
+    color: var(--iot-color-primary);
+    font-size: 18px;
+  }
+
+  .pw-room-radio {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  :deep(.el-radio-button__inner) {
+    border-radius: var(--iot-radius-base) !important;
+    border: 1px solid var(--iot-border-color-light);
+    margin-right: 4px;
+    box-shadow: none !important;
+  }
+
+  :deep(.el-radio-button:first-child .el-radio-button__inner) {
+    border-left: 1px solid var(--iot-border-color-light);
+  }
+
+  :deep(.el-radio-button__original-input:checked + .el-radio-button__inner) {
+    background: var(--iot-color-primary);
+    border-color: var(--iot-color-primary);
+    color: #fff;
+  }
 }
 
 /* 分段式 Tab 样式 */

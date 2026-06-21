@@ -24,6 +24,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
@@ -126,8 +127,8 @@ def _device_state(member: ProjectDeviceMember) -> dict:
 
 
 def _build_layout(project: Project) -> dict:
-    """展示骨架：有序分区，每段挂它的传感器/设备成员（静态元信息），
-    未归属 section 的成员统一落到末尾「未分组」段。"""
+    """展示骨架：有序房间(分区)，每个房间挂它的传感器/设备成员（静态元信息）。
+    成员 section 必填，故无「未分组」段。"""
     sensor_members = (
         project.sensor_members.filter(is_visible=True)
         .select_related("sensor", "sensor__sensor_type", "section")
@@ -154,17 +155,6 @@ def _build_layout(project: Project) -> dict:
             "sort_order": sec.sort_order,
             "sensors": s_by_sec.get(sec.id, []),
             "devices": d_by_sec.get(sec.id, []),
-        })
-
-    unassigned_sensors = s_by_sec.get(None, [])
-    unassigned_devices = d_by_sec.get(None, [])
-    if unassigned_sensors or unassigned_devices:
-        sections.append({
-            "id": None,
-            "name": "未分组",
-            "sort_order": 10 ** 9,
-            "sensors": unassigned_sensors,
-            "devices": unassigned_devices,
         })
 
     return {
@@ -221,6 +211,9 @@ class ProjectViewSet(_AdminWritePermission, viewsets.ModelViewSet):
         sensors_qs = Sensor.objects.select_related("sensor_type").order_by("sort_order", "sensor_id")
         devices_qs = Device.objects.select_related("device_type").order_by("sort_order", "device_id")
         ctx = {"project_id": project.id}
+        section_id = request.query_params.get("section")
+        if section_id:
+            ctx["section_id"] = section_id
         return Response({
             "sensors": BindableSensorSerializer(sensors_qs, many=True, context=ctx).data,
             "devices": BindableDeviceSerializer(devices_qs, many=True, context=ctx).data,
@@ -293,14 +286,29 @@ class ProjectViewSet(_AdminWritePermission, viewsets.ModelViewSet):
 # ---------- 子资源（平铺 + ?project= 过滤） ----------
 
 class _ProjectScopedViewSet(_AdminWritePermission, viewsets.ModelViewSet):
-    """按 ?project=<id> 过滤的子资源基类。"""
+    """按 ?project=<id> 过滤的子资源基类。section_scoped=True 的子类额外支持 ?section=<id>。"""
+
+    section_scoped = False
 
     def get_queryset(self):
         qs = super().get_queryset()
         pid = self.request.query_params.get("project")
         if pid:
             qs = qs.filter(project_id=pid)
+        if self.section_scoped:
+            sid = self.request.query_params.get("section")
+            if sid:
+                qs = qs.filter(section_id=sid)
         return qs
+
+    def _resolve_section(self, section_id) -> ProjectSection:
+        """批量导入用：取出目标房间并校验存在；缺失/无效抛 400。"""
+        if not section_id:
+            raise ValidationError({"section": "批量导入需指定 section（房间）"})
+        try:
+            return ProjectSection.objects.select_related("project").get(id=section_id)
+        except ProjectSection.DoesNotExist:
+            raise ValidationError({"section": "房间不存在"})
 
 
 class ProjectSectionViewSet(_ProjectScopedViewSet):
@@ -321,39 +329,41 @@ class ProjectSectionViewSet(_ProjectScopedViewSet):
 class ProjectSensorMemberViewSet(_ProjectScopedViewSet):
     queryset = ProjectSensorMember.objects.select_related("sensor", "sensor__sensor_type", "section").all()
     serializer_class = ProjectSensorMemberSerializer
+    section_scoped = True
 
     def create(self, request, *args, **kwargs):
-        """单条或批量导入：
-        - 传 project + sensor_ids=[...] 走批量，按各 sensor 的 sensor_type.data_fields 拆分：
+        """单条或批量导入到某房间(section)：
+        - 传 section + sensor_ids=[...] 走批量，按各 sensor 的 sensor_type.data_fields 拆分：
           多字段 → 每字段一条（data_key=field、tag=sensorId-field）；单字段/无元数据 → 一条 data_key=""。
-          (project, sensor, data_key) 已存在的跳过；UniqueConstraint + ignore_conflicts 兜底并发。
-        - 否则走标准 create（用于「+字段」单条新增）。
+          (section, sensor, data_key) 已存在的跳过；UniqueConstraint + ignore_conflicts 兜底并发。
+        - 否则走标准 create（用于「+字段」单条新增，serializer 由 section 回填 project）。
         """
         sensor_ids = request.data.get("sensor_ids")
-        project_id = request.data.get("project")
+        section_id = request.data.get("section")
         if isinstance(sensor_ids, list):
-            if not project_id:
-                return Response({"detail": "批量导入需指定 project"}, status=status.HTTP_400_BAD_REQUEST)
+            section = self._resolve_section(section_id)
             sensors = Sensor.objects.filter(id__in=sensor_ids).select_related("sensor_type")
             to_create = []
             for s in sensors:
                 fields = s.sensor_type.data_fields if s.sensor_type_id else None
                 fields_to_use = list(fields) if (isinstance(fields, list) and fields) else [""]
                 existing = set(
-                    ProjectSensorMember.objects.filter(project_id=project_id, sensor=s)
+                    ProjectSensorMember.objects.filter(section_id=section.id, sensor=s)
                     .values_list("data_key", flat=True)
                 )
                 for f in fields_to_use:
                     if f in existing:
                         continue
                     tag = (f"{s.sensor_id}-{f}" if f else s.sensor_id)[:50]
-                    to_create.append(ProjectSensorMember(project_id=project_id, sensor=s, data_key=f, tag=tag))
+                    to_create.append(ProjectSensorMember(
+                        project_id=section.project_id, section_id=section.id, sensor=s, data_key=f, tag=tag,
+                    ))
 
             ProjectSensorMember.objects.bulk_create(to_create, ignore_conflicts=True)
             created_keys = {(b.sensor_id, b.data_key) for b in to_create}
             if created_keys:
                 created_qs = ProjectSensorMember.objects.filter(
-                    project_id=project_id, sensor_id__in={k[0] for k in created_keys}
+                    section_id=section.id, sensor_id__in={k[0] for k in created_keys}
                 ).select_related("sensor", "sensor__sensor_type")
                 created_qs = [b for b in created_qs if (b.sensor_id, b.data_key) in created_keys]
             else:
@@ -366,22 +376,24 @@ class ProjectSensorMemberViewSet(_ProjectScopedViewSet):
 class ProjectDeviceMemberViewSet(_ProjectScopedViewSet):
     queryset = ProjectDeviceMember.objects.select_related("device", "device__device_type", "section").all()
     serializer_class = ProjectDeviceMemberSerializer
+    section_scoped = True
 
     def create(self, request, *args, **kwargs):
         device_ids = request.data.get("device_ids")
-        project_id = request.data.get("project")
+        section_id = request.data.get("section")
         if isinstance(device_ids, list):
-            if not project_id:
-                return Response({"detail": "批量导入需指定 project"}, status=status.HTTP_400_BAD_REQUEST)
+            section = self._resolve_section(section_id)
             existing = set(
-                ProjectDeviceMember.objects.filter(project_id=project_id, device_id__in=device_ids)
+                ProjectDeviceMember.objects.filter(section_id=section.id, device_id__in=device_ids)
                 .values_list("device_id", flat=True)
             )
             created = []
             for d in Device.objects.filter(id__in=device_ids):
                 if d.id in existing:
                     continue
-                b = ProjectDeviceMember.objects.create(project_id=project_id, device=d, tag=d.device_id)
+                b = ProjectDeviceMember.objects.create(
+                    project_id=section.project_id, section_id=section.id, device=d, tag=d.device_id,
+                )
                 created.append(b)
             data = ProjectDeviceMemberSerializer(created, many=True).data
             return Response({"created": data, "skipped": len(existing)}, status=status.HTTP_201_CREATED)
@@ -391,3 +403,4 @@ class ProjectDeviceMemberViewSet(_ProjectScopedViewSet):
 class ProjectViewViewSet(_ProjectScopedViewSet):
     queryset = ProjectView.objects.all()
     serializer_class = ProjectViewSerializer
+    section_scoped = True

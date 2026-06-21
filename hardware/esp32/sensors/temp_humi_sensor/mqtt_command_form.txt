@@ -1,0 +1,28 @@
+{
+    "turn_on": {
+        "mqtt_message": {"command": "enable"},
+        "description": "启动传感器",
+        "params": [] 
+    },
+    "turn_off": {
+        "mqtt_message": {"command": "disable"},
+        "description": "关闭传感器",
+        "params": []
+    },
+    "set_data_interval": {
+        "mqtt_message": {
+            "command": "set_data_interval",
+            "interval": "{val}"
+        },
+        "description": "设置数据传输间隔",
+        "params": ["val"]
+    },
+    "set_status_interval": {
+        "mqtt_message": {
+            "command": "set_status_interval",
+            "interval": "{val}"
+        },
+        "description": "设置状态传输间隔",
+        "params": ["val"]
+    }
+}

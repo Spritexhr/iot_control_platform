@@ -3,223 +3,225 @@
     <div class="iot-page-header">
       <div>
         <h1 class="iot-page-title">项目配置：{{ project?.name || '' }}</h1>
-        <p class="iot-page-subtitle">唯一代号 {{ project?.code }} · 统一配置分区、数据源及视图</p>
+        <p class="iot-page-subtitle">唯一代号 {{ project?.code }} · 房间(分区)隔离：每个房间各自管理传感器 / 设备 / 视图</p>
       </div>
       <el-button :icon="ArrowLeft" class="pc__back-btn" @click="$router.push(`/projects/${projectId}`)">返回工作台</el-button>
     </div>
 
-    <el-tabs v-model="tab" class="pc__tabs segmented-tabs">
-      <!-- ============ 分区 ============ -->
-      <el-tab-pane name="sections">
-        <template #label>
-          <span class="tab-label-custom">
-            <el-icon><Folder /></el-icon>
-            <span>分区管理</span>
-          </span>
-        </template>
-        <div class="pc-panel">
-          <div class="pc__row">
-            <span class="pc__row-title">新建分区：</span>
-            <el-input v-model="newSectionName" placeholder="如 反应工段 / 客厅" style="width: 260px" />
-            <el-button type="primary" @click="addSection">新建分区</el-button>
-          </div>
-          <el-table :data="sections" size="default" border style="margin-top: 12px">
-            <el-table-column type="index" label="#" width="60" align="center" />
-            <el-table-column prop="name" label="分区名" />
-            <el-table-column label="操作" width="220" align="center">
-              <template #default="{ row, $index }">
-                <el-button size="small" :disabled="$index === 0" @click="moveSection($index, -1)">上移</el-button>
-                <el-button size="small" :disabled="$index === sections.length - 1" @click="moveSection($index, 1)">下移</el-button>
-                <el-button size="small" type="danger" plain @click="removeSection(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <p class="pc__hint">提示：删除分区不会删除其下挂载的成员，它们会被自动归置到「未分组」中。</p>
+    <div class="pc-body">
+      <!-- ============ 左：房间列表 ============ -->
+      <aside class="pc-rooms">
+        <div class="pc-rooms__head">
+          <span class="pc-rooms__title"><el-icon><House /></el-icon> 房间（分区）</span>
         </div>
-      </el-tab-pane>
+        <div class="pc-rooms__add">
+          <el-input v-model="newSectionName" placeholder="新房间名" size="small" @keyup.enter="addSection" />
+          <el-button type="primary" size="small" :icon="Plus" @click="addSection" />
+        </div>
+        <ul v-if="sections.length" class="pc-rooms__list">
+          <li
+            v-for="(sec, idx) in sections"
+            :key="sec.id"
+            class="pc-room"
+            :class="{ 'is-active': sec.id === activeSectionId }"
+            @click="activeSectionId = sec.id"
+          >
+            <div class="pc-room__main">
+              <span class="pc-room__name">{{ sec.name }}</span>
+              <span class="pc-room__stat">{{ roomStat(sec.id) }}</span>
+            </div>
+            <el-dropdown trigger="click" @command="(c) => onRoomCommand(c, sec, idx)">
+              <el-icon class="pc-room__more" @click.stop><MoreFilled /></el-icon>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="rename" :icon="EditPen">重命名</el-dropdown-item>
+                  <el-dropdown-item command="up" :icon="Top" :disabled="idx === 0">上移</el-dropdown-item>
+                  <el-dropdown-item command="down" :icon="Bottom" :disabled="idx === sections.length - 1">下移</el-dropdown-item>
+                  <el-dropdown-item command="delete" :icon="Delete" divided style="color: var(--iot-color-danger)">删除房间</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </li>
+        </ul>
+        <el-empty v-else :image-size="60" description="先新建一个房间" />
+      </aside>
 
-      <!-- ============ 传感器成员 ============ -->
-      <el-tab-pane name="sensors">
-        <template #label>
-          <span class="tab-label-custom">
-            <el-icon><Cpu /></el-icon>
-            <span>传感器成员</span>
-          </span>
-        </template>
-        <div class="pc-panel">
-          <div class="pc__row">
-            <span class="pc__row-title">绑定数据源：</span>
-            <el-select v-model="pickSensorIds" multiple filterable placeholder="选择要导入的传感器" style="flex: 1; max-width: 450px;">
-              <el-option
-                v-for="s in bindableSensors"
-                :key="s.id"
-                :label="`${s.sensor_id} · ${s.name}`"
-                :value="s.id"
-              />
-            </el-select>
-            <el-button type="primary" :disabled="!pickSensorIds.length" @click="importSensors">导入选中</el-button>
-          </div>
-          <el-table :data="sensorMembers" size="default" border style="margin-top: 12px">
-            <el-table-column prop="tag" label="位号 (Tag)" width="150">
-              <template #default="{ row }">
-                <el-input v-model="row.tag" size="small" @change="patchSensor(row, { tag: row.tag })" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="point_id" label="点位ID" width="160" />
-            <el-table-column label="所属分区" width="160">
-              <template #default="{ row }">
-                <el-select v-model="row.section" size="small" clearable placeholder="未分组" @change="patchSensor(row, { section: row.section })">
-                  <el-option v-for="sec in sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+      <!-- ============ 右：房间详情 ============ -->
+      <section v-if="activeSection" class="pc-detail">
+        <el-tabs v-model="tab" class="pc__tabs segmented-tabs">
+          <!-- ===== 传感器 ===== -->
+          <el-tab-pane name="sensors">
+            <template #label>
+              <span class="tab-label-custom"><el-icon><Cpu /></el-icon><span>传感器</span></span>
+            </template>
+            <div class="pc-panel">
+              <div class="pc__row">
+                <span class="pc__row-title">加入「{{ activeSection.name }}」：</span>
+                <el-select v-model="pickSensorIds" multiple filterable placeholder="选择要导入到本房间的传感器" style="flex: 1; max-width: 450px;">
+                  <el-option v-for="s in bindableSensors" :key="s.id" :label="`${s.sensor_id} · ${s.name}`" :value="s.id" />
                 </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column prop="unit" label="单位" width="100">
-              <template #default="{ row }">
-                <el-input v-model="row.unit" size="small" @change="patchSensor(row, { unit: row.unit })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="超限阈值 (低 / 高)" width="230" align="center">
-              <template #default="{ row }">
-                <div class="threshold-inputs">
-                  <el-input-number v-model="row.lo_threshold" size="small" controls-position="right" :value-on-clear="null" style="width: 90px" placeholder="低" @change="patchSensor(row, { lo_threshold: row.lo_threshold })" />
-                  <span class="threshold-sep">/</span>
-                  <el-input-number v-model="row.hi_threshold" size="small" controls-position="right" :value-on-clear="null" style="width: 90px" placeholder="高" @change="patchSensor(row, { hi_threshold: row.hi_threshold })" />
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="严重度" width="150" align="center">
-              <template #default="{ row }">
-                <el-select v-model="row.severity" size="small" :class="'severity-select--' + row.severity" @change="patchSensor(row, { severity: row.severity })">
-                  <el-option v-for="lv in SEVERITIES" :key="lv" :label="severityLabel(lv)" :value="lv">
-                    <span class="severity-badge-option" :class="'severity-badge--' + lv">{{ severityLabel(lv) }}</span>
-                  </el-option>
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="显示" width="80" align="center">
-              <template #default="{ row }">
-                <el-switch v-model="row.is_visible" size="small" @change="patchSensor(row, { is_visible: row.is_visible })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80" align="center">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" plain @click="removeSensor(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </el-tab-pane>
+                <el-button type="primary" :disabled="!pickSensorIds.length" @click="importSensors">导入选中</el-button>
+              </div>
+              <el-table :data="sectionSensors" size="default" border style="margin-top: 12px">
+                <el-table-column prop="tag" label="位号 (Tag)" width="150">
+                  <template #default="{ row }">
+                    <el-input v-model="row.tag" size="small" @change="patchSensor(row, { tag: row.tag })" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="point_id" label="点位ID" width="160" />
+                <el-table-column label="所属房间" width="160">
+                  <template #default="{ row }">
+                    <el-select v-model="row.section" size="small" @change="moveSensor(row)">
+                      <el-option v-for="sec in sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+                    </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="unit" label="单位" width="100">
+                  <template #default="{ row }">
+                    <el-input v-model="row.unit" size="small" @change="patchSensor(row, { unit: row.unit })" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="超限阈值 (低 / 高)" width="230" align="center">
+                  <template #default="{ row }">
+                    <div class="threshold-inputs">
+                      <el-input-number v-model="row.lo_threshold" size="small" controls-position="right" :value-on-clear="null" style="width: 90px" placeholder="低" @change="patchSensor(row, { lo_threshold: row.lo_threshold })" />
+                      <span class="threshold-sep">/</span>
+                      <el-input-number v-model="row.hi_threshold" size="small" controls-position="right" :value-on-clear="null" style="width: 90px" placeholder="高" @change="patchSensor(row, { hi_threshold: row.hi_threshold })" />
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="严重度" width="150" align="center">
+                  <template #default="{ row }">
+                    <el-select v-model="row.severity" size="small" :class="'severity-select--' + row.severity" @change="patchSensor(row, { severity: row.severity })">
+                      <el-option v-for="lv in SEVERITIES" :key="lv" :label="severityLabel(lv)" :value="lv">
+                        <span class="severity-badge-option" :class="'severity-badge--' + lv">{{ severityLabel(lv) }}</span>
+                      </el-option>
+                    </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column label="显示" width="80" align="center">
+                  <template #default="{ row }">
+                    <el-switch v-model="row.is_visible" size="small" @change="patchSensor(row, { is_visible: row.is_visible })" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="80" align="center">
+                  <template #default="{ row }">
+                    <el-button size="small" type="danger" plain @click="removeSensor(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+                <template #empty>本房间暂无传感器，从上方导入。</template>
+              </el-table>
+            </div>
+          </el-tab-pane>
 
-      <!-- ============ 设备成员 ============ -->
-      <el-tab-pane name="devices">
-        <template #label>
-          <span class="tab-label-custom">
-            <el-icon><Connection /></el-icon>
-            <span>设备成员</span>
-          </span>
-        </template>
-        <div class="pc-panel">
-          <div class="pc__row">
-            <span class="pc__row-title">绑定设备源：</span>
-            <el-select v-model="pickDeviceIds" multiple filterable placeholder="选择要导入的设备" style="flex: 1; max-width: 450px;">
-              <el-option
-                v-for="d in bindableDevices"
-                :key="d.id"
-                :label="`${d.device_id} · ${d.name}`"
-                :value="d.id"
-              />
-            </el-select>
-            <el-button type="primary" :disabled="!pickDeviceIds.length" @click="importDevices">导入选中</el-button>
-          </div>
-          <el-table :data="deviceMembers" size="default" border style="margin-top: 12px">
-            <el-table-column prop="tag" label="位号 (Tag)" width="180">
-              <template #default="{ row }">
-                <el-input v-model="row.tag" size="small" @change="patchDevice(row, { tag: row.tag })" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="device_id" label="设备ID" width="220" />
-            <el-table-column label="所属分区" width="220">
-              <template #default="{ row }">
-                <el-select v-model="row.section" size="small" clearable placeholder="未分组" @change="patchDevice(row, { section: row.section })">
-                  <el-option v-for="sec in sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+          <!-- ===== 设备 ===== -->
+          <el-tab-pane name="devices">
+            <template #label>
+              <span class="tab-label-custom"><el-icon><Connection /></el-icon><span>设备</span></span>
+            </template>
+            <div class="pc-panel">
+              <div class="pc__row">
+                <span class="pc__row-title">加入「{{ activeSection.name }}」：</span>
+                <el-select v-model="pickDeviceIds" multiple filterable placeholder="选择要导入到本房间的设备" style="flex: 1; max-width: 450px;">
+                  <el-option v-for="d in bindableDevices" :key="d.id" :label="`${d.device_id} · ${d.name}`" :value="d.id" />
                 </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="工作台显示" width="120" align="center">
-              <template #default="{ row }">
-                <el-switch v-model="row.is_visible" size="small" @change="patchDevice(row, { is_visible: row.is_visible })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100" align="center">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" plain @click="removeDevice(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </el-tab-pane>
+                <el-button type="primary" :disabled="!pickDeviceIds.length" @click="importDevices">导入选中</el-button>
+              </div>
+              <el-table :data="sectionDevices" size="default" border style="margin-top: 12px">
+                <el-table-column prop="tag" label="位号 (Tag)" width="180">
+                  <template #default="{ row }">
+                    <el-input v-model="row.tag" size="small" @change="patchDevice(row, { tag: row.tag })" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="device_id" label="设备ID" width="220" />
+                <el-table-column label="所属房间" width="220">
+                  <template #default="{ row }">
+                    <el-select v-model="row.section" size="small" @change="moveDevice(row)">
+                      <el-option v-for="sec in sections" :key="sec.id" :label="sec.name" :value="sec.id" />
+                    </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column label="工作台显示" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-switch v-model="row.is_visible" size="small" @change="patchDevice(row, { is_visible: row.is_visible })" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="100" align="center">
+                  <template #default="{ row }">
+                    <el-button size="small" type="danger" plain @click="removeDevice(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+                <template #empty>本房间暂无设备，从上方导入。</template>
+              </el-table>
+            </div>
+          </el-tab-pane>
 
-      <!-- ============ 视图 ============ -->
-      <el-tab-pane name="views">
-        <template #label>
-          <span class="tab-label-custom">
-            <el-icon><Monitor /></el-icon>
-            <span>视图管理</span>
-          </span>
-        </template>
-        <div class="pc-panel">
-          <div class="pc__row">
-            <span class="pc__row-title">新建视图：</span>
-            <el-input v-model="newView.name" placeholder="如 一期总览" style="width: 200px" />
-            <el-select v-model="newView.view_type" style="width: 160px">
-              <el-option label="卡片大屏" value="card" />
-              <el-option label="工艺流程图" value="diagram" />
-              <el-option label="时序趋势图" value="timeseries" />
-            </el-select>
-            <el-checkbox v-model="newView.is_default">设为默认视图</el-checkbox>
-            <el-button type="primary" @click="addView">创建视图</el-button>
-          </div>
-          <el-table :data="views" size="default" border style="margin-top: 12px">
-            <el-table-column prop="name" label="视图名称" />
-            <el-table-column prop="view_type" label="视图类型" width="180" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain">{{ VIEW_TYPE_LABELS[row.view_type] || row.view_type }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="设为默认" width="120" align="center">
-              <template #default="{ row }">
-                <el-switch v-model="row.is_default" size="small" @change="patchView(row, { is_default: row.is_default })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" align="center">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" plain @click="removeView(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <p class="pc__hint">提示：当未创建任何视图时，工作台会自动加载一个基础的「卡片大屏」展示点位。</p>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+          <!-- ===== 视图 ===== -->
+          <el-tab-pane name="views">
+            <template #label>
+              <span class="tab-label-custom"><el-icon><Monitor /></el-icon><span>视图</span></span>
+            </template>
+            <div class="pc-panel">
+              <div class="pc__row">
+                <span class="pc__row-title">新建视图（属于「{{ activeSection.name }}」）：</span>
+                <el-input v-model="newView.name" placeholder="如 一期总览" style="width: 200px" />
+                <el-select v-model="newView.view_type" style="width: 160px">
+                  <el-option label="卡片大屏" value="card" />
+                  <el-option label="工艺流程图" value="diagram" />
+                  <el-option label="时序趋势图" value="timeseries" />
+                </el-select>
+                <el-checkbox v-model="newView.is_default">设为默认视图</el-checkbox>
+                <el-button type="primary" @click="addView">创建视图</el-button>
+              </div>
+              <el-table :data="sectionViews" size="default" border style="margin-top: 12px">
+                <el-table-column prop="name" label="视图名称">
+                  <template #default="{ row }">
+                    <el-input v-model="row.name" size="small" @change="patchView(row, { name: row.name })" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="view_type" label="视图类型" width="180" align="center">
+                  <template #default="{ row }">
+                    <el-tag size="small" effect="plain">{{ VIEW_TYPE_LABELS[row.view_type] || row.view_type }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="设为默认" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-switch v-model="row.is_default" size="small" @change="patchView(row, { is_default: row.is_default })" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-button size="small" type="danger" plain @click="removeView(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+                <template #empty>本房间暂无视图，工作台会自动渲染一个卡片大屏展示本房间点位。</template>
+              </el-table>
+              <p class="pc__hint">提示：视图只能展示本房间的传感器 / 设备；默认视图为进入房间时首先显示的视图。</p>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </section>
+
+      <section v-else class="pc-detail pc-detail--empty">
+        <el-empty description="请选择左侧房间，或在上方新建一个房间" />
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  ArrowLeft,
-  Folder,
-  Cpu,
-  Connection,
-  Monitor
+import {
+  ArrowLeft, Cpu, Connection, Monitor,
+  House, Plus, MoreFilled, EditPen, Top, Bottom, Delete,
 } from '@element-plus/icons-vue'
 
 import {
   getProject,
   listProjectBindableSources,
-  listSections, createSection, deleteSection, reorderSections,
+  listSections, createSection, updateSection, deleteSection, reorderSections,
   listSensorMembers, createSensorMembers, updateSensorMember, deleteSensorMember,
   listDeviceMembers, createDeviceMembers, updateDeviceMember, deleteDeviceMember,
   listViews, createView, updateView, deleteView,
@@ -234,9 +236,10 @@ function severityLabel(lv) { return SEVERITY_LABELS[lv] || lv }
 
 const VIEW_TYPE_LABELS = { card: '卡片大屏', diagram: '流程图', timeseries: '时序趋势' }
 
-const tab = ref('sections')
+const tab = ref('sensors')
 const project = ref(null)
 const sections = ref([])
+const activeSectionId = ref(null)
 const sensorMembers = ref([])
 const deviceMembers = ref([])
 const views = ref([])
@@ -252,39 +255,98 @@ function unwrap(data) {
   return data?.results || data || []
 }
 
+// ---------- 当前房间派生数据 ----------
+const activeSection = computed(() => sections.value.find((s) => s.id === activeSectionId.value) || null)
+const sectionSensors = computed(() => sensorMembers.value.filter((m) => m.section === activeSectionId.value))
+const sectionDevices = computed(() => deviceMembers.value.filter((m) => m.section === activeSectionId.value))
+const sectionViews = computed(() => views.value.filter((v) => v.section === activeSectionId.value))
+
+function roomStat(secId) {
+  const sCount = sensorMembers.value.filter((m) => m.section === secId).length
+  const dCount = deviceMembers.value.filter((m) => m.section === secId).length
+  return `${sCount} 传感 · ${dCount} 设备`
+}
+
+// ---------- 加载 ----------
+async function loadSections() {
+  sections.value = unwrap(await listSections(projectId))
+  if (!sections.value.some((s) => s.id === activeSectionId.value)) {
+    activeSectionId.value = sections.value[0]?.id ?? null
+  }
+}
 async function loadMembers() {
   sensorMembers.value = unwrap(await listSensorMembers(projectId))
   deviceMembers.value = unwrap(await listDeviceMembers(projectId))
 }
-async function loadBindable() {
-  const data = await listProjectBindableSources(projectId)
-  bindableSensors.value = data.sensors || []
-  bindableDevices.value = data.devices || []
-}
-async function loadSections() {
-  sections.value = unwrap(await listSections(projectId))
-}
 async function loadViews() {
   views.value = unwrap(await listViews(projectId))
+}
+async function loadBindable() {
+  if (!activeSectionId.value) {
+    bindableSensors.value = []
+    bindableDevices.value = []
+    return
+  }
+  const data = await listProjectBindableSources(projectId, activeSectionId.value)
+  bindableSensors.value = data.sensors || []
+  bindableDevices.value = data.devices || []
 }
 
 async function init() {
   try {
     project.value = await getProject(projectId)
-    await Promise.all([loadSections(), loadMembers(), loadViews(), loadBindable()])
+    await Promise.all([loadSections(), loadMembers(), loadViews()])
+    await loadBindable()
   } catch (e) {
     console.error('[project-config] 加载失败', e)
   }
 }
 init()
 
-// ---------- 分区 ----------
+// 切换房间时重置选择并刷新该房间的可导入清单
+watch(activeSectionId, () => {
+  pickSensorIds.value = []
+  pickDeviceIds.value = []
+  loadBindable()
+})
+
+// ---------- 房间（分区）管理 ----------
 async function addSection() {
-  if (!newSectionName.value.trim()) return
-  await createSection({ project: projectId, name: newSectionName.value.trim(), sort_order: sections.value.length })
-  newSectionName.value = ''
-  await loadSections()
+  const name = newSectionName.value.trim()
+  if (!name) return
+  try {
+    const created = await createSection({ project: projectId, name, sort_order: sections.value.length })
+    newSectionName.value = ''
+    await loadSections()
+    if (created?.id) activeSectionId.value = created.id
+  } catch (e) {
+    ElMessage.error('新建房间失败')
+  }
 }
+
+function onRoomCommand(cmd, sec, idx) {
+  if (cmd === 'rename') renameSection(sec)
+  else if (cmd === 'up') moveSection(idx, -1)
+  else if (cmd === 'down') moveSection(idx, 1)
+  else if (cmd === 'delete') removeSection(sec)
+}
+
+async function renameSection(sec) {
+  let value
+  try {
+    ({ value } = await ElMessageBox.prompt('请输入新的房间名', '重命名房间', {
+      inputValue: sec.name,
+      inputValidator: (v) => (v && v.trim() ? true : '名称不能为空'),
+    }))
+  } catch { return }
+  try {
+    await updateSection(sec.id, { name: value.trim() })
+    await loadSections()
+  } catch (e) {
+    ElMessage.error('重命名失败')
+  }
+}
+
 async function moveSection(index, dir) {
   const arr = [...sections.value]
   const j = index + dir
@@ -293,23 +355,46 @@ async function moveSection(index, dir) {
   sections.value = arr
   await reorderSections(arr.map((s) => s.id))
 }
-async function removeSection(row) {
+
+async function removeSection(sec) {
   try {
-    await ElMessageBox.confirm(`删除分区「${row.name}」？其成员将移到未分组。`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `删除房间「${sec.name}」？将一并删除该房间下的传感器 / 设备成员与视图（不影响主模型传感器 / 设备）。`,
+      '删除房间', { type: 'warning' },
+    )
   } catch { return }
-  await deleteSection(row.id)
-  await Promise.all([loadSections(), loadMembers()])
+  try {
+    await deleteSection(sec.id)
+    if (activeSectionId.value === sec.id) activeSectionId.value = null
+    await Promise.all([loadSections(), loadMembers(), loadViews()])
+    await loadBindable()
+  } catch (e) {
+    ElMessage.error('删除失败')
+  }
 }
 
 // ---------- 传感器成员 ----------
 async function importSensors() {
-  await createSensorMembers(projectId, pickSensorIds.value)
-  pickSensorIds.value = []
-  ElMessage.success('已导入')
-  await Promise.all([loadMembers(), loadBindable()])
+  try {
+    await createSensorMembers(projectId, pickSensorIds.value, activeSectionId.value)
+    pickSensorIds.value = []
+    ElMessage.success('已导入')
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (e) {
+    ElMessage.error('导入失败')
+  }
 }
 async function patchSensor(row, patch) {
   try { await updateSensorMember(row.id, patch) } catch { ElMessage.error('保存失败') }
+}
+async function moveSensor(row) {
+  try {
+    await updateSensorMember(row.id, { section: row.section })
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (e) {
+    ElMessage.error('移动失败：该房间可能已存在同一传感器点位')
+    await loadMembers()
+  }
 }
 async function removeSensor(row) {
   await deleteSensorMember(row.id)
@@ -318,13 +403,26 @@ async function removeSensor(row) {
 
 // ---------- 设备成员 ----------
 async function importDevices() {
-  await createDeviceMembers(projectId, pickDeviceIds.value)
-  pickDeviceIds.value = []
-  ElMessage.success('已导入')
-  await Promise.all([loadMembers(), loadBindable()])
+  try {
+    await createDeviceMembers(projectId, pickDeviceIds.value, activeSectionId.value)
+    pickDeviceIds.value = []
+    ElMessage.success('已导入')
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (e) {
+    ElMessage.error('导入失败')
+  }
 }
 async function patchDevice(row, patch) {
   try { await updateDeviceMember(row.id, patch) } catch { ElMessage.error('保存失败') }
+}
+async function moveDevice(row) {
+  try {
+    await updateDeviceMember(row.id, { section: row.section })
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (e) {
+    ElMessage.error('移动失败：该房间可能已存在同一设备')
+    await loadMembers()
+  }
 }
 async function removeDevice(row) {
   await deleteDeviceMember(row.id)
@@ -334,9 +432,18 @@ async function removeDevice(row) {
 // ---------- 视图 ----------
 async function addView() {
   if (!newView.value.name.trim()) { ElMessage.warning('请填写视图名'); return }
-  await createView({ project: projectId, ...newView.value, sort_order: views.value.length })
-  newView.value = { name: '', view_type: 'card', is_default: false }
-  await loadViews()
+  try {
+    await createView({
+      project: projectId,
+      section: activeSectionId.value,
+      ...newView.value,
+      sort_order: sectionViews.value.length,
+    })
+    newView.value = { name: '', view_type: 'card', is_default: false }
+    await loadViews()
+  } catch (e) {
+    ElMessage.error('创建视图失败')
+  }
 }
 async function patchView(row, patch) {
   try { await updateView(row.id, patch) } catch { ElMessage.error('保存失败') }
@@ -362,6 +469,116 @@ async function removeView(row) {
     color: var(--iot-text-primary);
     background: var(--iot-border-color-lighter);
   }
+}
+
+/* 主从两栏布局 */
+.pc-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--iot-spacing-lg);
+  align-items: start;
+}
+
+/* 左：房间列表 */
+.pc-rooms {
+  background: var(--iot-bg-card);
+  border: 1px solid var(--iot-border-color-light);
+  border-radius: var(--iot-radius-lg);
+  box-shadow: var(--iot-shadow-sm);
+  padding: var(--iot-spacing-md);
+  position: sticky;
+  top: var(--iot-spacing-md);
+}
+
+.pc-rooms__head {
+  margin-bottom: var(--iot-spacing-sm);
+}
+
+.pc-rooms__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--iot-font-size-sm);
+  font-weight: 600;
+  color: var(--iot-text-primary);
+}
+
+.pc-rooms__add {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--iot-spacing-sm);
+}
+
+.pc-rooms__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pc-room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--iot-radius-base);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--iot-transition-fast);
+
+  &:hover {
+    background: var(--iot-border-color-lighter);
+  }
+
+  &.is-active {
+    background: var(--iot-color-primary-bg);
+    border-color: var(--iot-color-primary-light);
+  }
+
+  &__main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: var(--iot-font-size-sm);
+    font-weight: 600;
+    color: var(--iot-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__stat {
+    font-size: 11px;
+    color: var(--iot-text-secondary);
+  }
+
+  &__more {
+    color: var(--iot-text-secondary);
+    flex-shrink: 0;
+
+    &:hover {
+      color: var(--iot-text-primary);
+    }
+  }
+}
+
+/* 右：详情 */
+.pc-detail {
+  min-width: 0;
+}
+
+.pc-detail--empty {
+  background: var(--iot-bg-card);
+  border: 1px dashed var(--iot-border-color);
+  border-radius: var(--iot-radius-lg);
+  padding: 60px 0;
 }
 
 .pc-panel {
@@ -493,5 +710,13 @@ async function removeView(row) {
 :deep(.severity-select--mid .el-input__inner) { color: var(--iot-color-success); font-weight: 600; }
 :deep(.severity-select--high .el-input__inner) { color: var(--iot-color-warning); font-weight: 600; }
 :deep(.severity-select--critical .el-input__inner) { color: var(--iot-color-danger); font-weight: 600; }
-</style>
 
+@media screen and (max-width: 900px) {
+  .pc-body {
+    grid-template-columns: 1fr;
+  }
+  .pc-rooms {
+    position: static;
+  }
+}
+</style>

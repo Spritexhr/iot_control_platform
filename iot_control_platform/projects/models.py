@@ -3,12 +3,19 @@
 
 一个 Project（项目/场景）= 一批传感器/设备成员（装置）+ 自动化规则（控制）+ 多个视图（展示）。
 
+层级模型（房子 / 房间）：
+- Project（房子）= 多个 ProjectSection（房间）；房间之间彼此隔离。
+- 传感器 / 设备成员、视图都归属某个房间（section 必填）：成员与视图是房间的内容物，
+  删除房间时一并 CASCADE 删除（不影响主模型 Sensor / Device）。
+- 视图只能展示其所属房间的成员（前端按 section 过滤候选数据源）。
+
 设计要点（由 plugins/eb_plant 的 binding/section 模式升格为平台一等公民）：
-- 主模型 Sensor / Device 零改动：Project 通过 ProjectSensorMember / ProjectDeviceMember
-  「软引用」全局 Sensor / Device，项目内固有的展示元数据（位号 / 分区 / 阈值 / 排序 /
+- 主模型 Sensor / Device 零改动：通过 ProjectSensorMember / ProjectDeviceMember
+  「软引用」全局 Sensor / Device，房间内固有的展示元数据（位号 / 阈值 / 排序 /
   可见性）独立存储在成员表里。主模型对本 app 零感知。
-- 同一传感器 / 设备可被多个项目复用：成员唯一性按 (project, sensor, data_key) /
-  (project, device)，而非全局唯一。
+- 同一传感器 / 设备可被同一项目的多个房间各自复用：成员唯一性按 (section, sensor, data_key) /
+  (section, device)。成员表保留冗余的 project 外键（= section.project）方便按项目查询，
+  在 serializer / viewset 落库时由 section 自动回填，二者须保持一致。
 - related_name 统一用 project_members，与 eb_plant 插件占用的 eb_bindings /
   eb_device_binding 并存不冲突。
 - point_id 规则与 EB 保持一致（sensor_id 或 sensor_id::data_key），前端 findByBinding 可直接复用。
@@ -79,8 +86,8 @@ class Project(models.Model):
 
 
 class ProjectSection(models.Model):
-    """项目内分区（工段 / 区域 / 房间）。成员可归属一个分区；
-    未归属（section 为空）的成员在展示时统一落到末尾「未分组」段。"""
+    """项目内的房间（分区，对应工段 / 区域 / 房间）。是传感器/设备成员与视图的归属容器，
+    房间之间彼此隔离；删除房间会一并删除其下成员与视图。"""
 
     project = models.ForeignKey(
         Project,
@@ -120,12 +127,10 @@ class ProjectSensorMember(models.Model):
     )
     section = models.ForeignKey(
         ProjectSection,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="sensor_members",
-        verbose_name="所属分区",
-        help_text="留空表示未分组（展示时归到末尾「未分组」段）",
+        verbose_name="所属房间",
+        help_text="成员必属于一个房间（分区）；删除房间会一并删除其成员",
     )
 
     tag = models.CharField(max_length=50, blank=True, verbose_name="位号", help_text="如 TT-101")
@@ -161,8 +166,8 @@ class ProjectSensorMember(models.Model):
         ordering = ["sort_order", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["project", "sensor", "data_key"],
-                name="uniq_project_sensor_data_key",
+                fields=["section", "sensor", "data_key"],
+                name="uniq_section_sensor_data_key",
             ),
         ]
 
@@ -187,8 +192,8 @@ class ProjectSensorMember(models.Model):
 class ProjectDeviceMember(models.Model):
     """把全局 Device 加入某项目的成员记录（升格自 EBPlantDeviceBinding）。
 
-    与 EB 不同：EB 是全局 OneToOne（一个设备只能上一次大屏），这里用 FK + (project, device)
-    唯一约束，使同一设备可被多个项目复用。"""
+    与 EB 不同：EB 是全局 OneToOne（一个设备只能上一次大屏），这里用 FK + (section, device)
+    唯一约束，使同一设备可被一个项目的多个房间（分区）各自复用。"""
 
     project = models.ForeignKey(
         Project,
@@ -204,12 +209,10 @@ class ProjectDeviceMember(models.Model):
     )
     section = models.ForeignKey(
         ProjectSection,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="device_members",
-        verbose_name="所属分区",
-        help_text="留空表示未分组",
+        verbose_name="所属房间",
+        help_text="成员必属于一个房间（分区）；删除房间会一并删除其成员",
     )
 
     tag = models.CharField(max_length=50, blank=True, verbose_name="位号", help_text="如 P-101")
@@ -227,8 +230,8 @@ class ProjectDeviceMember(models.Model):
         ordering = ["sort_order", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["project", "device"],
-                name="uniq_project_device",
+                fields=["section", "device"],
+                name="uniq_section_device",
             ),
         ]
 
@@ -251,6 +254,13 @@ class ProjectView(models.Model):
         on_delete=models.CASCADE,
         related_name="views",
         verbose_name="所属项目",
+    )
+    section = models.ForeignKey(
+        ProjectSection,
+        on_delete=models.CASCADE,
+        related_name="views",
+        verbose_name="所属房间",
+        help_text="视图归属一个房间（分区），只能展示本房间成员",
     )
     name = models.CharField(max_length=50, verbose_name="视图名")
     view_type = models.CharField(

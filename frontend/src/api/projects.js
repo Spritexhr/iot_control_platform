@@ -28,9 +28,11 @@ export function getProjectLayout(id) {
 export function getProjectSnapshot(id) {
   return request.get(`${BASE}/${id}/snapshot/`)
 }
-/** 可导入到本项目的全量传感器/设备（含已占用判断） */
-export function listProjectBindableSources(id) {
-  return request.get(`${BASE}/${id}/bindable_sources/`)
+/** 可导入到本项目的全量传感器/设备（含已占用判断）。传 sectionId 则按该房间算占用 */
+export function listProjectBindableSources(id, sectionId) {
+  return request.get(`${BASE}/${id}/bindable_sources/`, {
+    params: sectionId ? { section: sectionId } : {},
+  })
 }
 /** 项目实时 WebSocket 路径（不含 host）。useWebSocket(buildWsUrl(buildProjectWsPath(id)), ...) 用 */
 export function buildProjectWsPath(id) {
@@ -63,12 +65,14 @@ export function reorderSections(order) {
 }
 
 // ==================== 传感器成员 ====================
-export function listSensorMembers(projectId) {
-  return request.get('/project_sensor_members/', { params: { project: projectId } })
+export function listSensorMembers(projectId, sectionId) {
+  const params = { project: projectId }
+  if (sectionId) params.section = sectionId
+  return request.get('/project_sensor_members/', { params })
 }
-/** 批量导入：按各 sensor 的 data_fields 自动拆分多字段 */
-export function createSensorMembers(projectId, sensorIds) {
-  return request.post('/project_sensor_members/', { project: projectId, sensor_ids: sensorIds })
+/** 批量导入到某房间：按各 sensor 的 data_fields 自动拆分多字段 */
+export function createSensorMembers(projectId, sensorIds, sectionId) {
+  return request.post('/project_sensor_members/', { project: projectId, sensor_ids: sensorIds, section: sectionId })
 }
 /** 为某传感器追加一条不同 data_key 的成员。payload: { project, sensor, data_key, tag?, ... } */
 export function createSensorFieldMember(payload) {
@@ -82,11 +86,13 @@ export function deleteSensorMember(id) {
 }
 
 // ==================== 设备成员 ====================
-export function listDeviceMembers(projectId) {
-  return request.get('/project_device_members/', { params: { project: projectId } })
+export function listDeviceMembers(projectId, sectionId) {
+  const params = { project: projectId }
+  if (sectionId) params.section = sectionId
+  return request.get('/project_device_members/', { params })
 }
-export function createDeviceMembers(projectId, deviceIds) {
-  return request.post('/project_device_members/', { project: projectId, device_ids: deviceIds })
+export function createDeviceMembers(projectId, deviceIds, sectionId) {
+  return request.post('/project_device_members/', { project: projectId, device_ids: deviceIds, section: sectionId })
 }
 export function updateDeviceMember(id, patch) {
   return request.patch(`/project_device_members/${id}/`, patch)
@@ -96,8 +102,10 @@ export function deleteDeviceMember(id) {
 }
 
 // ==================== 视图 ====================
-export function listViews(projectId) {
-  return request.get('/project_views/', { params: { project: projectId } })
+export function listViews(projectId, sectionId) {
+  const params = { project: projectId }
+  if (sectionId) params.section = sectionId
+  return request.get('/project_views/', { params })
 }
 export function createView(payload) {
   return request.post('/project_views/', payload)

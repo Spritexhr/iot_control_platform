@@ -24,19 +24,19 @@ class ProjectSectionAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectSensorMember)
 class ProjectSensorMemberAdmin(admin.ModelAdmin):
-    list_display = ("project", "tag", "sensor", "data_key", "section", "is_visible", "sort_order")
-    list_filter = ("project", "is_visible", "severity")
+    list_display = ("project", "section", "tag", "sensor", "data_key", "is_visible", "sort_order")
+    list_filter = ("project", "section", "is_visible", "severity")
     search_fields = ("tag", "sensor__sensor_id", "sensor__name")
 
 
 @admin.register(ProjectDeviceMember)
 class ProjectDeviceMemberAdmin(admin.ModelAdmin):
-    list_display = ("project", "tag", "device", "section", "is_visible", "sort_order")
-    list_filter = ("project", "is_visible")
+    list_display = ("project", "section", "tag", "device", "is_visible", "sort_order")
+    list_filter = ("project", "section", "is_visible")
     search_fields = ("tag", "device__device_id", "device__name")
 
 
 @admin.register(ProjectView)
 class ProjectViewAdmin(admin.ModelAdmin):
-    list_display = ("project", "name", "view_type", "is_default", "sort_order")
-    list_filter = ("project", "view_type")
+    list_display = ("project", "section", "name", "view_type", "is_default", "sort_order")
+    list_filter = ("project", "section", "view_type")

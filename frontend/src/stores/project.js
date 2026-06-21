@@ -113,6 +113,18 @@ export const useProjectStore = defineStore('project', () => {
     return deviceId ? devices.value.get(deviceId) || null : null
   }
 
+  /** 取某房间(分区)对象（含其传感器/设备成员） */
+  function getSection(sectionId) {
+    const sid = Number(sectionId)
+    return (layout.value?.sections || []).find((s) => s.id === sid) || null
+  }
+
+  /** 取某房间的成员 { sensors, devices }，供视图按房间过滤候选数据源 */
+  function sectionMembers(sectionId) {
+    const sec = getSection(sectionId)
+    return { sensors: sec?.sensors || [], devices: sec?.devices || [] }
+  }
+
   return {
     currentProjectId,
     samples,
@@ -130,5 +142,7 @@ export const useProjectStore = defineStore('project', () => {
     loadSnapshot,
     findByBinding,
     findDevice,
+    getSection,
+    sectionMembers,
   }
 })

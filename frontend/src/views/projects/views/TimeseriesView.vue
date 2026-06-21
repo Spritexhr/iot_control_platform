@@ -109,7 +109,10 @@ const availableFields = computed(() => seriesData.value.fields || [])
 const sourceOptions = computed(() => {
   const sensors = new Map()
   const devices = new Map()
-  for (const sec of store.layout?.sections || []) {
+  const secs = (store.layout?.sections || []).filter(
+    (sec) => props.view.section == null || sec.id === props.view.section,
+  )
+  for (const sec of secs) {
     for (const s of sec.sensors || []) {
       if (s.sensor_id && !sensors.has(s.sensor_id)) sensors.set(s.sensor_id, { id: s.sensor_id, name: s.sensor_name || s.tag })
     }

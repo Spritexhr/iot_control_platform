@@ -76,7 +76,15 @@ const transformStyle = computed(() => {
   display: block;
 }
 
+/* 标签脱离文档流，置于图元下方、所有连接点之外：
+   这样节点盒子只等于图形本身，4 个连接点贴在图形四边，名字落在底部连接点更下方。 */
 .symbol-node__label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  white-space: nowrap;
   font-size: 11px;
   color: #2a2a2a;
   font-family: 'JetBrains Mono', monospace;

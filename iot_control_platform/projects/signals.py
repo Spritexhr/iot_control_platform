@@ -28,13 +28,19 @@ def on_sensor_data_saved(sender, instance: SensorData, created: bool, **kwargs):
     if not created:
         return
     try:
-        # 同一 sensor 可能属于多个项目、且每个项目内可有多条成员（多 data_key）。
+        # 同一 sensor 可能属于多个项目；同一项目内还可能被多个房间复用（多条成员）。
         members = ProjectSensorMember.objects.filter(
             sensor_id=instance.sensor_id, is_visible=True,
         ).select_related("sensor", "project")
         ts = instance.timestamp.timestamp() if instance.timestamp else None
         payloads = []
+        # 按 (project_id, point_id) 去重：跨房间复用同一点位时只向该项目通道推一次
+        seen = set()
         for m in members:
+            key = (m.project_id, m.point_id)
+            if key in seen:
+                continue
+            seen.add(key)
             sample = build_point_sample(
                 m.point_id, instance.data, ts,
                 plugin_code=m.project.code, binding=m,

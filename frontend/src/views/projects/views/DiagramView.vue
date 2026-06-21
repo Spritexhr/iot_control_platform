@@ -53,11 +53,14 @@ const saving = ref(false)
 // DiagramEditor / DiagramRuntime 期望 { id, canvas } 形态的 diagram 对象
 const diagramObj = computed(() => ({ id: props.view.id, canvas: canvas.value }))
 
-// 可绑定点位 = 本项目的成员（等价于 plant_diagram 的 bindable_targets，但来源是项目 members）
+// 可绑定点位 = 本视图所属房间(分区)的成员
 const targets = computed(() => {
   const sensors = []
   const devices = []
-  for (const sec of store.layout?.sections || []) {
+  const secs = (store.layout?.sections || []).filter(
+    (sec) => props.view.section == null || sec.id === props.view.section,
+  )
+  for (const sec of secs) {
     for (const s of sec.sensors || []) {
       sensors.push({ id: s.point_id, name: s.sensor_name || s.tag, tag: s.tag, data_key: s.data_key, unit: s.unit })
     }

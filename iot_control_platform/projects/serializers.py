@@ -38,6 +38,21 @@ def public_command_schema(device) -> dict:
     return schema
 
 
+class _SectionScopedSerializerMixin:
+    """成员 / 视图都归属房间(section)：校验 section 与 project 同属一个项目，
+    并以 section 为准回填冗余的 project 外键（前端只需传 section）。"""
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        section = attrs.get("section")
+        project = attrs.get("project") or getattr(self.instance, "project", None)
+        if section is not None:
+            if project is not None and section.project_id != project.id:
+                raise serializers.ValidationError({"section": "该房间不属于此项目"})
+            attrs["project"] = section.project
+        return attrs
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     section_count = serializers.SerializerMethodField()
     sensor_count = serializers.SerializerMethodField()
@@ -77,7 +92,7 @@ class ProjectSectionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class ProjectSensorMemberSerializer(serializers.ModelSerializer):
+class ProjectSensorMemberSerializer(_SectionScopedSerializerMixin, serializers.ModelSerializer):
     sensor_id = serializers.CharField(source="sensor.sensor_id", read_only=True)
     sensor_name = serializers.CharField(source="sensor.name", read_only=True)
     sensor_type = serializers.SerializerMethodField()
@@ -97,7 +112,7 @@ class ProjectSensorMemberSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "sensor_id", "sensor_name", "sensor_type", "data_fields",
+            "id", "project", "sensor_id", "sensor_name", "sensor_type", "data_fields",
             "point_id", "section_name", "created_at", "updated_at",
         ]
 
@@ -108,7 +123,7 @@ class ProjectSensorMemberSerializer(serializers.ModelSerializer):
         return obj.sensor.sensor_type.data_fields if obj.sensor.sensor_type_id else []
 
 
-class ProjectDeviceMemberSerializer(serializers.ModelSerializer):
+class ProjectDeviceMemberSerializer(_SectionScopedSerializerMixin, serializers.ModelSerializer):
     device_id = serializers.CharField(source="device.device_id", read_only=True)
     device_name = serializers.CharField(source="device.name", read_only=True)
     device_type = serializers.SerializerMethodField()
@@ -124,7 +139,7 @@ class ProjectDeviceMemberSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "device_id", "device_name", "device_type", "commands",
+            "id", "project", "device_id", "device_name", "device_type", "commands",
             "section_name", "created_at", "updated_at",
         ]
 
@@ -135,18 +150,21 @@ class ProjectDeviceMemberSerializer(serializers.ModelSerializer):
         return public_command_schema(obj.device)
 
 
-class ProjectViewSerializer(serializers.ModelSerializer):
+class ProjectViewSerializer(_SectionScopedSerializerMixin, serializers.ModelSerializer):
+    section_name = serializers.CharField(source="section.name", read_only=True, default="")
+
     class Meta:
         model = ProjectView
         fields = [
-            "id", "project", "name", "view_type", "config",
+            "id", "project", "section", "section_name", "name", "view_type", "config",
             "is_default", "sort_order", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "project", "section_name", "created_at", "updated_at"]
 
 
 class BindableSensorSerializer(serializers.ModelSerializer):
-    """供「挑选要导入到本项目的传感器」下拉用。bound_data_keys 按当前项目过滤。"""
+    """供「挑选要导入到本房间的传感器」下拉用。bound_data_keys 优先按当前房间(section)过滤，
+    无 section 上下文时回退到项目维度。"""
 
     sensor_type = serializers.CharField(source="sensor_type.name", read_only=True)
     data_fields = serializers.SerializerMethodField()
@@ -160,9 +178,12 @@ class BindableSensorSerializer(serializers.ModelSerializer):
         return obj.sensor_type.data_fields if obj.sensor_type_id else []
 
     def get_bound_data_keys(self, obj):
+        sid = self.context.get("section_id")
         pid = self.context.get("project_id")
         qs = obj.project_members
-        if pid is not None:
+        if sid is not None:
+            qs = qs.filter(section_id=sid)
+        elif pid is not None:
             qs = qs.filter(project_id=pid)
         return list(qs.values_list("data_key", flat=True))
 
@@ -183,8 +204,11 @@ class BindableDeviceSerializer(serializers.ModelSerializer):
         return list(cmds.keys()) if isinstance(cmds, dict) else []
 
     def get_already_bound(self, obj):
+        sid = self.context.get("section_id")
         pid = self.context.get("project_id")
         qs = obj.project_members
-        if pid is not None:
+        if sid is not None:
+            qs = qs.filter(section_id=sid)
+        elif pid is not None:
             qs = qs.filter(project_id=pid)
         return qs.exists()

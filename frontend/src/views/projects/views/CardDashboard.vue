@@ -70,8 +70,8 @@
     </transition-group>
 
     <div v-if="filteredSections.length === 0" class="card-dash__empty">
-      <el-empty :description="searchQuery ? '未找到匹配的点位' : '暂无可显示的点位'" />
-      <p v-if="!searchQuery" class="card-dash__empty-hint">请到配置页建立分区，并从主模型选取要展示的传感器 / 设备。</p>
+      <el-empty :description="searchQuery ? '未找到匹配的点位' : '本房间暂无可显示的点位'" />
+      <p v-if="!searchQuery" class="card-dash__empty-hint">请到配置页将传感器 / 设备导入到本房间。</p>
     </div>
   </div>
 </template>
@@ -85,11 +85,19 @@ import DeviceCard from '../cards/DeviceCard.vue'
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
 
+const props = defineProps({
+  // 限定只渲染某个房间(分区)的成员；为 null 时渲染全部房间（兜底）
+  sectionId: { type: [Number, null], default: null },
+})
+
 const store = useProjectStore()
 const userStore = useUserStore()
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 
-const sections = computed(() => store.layout?.sections || [])
+const sections = computed(() => {
+  const all = store.layout?.sections || []
+  return props.sectionId == null ? all : all.filter((s) => s.id === props.sectionId)
+})
 
 // 搜索和状态过滤
 const searchQuery = ref('')

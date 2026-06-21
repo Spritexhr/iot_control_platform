@@ -6,24 +6,15 @@
         <p class="iot-page-subtitle">浏览、启用与管理实验性扩展功能</p>
       </div>
       <div class="header-actions">
-        <el-button :icon="Refresh" circle @click="fetchPlugins" />
         <el-button v-if="isSuperuser" type="primary" :icon="Connection" @click="handleSync">
           同步插件
         </el-button>
       </div>
     </div>
 
-    <el-alert type="warning" show-icon :closable="false" class="migrate-tip">
-      <template #title>
-        展示类扩展（大屏 / P&amp;ID / 时序）正逐步被平台原生
-        <el-link type="primary" :underline="false" @click="router.push('/projects')">「项目 / 场景」</el-link>
-        取代，新场景建议直接在项目中创建。
-      </template>
-    </el-alert>
-
     <div v-loading="loading">
-      <div v-if="plugins.length" class="iot-grid iot-grid--cards">
-        <div v-for="p in plugins" :key="p.name" class="iot-card plugin-card">
+      <div v-if="visiblePlugins.length" class="iot-grid iot-grid--cards">
+        <div v-for="p in visiblePlugins" :key="p.name" class="iot-card plugin-card">
           <div class="plugin-card__header">
             <div class="plugin-card__icon">
               <el-icon :size="24"><component :is="iconFor(p.name)" /></el-icon>
@@ -31,7 +22,6 @@
             <div class="plugin-card__title-block">
               <div class="plugin-card__title">
                 {{ titleFor(p.name) }}
-                <el-tag v-if="isDeprecated(p.name)" type="warning" size="small" effect="plain">建议迁移</el-tag>
               </div>
               <div class="plugin-card__name">{{ p.name }} · v{{ p.version || '0.0.0' }}</div>
             </div>
@@ -70,20 +60,12 @@
       </div>
 
       <div v-else class="iot-card empty-card">
-        <el-empty :description="loading ? '加载中…' : '尚未登记任何插件'">
+        <el-empty :description="loading ? '加载中…' : '暂无可用插件'">
           <el-button v-if="isSuperuser" type="primary" :icon="Connection" @click="handleSync">
             同步插件
           </el-button>
         </el-empty>
       </div>
-
-      <el-alert
-        type="info"
-        show-icon
-        :closable="false"
-        title="启用/禁用插件后需重启 Django 进程才会生效（URL 路由在启动时绑定）"
-        class="restart-tip"
-      />
     </div>
   </div>
 </template>
@@ -92,7 +74,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh, Connection, View, DataLine, DataAnalysis, Box } from '@element-plus/icons-vue'
+import { Connection, View, Box } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getPlugins, syncPlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 
@@ -104,18 +86,15 @@ const plugins = ref([])
 const loading = ref(false)
 const toggling = ref('')
 
-// 已知插件的 UI 入口与展示信息
-const KNOWN_PLUGINS = {
-  data_viz: { route: '/plugins/data_viz', title: '数据可视化', icon: DataLine, deprecated: true },
-  eb_plant: { route: '/plugins/eb_plant', title: '全厂设备辅助监控大屏', icon: DataAnalysis, deprecated: true },
-  // P&ID 画板不做独立卡片，入口收在「全厂设备辅助监控大屏」内
-}
+// 已弃用的展示类插件：已被平台原生「项目 / 场景」取代，从插件中心隐藏（路由仍保留）
+const HIDDEN_PLUGINS = new Set(['data_viz', 'eb_plant', 'plant_diagram'])
+const visiblePlugins = computed(() => plugins.value.filter((p) => !HIDDEN_PLUGINS.has(p.name)))
+
+// 已知插件的 UI 入口与展示信息（为将来真正的新插件预留；当前展示插件均已隐藏）
+const KNOWN_PLUGINS = {}
 
 function hasUI(name) {
   return name in KNOWN_PLUGINS
-}
-function isDeprecated(name) {
-  return !!KNOWN_PLUGINS[name]?.deprecated
 }
 function iconFor(name) {
   return KNOWN_PLUGINS[name]?.icon || Box
@@ -252,9 +231,5 @@ onMounted(fetchPlugins)
 
 .empty-card {
   padding: 40px 0;
-}
-
-.restart-tip {
-  margin-top: 24px;
 }
 </style>
