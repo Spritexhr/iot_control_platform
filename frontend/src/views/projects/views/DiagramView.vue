@@ -1,5 +1,5 @@
 <template>
-  <div class="dv">
+  <div ref="containerRef" class="dv">
     <div class="dv__bar">
       <span class="dv__name">{{ view.name }}</span>
       <div class="dv__actions">
@@ -9,6 +9,16 @@
         </el-button>
         <el-button v-if="mode === 'edit' && canEdit" type="primary" size="small" :loading="saving" @click="save">
           保存
+        </el-button>
+        <el-button size="small" @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏'">
+          <svg v-if="!isFullscreen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>
+            <line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>
+          </svg>
         </el-button>
       </div>
     </div>
@@ -24,7 +34,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import DiagramEditor from '../diagram/editor/DiagramEditor.vue'
@@ -40,6 +50,25 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 
 const store = useProjectStore()
+
+// ============ 全屏 ============
+const containerRef = ref(null)
+const isFullscreen = ref(false)
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    containerRef.value?.requestFullscreen()
+  } else {
+    document.exitFullscreen()
+  }
+}
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
+onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
 const EMPTY = () => ({ version: 1, viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [] })
 const canvas = ref(
@@ -105,6 +134,12 @@ async function save() {
   box-shadow: var(--iot-shadow-sm);
   overflow: hidden;
   background: var(--iot-bg-card);
+}
+
+.dv:fullscreen {
+  height: 100vh;
+  border-radius: 0;
+  border: none;
 }
 
 .dv__bar {

@@ -21,7 +21,7 @@
 export const SIMPLE_SYMBOLS = {
   vessel: {
     label: '反应器', group: '仪表/容器', defaultData: { label: '反应器' },
-    size: { w: 56, h: 94 }, viewBox: '0 0 56 94', labelMode: 'below',
+    size: { w: 80, h: 135 }, viewBox: '0 0 56 94', labelMode: 'below',
     draw: [
       { el: 'ellipse', cx: 28, cy: 32, rx: 22, ry: 7 },
       { el: 'line', x1: 6, y1: 32, x2: 6, y2: 83 },
@@ -35,7 +35,7 @@ export const SIMPLE_SYMBOLS = {
 
   valve: {
     label: '阀门', group: '管路', defaultData: { label: 'FCV' },
-    size: { w: 80, h: 50 }, viewBox: '0 0 80 50', labelMode: 'below',
+    size: { w: 56, h: 35 }, viewBox: '0 0 80 50', labelMode: 'below',
     draw: [
       { el: 'polygon', points: '6,8 40,25 6,42' },
       { el: 'polygon', points: '74,8 40,25 74,42' },
@@ -58,7 +58,7 @@ export const SIMPLE_SYMBOLS = {
 
   pump: {
     label: '泵', group: '动设备', defaultData: { label: 'P-1' },
-    size: { w: 70, h: 80 }, viewBox: '0 0 70 80', labelMode: 'below',
+    size: { w: 50, h: 57 }, viewBox: '0 0 70 80', labelMode: 'below',
     draw: [
       { el: 'circle', cx: 40, cy: 40, r: 20 },
       { el: 'line', x1: 28, y1: 57, x2: 19, y2: 69 },
@@ -82,7 +82,7 @@ export const SIMPLE_SYMBOLS = {
 
   mixer: {
     label: '混合器', group: '动设备', defaultData: { label: 'MIX' },
-    size: { w: 76, h: 48 }, viewBox: '0 0 76 48', labelMode: 'below',
+    size: { w: 110, h: 70 }, viewBox: '0 0 76 48', labelMode: 'below',
     draw: [
       { el: 'rect', x: 9, y: 16, width: 58, height: 16 },
       { el: 'rect', x: 18, y: 7, width: 12, height: 9 },

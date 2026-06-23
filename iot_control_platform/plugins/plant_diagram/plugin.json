@@ -1,6 +1,0 @@
-{
-  "name": "plant_diagram",
-  "version": "0.1.0",
-  "description": "工厂 P&ID 画板编辑器 - 自定义节点布局 + 实时数据绑定",
-  "enabled": true
-}

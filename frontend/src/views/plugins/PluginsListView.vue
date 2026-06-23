@@ -74,7 +74,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Connection, View, Box } from '@element-plus/icons-vue'
+import { Connection, View, Box, DataLine } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getPlugins, syncPlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 
@@ -86,12 +86,11 @@ const plugins = ref([])
 const loading = ref(false)
 const toggling = ref('')
 
-// 已弃用的展示类插件：已被平台原生「项目 / 场景」取代，从插件中心隐藏（路由仍保留）
-const HIDDEN_PLUGINS = new Set(['data_viz', 'eb_plant', 'plant_diagram'])
-const visiblePlugins = computed(() => plugins.value.filter((p) => !HIDDEN_PLUGINS.has(p.name)))
+const visiblePlugins = computed(() => plugins.value)
 
-// 已知插件的 UI 入口与展示信息（为将来真正的新插件预留；当前展示插件均已隐藏）
-const KNOWN_PLUGINS = {}
+const KNOWN_PLUGINS = {
+  data_viz: { title: '数据可视化', icon: DataLine, route: '/plugins/data_viz' },
+}
 
 function hasUI(name) {
   return name in KNOWN_PLUGINS
