@@ -24,6 +24,7 @@
           <el-select
             v-model="local.binding.id"
             filterable
+            :teleported="false"
             placeholder="搜索位号 / 名称"
             @change="onSensorChange"
           >
@@ -40,6 +41,7 @@
           <el-select
             v-model="local.binding.id"
             filterable
+            :teleported="false"
             placeholder="搜索位号 / 名称"
             @change="emitChange"
           >
@@ -92,7 +94,7 @@
           <el-input v-model="local.data.label" @input="emitChange" />
         </el-form-item>
         <el-form-item label="管线类型">
-          <el-select v-model="local.data.kind" @change="emitChange">
+          <el-select v-model="local.data.kind" :teleported="false" @change="emitChange">
             <el-option label="工艺管线（粗实线）" value="process" />
             <el-option label="公用工程（虚线）" value="utility" />
             <el-option label="信号线（细虚线）" value="signal" />

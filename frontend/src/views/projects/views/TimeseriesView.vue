@@ -208,18 +208,19 @@ function renderChart() {
     data: points.map((p) => [p.t, coerceNumber(p.data?.[field])]),
   }))
 
-  if (events.length && series.length) {
+  const visibleEvents = events.filter((e) => e.event !== 'heartbeat')
+  if (visibleEvents.length && series.length) {
     series[0] = {
       ...series[0],
       markLine: {
         symbol: 'none',
         silent: true,
         lineStyle: { color: isDark ? 'rgba(232, 136, 90, 0.4)' : 'rgba(217, 119, 87, 0.4)', type: 'dashed' },
-        data: events.slice(0, 50).map((e) => ({
+        data: visibleEvents.slice(0, 50).map((e) => ({
           xAxis: e.t,
-          label: { 
-            formatter: e.event || '', 
-            position: 'end', 
+          label: {
+            formatter: e.event || '',
+            position: 'end',
             fontSize: 9,
             color: textClr
           },

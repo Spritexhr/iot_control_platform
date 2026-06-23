@@ -104,13 +104,13 @@
       </div>
     </div>
 
-    <!-- 状态事件 -->
-    <div v-if="seriesData.events?.length" class="iot-card iot-mb-lg events-card">
+    <!-- 状态事件（heartbeat 不展示） -->
+    <div v-if="displayEvents.length" class="iot-card iot-mb-lg events-card">
       <div class="iot-card__header">
-        <span class="section-title">状态事件 ({{ seriesData.events.length }})</span>
+        <span class="section-title">状态事件 ({{ displayEvents.length }})</span>
       </div>
       <div class="iot-card__body">
-        <el-table :data="seriesData.events" stripe size="small" max-height="320">
+        <el-table :data="displayEvents" stripe size="small" max-height="320">
           <el-table-column label="时间" width="200">
             <template #default="{ row }">{{ formatTime(row.t) }}</template>
           </el-table-column>
@@ -151,6 +151,9 @@ const chartEl = ref(null)
 let chartInstance = null
 
 const hasPoints = computed(() => (seriesData.value.points || []).length > 0)
+const displayEvents = computed(() =>
+  (seriesData.value.events || []).filter((e) => e.event !== 'heartbeat'),
+)
 
 // 当前来源对象（拆分 selectedSource）
 const currentSource = computed(() => {
@@ -266,15 +269,16 @@ function renderChart() {
     data: points.map((p) => [p.t, coerceNumber(p.data?.[field])]),
   }))
 
-  // 状态事件标记到图表中（mark line）
-  if (events.length && series.length) {
+  // 状态事件标记到图表中（mark line），heartbeat 纯心跳包不展示
+  const visibleEvents = events.filter((e) => e.event !== 'heartbeat')
+  if (visibleEvents.length && series.length) {
     series[0] = {
       ...series[0],
       markLine: {
         symbol: 'none',
         silent: true,
         lineStyle: { color: 'rgba(255, 159, 64, 0.6)', type: 'dashed' },
-        data: events.slice(0, 50).map((e) => ({
+        data: visibleEvents.slice(0, 50).map((e) => ({
           xAxis: e.t,
           label: { formatter: e.event || '', position: 'end', fontSize: 10 },
         })),
