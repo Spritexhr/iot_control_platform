@@ -4,6 +4,7 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'automation-rules', views.AutomationRuleViewSet, basename='automation-rule')
+router.register(r'control-schemes', views.ControlSchemeViewSet, basename='control-scheme')
 
 urlpatterns = [
     path('', include(router.urls)),

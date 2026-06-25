@@ -88,6 +88,11 @@
               :can-edit="isStaff"
               @saved="onViewSaved"
             />
+            <ControlSchemeView
+              v-else-if="t.type === 'control'"
+              :project-id="projectId"
+              :section-id="activeRoomId"
+            />
             <div v-else class="pw__placeholder">{{ placeholderLabel(t.type) }}</div>
           </div>
         </transition>
@@ -112,12 +117,14 @@ import {
   Share,
   TrendCharts,
   Monitor,
-  House
+  House,
+  Cpu
 } from '@element-plus/icons-vue'
 
 import CardDashboard from './views/CardDashboard.vue'
 import DiagramView from './views/DiagramView.vue'
 import TimeseriesView from './views/TimeseriesView.vue'
+import ControlSchemeView from './views/ControlSchemeView.vue'
 import { getProject, listViews, buildProjectWsPath } from '@/api/projects'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 import { useProjectStore } from '@/stores/project'
@@ -154,6 +161,7 @@ function getViewIcon(type) {
   if (type === 'card') return Grid
   if (type === 'diagram') return Share
   if (type === 'timeseries') return TrendCharts
+  if (type === 'control') return Cpu
   return Monitor
 }
 

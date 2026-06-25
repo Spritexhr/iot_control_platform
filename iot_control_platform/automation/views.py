@@ -7,11 +7,13 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from config.permissions import IsSuperuser
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import AutomationRule
+from .models import AutomationRule, ControlScheme
 from .serializers import (
     AutomationRuleListSerializer,
     AutomationRuleDetailSerializer,
     AutomationRuleCreateUpdateSerializer,
+    ControlSchemeSerializer,
+    ControlSchemeCreateUpdateSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -174,3 +176,73 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
         finally:
             for lg in captured_loggers:
                 lg.removeHandler(log_capture)
+
+
+class ControlSchemeViewSet(viewsets.ModelViewSet):
+    """
+    控制方案（双位 / PI / PID）CRUD + 启停 + 单拍测试 + 模板。
+    增删改仅限超级用户；启停/试运行仅限工作人员；非工作人员仅可查看。
+    """
+    queryset = ControlScheme.objects.select_related(
+        'sensor_member__sensor', 'device_member__device', 'project', 'section'
+    ).all()
+
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [IsAuthenticated(), IsSuperuser()]
+        if self.action in ('enable', 'disable', 'step'):
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        if self.action in ('create', 'update', 'partial_update'):
+            return ControlSchemeCreateUpdateSerializer
+        return ControlSchemeSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        project = self.request.query_params.get('project')
+        section = self.request.query_params.get('section')
+        if project:
+            qs = qs.filter(project_id=project)
+        if section:
+            qs = qs.filter(section_id=section)
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='enable')
+    def enable(self, request, pk=None):
+        """启用控制环：重置内部运行态并标记为运行中。"""
+        scheme = self.get_object()
+        scheme.reset_runtime_state()
+        scheme.is_enabled = True
+        scheme.status = 'running'
+        scheme.error_message = ''
+        scheme.last_run_time = None
+        scheme.save(update_fields=['runtime_state', 'is_enabled', 'status',
+                                   'error_message', 'last_run_time', 'updated_at'])
+        return Response(ControlSchemeSerializer(scheme).data)
+
+    @action(detail=True, methods=['post'], url_path='disable')
+    def disable(self, request, pk=None):
+        """停用控制环。"""
+        scheme = self.get_object()
+        scheme.is_enabled = False
+        scheme.status = 'idle'
+        scheme.error_message = ''
+        scheme.save(update_fields=['is_enabled', 'status', 'error_message', 'updated_at'])
+        return Response(ControlSchemeSerializer(scheme).data)
+
+    @action(detail=True, methods=['post'], url_path='step')
+    def step(self, request, pk=None):
+        """手动跑一拍控制（真实下发），返回算得的 PV / 输出 / 命令，供前端"试一下"。"""
+        from .controllers import run_control_scheme
+        scheme = self.get_object()
+        send = request.data.get('send', True)
+        result = run_control_scheme(scheme, send=bool(send))
+        return Response({**result, 'scheme': ControlSchemeSerializer(scheme).data})
+
+    @action(detail=False, methods=['get'], url_path='templates')
+    def templates(self, request):
+        """返回三套控制方案模板（参数 schema + 默认值），供前端表单使用。"""
+        from .controllers import CONTROL_TEMPLATES
+        return Response({'templates': CONTROL_TEMPLATES})

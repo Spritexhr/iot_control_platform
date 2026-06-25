@@ -247,6 +247,7 @@ class ProjectView(models.Model):
         ("card", "卡片大屏"),
         ("diagram", "流程图"),
         ("timeseries", "时序趋势"),
+        ("control", "自动化控制"),
     ]
 
     project = models.ForeignKey(

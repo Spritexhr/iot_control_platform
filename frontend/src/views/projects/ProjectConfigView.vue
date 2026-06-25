@@ -169,6 +169,7 @@
                   <el-option label="卡片大屏" value="card" />
                   <el-option label="工艺流程图" value="diagram" />
                   <el-option label="时序趋势图" value="timeseries" />
+                  <el-option label="自动化控制" value="control" />
                 </el-select>
                 <el-checkbox v-model="newView.is_default">设为默认视图</el-checkbox>
                 <el-button type="primary" @click="addView">创建视图</el-button>
@@ -234,7 +235,7 @@ const SEVERITIES = ['low', 'mid', 'high', 'critical']
 const SEVERITY_LABELS = { low: '低严重度', mid: '中严重度', high: '高严重度', critical: '紧急严重度' }
 function severityLabel(lv) { return SEVERITY_LABELS[lv] || lv }
 
-const VIEW_TYPE_LABELS = { card: '卡片大屏', diagram: '流程图', timeseries: '时序趋势' }
+const VIEW_TYPE_LABELS = { card: '卡片大屏', diagram: '流程图', timeseries: '时序趋势', control: '自动化控制' }
 
 const tab = ref('sensors')
 const project = ref(null)

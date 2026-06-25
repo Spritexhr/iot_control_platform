@@ -176,3 +176,152 @@ class AutomationRule(models.Model):
                 time.sleep(interval_seconds)
         except KeyboardInterrupt:
             print("\n定时轮询已停止")
+
+
+# ============================================================================
+# 控制方案（结构化闭环控制）
+# ============================================================================
+# 与上面的自由脚本 AutomationRule 并存、互不影响。
+# AutomationRule = 用户手写 Python 脚本；ControlScheme = 选模板(双位/PI/PID) + 绑定 + 填参数。
+# 核心逻辑：周期性「对比传感器实测值(PV) 与 设定值(SP) → 驱动执行器设备」。
+
+CONTROL_TYPE_CHOICES = [
+    ('on_off', '双位控制'),
+    ('pi', '比例积分(PI)'),
+    ('pid', 'PID控制'),
+]
+
+# 作用方向：决定误差符号（PV 偏离 SP 时输出该增大还是减小）
+CONTROL_ACTION_CHOICES = [
+    ('heat', '正作用（PV 低于 SP 时增大输出/开，如加热）'),
+    ('cool', '反作用（PV 高于 SP 时增大输出/开，如降温开阀）'),
+]
+
+OUTPUT_MODE_CHOICES = [
+    ('analog', '模拟量（下发数值，如舵机角度/阀门开度%）'),
+    ('switch', '开关量（开/关命令）'),
+]
+
+CONTROL_STATUS_CHOICES = [
+    ('idle', '未启用'),
+    ('running', '运行中'),
+    ('error', '错误停止'),
+]
+
+
+def _default_runtime_state():
+    """控制器内部运行态默认值（每拍更新，启停时重置）"""
+    return {'integral': 0.0, 'prev_error': 0.0, 'on': False, 'pwm_phase': 0.0}
+
+
+class ControlScheme(models.Model):
+    """
+    控制方案 - 基于模板的结构化闭环控制。
+
+    绑定项目内的一只传感器成员（被控量 PV 来源）与一个设备成员（执行器），
+    选择控制类型（双位 / PI / PID）并填写参数，启用后由后台调度器周期性执行：
+      读 PV → 与 setpoint 比较算出控制量 → 映射成设备命令下发。
+    """
+
+    # ========== 基本信息与作用域 ==========
+    name = models.CharField(max_length=100, verbose_name="方案名称")
+    description = models.TextField(blank=True, verbose_name="方案描述")
+    project = models.ForeignKey(
+        "projects.Project",
+        on_delete=models.CASCADE,
+        related_name="control_schemes",
+        verbose_name="所属项目",
+    )
+    section = models.ForeignKey(
+        "projects.ProjectSection",
+        on_delete=models.CASCADE,
+        related_name="control_schemes",
+        verbose_name="所属房间",
+    )
+
+    # ========== 绑定（被控量来源 / 执行器） ==========
+    sensor_member = models.ForeignKey(
+        "projects.ProjectSensorMember",
+        on_delete=models.PROTECT,
+        related_name="control_schemes",
+        verbose_name="被控量传感器（PV）",
+        help_text="被删除前需先解绑控制方案，避免静默失控",
+    )
+    data_key = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="数据字段",
+        help_text="从传感器最新数据中取哪个字段作为 PV；留空则用传感器成员的 data_key",
+    )
+    device_member = models.ForeignKey(
+        "projects.ProjectDeviceMember",
+        on_delete=models.PROTECT,
+        related_name="control_schemes",
+        verbose_name="执行器设备",
+    )
+
+    # ========== 控制配置 ==========
+    control_type = models.CharField(
+        max_length=10, choices=CONTROL_TYPE_CHOICES, default='on_off',
+        verbose_name="控制类型",
+    )
+    setpoint = models.FloatField(default=0.0, verbose_name="设定值（SP）")
+    action = models.CharField(
+        max_length=10, choices=CONTROL_ACTION_CHOICES, default='cool',
+        verbose_name="作用方向",
+    )
+    sample_interval = models.PositiveIntegerField(
+        default=5, verbose_name="控制周期（秒）",
+        help_text="后台多久执行一次控制计算，最小 1 秒",
+    )
+    output_mode = models.CharField(
+        max_length=10, choices=OUTPUT_MODE_CHOICES, default='switch',
+        verbose_name="输出方式",
+    )
+    params = models.JSONField(
+        default=dict, blank=True,
+        verbose_name="算法参数与输出映射",
+        help_text=(
+            "结构示例：{deadband, kp, ki, kd, out_min, out_max, "
+            "analog:{command, param, range_min, range_max}, "
+            "switch:{on_command, off_command, convert(threshold|pwm), pwm_period}}"
+        ),
+    )
+
+    # ========== 运行态 ==========
+    runtime_state = models.JSONField(
+        default=_default_runtime_state, blank=True,
+        verbose_name="控制器内部运行态",
+        help_text="integral / prev_error / on / pwm_phase，每拍更新",
+    )
+    is_enabled = models.BooleanField(default=False, verbose_name="是否启用控制环")
+    status = models.CharField(
+        max_length=10, choices=CONTROL_STATUS_CHOICES, default='idle',
+        verbose_name="运行状态",
+    )
+    error_message = models.TextField(blank=True, verbose_name="错误信息")
+    last_run_time = models.DateTimeField(null=True, blank=True, verbose_name="最后执行时间")
+    last_pv = models.FloatField(null=True, blank=True, verbose_name="最近实测值")
+    last_output = models.FloatField(null=True, blank=True, verbose_name="最近控制输出")
+    last_command = models.CharField(max_length=200, blank=True, verbose_name="最近下发命令")
+
+    # ========== 时间戳 ==========
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "控制方案"
+        verbose_name_plural = "控制方案"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name}({self.get_control_type_display()})"
+
+    @property
+    def pv_key(self) -> str:
+        """实际用于取 PV 的字段名"""
+        return self.data_key or (self.sensor_member.data_key if self.sensor_member else '')
+
+    def reset_runtime_state(self):
+        """重置控制器内部运行态（启停、重新启用时调用）"""
+        self.runtime_state = _default_runtime_state()
