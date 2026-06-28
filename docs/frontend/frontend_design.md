@@ -1,365 +1,203 @@
-# IoT 控制平台 - 前端设计说明
+# IoT 控制平台前端设计
 
-本文档描述物联网控制平台前端的架构设计、技术选型、页面规划及实现要点，供开发与维护参考。
-
----
+本文档概括当前 Vue 前端的主要结构和数据流。Project 场景的具体操作见 [Project 使用指南](../backend/backend_user_guide/project_guide.md)。
 
 ## 一、技术栈
 
-| 类别 | 技术 | 版本 / 说明 |
-|------|------|-------------|
-| 框架 | Vue 3 | Composition API + `<script setup>` 语法 |
-| 构建工具 | Vite | 5.x，快速 HMR，ESM 原生支持 |
-| 路由 | Vue Router 4 | 路由守卫、动态加载 |
-| 状态管理 | Pinia | 轻量级，组合式 API 友好 |
-| UI 组件库 | Element Plus | 管理后台常用组件 |
-| HTTP 请求 | Axios | 统一封装、拦截器、Token 刷新 |
-| 样式 | SCSS + CSS 变量 | 主题切换、设计规范 |
-| 图标 | Element Plus Icons | Odometer、Cpu、Monitor 等 |
+| 类别 | 当前实现 |
+|---|---|
+| 框架 | Vue 3、Composition API、`<script setup>` |
+| 构建 | Vite 5 |
+| 路由 | Vue Router 4，页面懒加载与认证守卫 |
+| 状态 | Pinia 3 |
+| UI | Element Plus、Element Plus Icons |
+| HTTP | Axios，JWT 注入与自动刷新 |
+| 实时通信 | 原生 WebSocket + `useWebSocket` composable |
+| 图表 | ECharts 6 |
+| 流程图 | Vue Flow |
+| 代码编辑 | CodeMirror 6 + Python 语法高亮 |
+| 样式 | SCSS、CSS 变量、亮暗主题 |
 
-**设计阶段规划、当前未实现**：
-- 图表：ECharts（传感器数据趋势、设备在线分布）
-- 实时通信：MQTT.js 订阅（当前采用 REST 轮询 + 后端 MQTT）
-- 代码编辑器：Monaco Editor（当前为 textarea 脚本编辑）
+浏览器不直接连接 MQTT。MQTT 消息由后端处理，前端通过 REST 获取静态/历史数据，通过 WebSocket 接收实时增量。
 
----
+## 二、应用结构
 
-## 二、总体布局
-
-### 2.1 布局结构
-
-采用经典管理后台布局：**可折叠侧边栏 + 顶部导航栏 + 主内容区**。
-
-```
-+---------------------------------------------------------------+
-|  Logo/Title       [MQTT状态] [主题] [全屏] [用户菜单]          |
-+-------------+-------------------------------------------------+
-|             |                                                 |
-|   侧边栏     |              主内容区                            |
-|   导航菜单   |           (Router View)                         |
-|             |                                                 |
-|  - 仪表盘    |   +-------------------------------------------+ |
-|  - 传感器    |   |  面包屑 / 页面标题                          | |
-|  - 设备      |   +-------------------------------------------+ |
-|  - 自动化    |   |                                           | |
-|  - 系统设置  |   |           页面具体内容                      | |
-|             |   |                                           | |
-|  [折叠按钮]  |   +-------------------------------------------+ |
-+-------------+-------------------------------------------------+
+```text
+App.vue
+└── RouterView
+    ├── Login / Register
+    └── AppLayout
+        ├── AppSidebar
+        ├── AppHeader
+        └── AppMain → 业务页面
 ```
 
-### 2.2 布局组件
+主布局采用可折叠侧边栏、顶栏和内容区；移动端切换为抽屉式导航。
 
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| AppLayout | `layouts/AppLayout.vue` | 主布局，侧边栏 + 顶栏 + 内容 |
-| AppSidebar | `layouts/AppSidebar.vue` | 侧边栏，Logo、导航菜单、折叠按钮 |
-| AppHeader | `layouts/AppHeader.vue` | 顶栏，面包屑、MQTT 状态、主题、全屏、用户菜单 |
-| AppMain | `layouts/AppMain.vue` | 主内容区，`<router-view />` |
-
-### 2.3 响应式策略
-
-| 屏幕宽度 | 侧边栏行为 |
-|----------|-----------|
-| ≥ 1200px | 展开（220px） |
-| 768px ~ 1199px | 折叠（64px，仅图标） |
-| < 768px | 隐藏，通过汉堡按钮打开抽屉式侧边栏 |
-
----
-
-## 三、页面设计
-
-### 3.1 路由与权限
-
-#### 3.1.1 路由表
-
-| 路径 | 名称 | 组件 | 权限 |
-|------|------|------|------|
-| `/login` | 登录 | LoginView | guest |
-| `/register` | 注册 | RegisterView | guest |
-| `/` | 仪表盘 | DashboardView | requiresAuth |
-| `/sensors` | 传感器管理 | SensorsView | requiresAuth |
-| `/sensors/:sensorId` | 传感器详情 | SensorDetailView | requiresAuth |
-| `/devices` | 设备管理 | DevicesView | requiresAuth |
-| `/devices/:deviceId` | 设备详情 | DeviceDetailView | requiresAuth |
-| `/automation` | 自动化规则 | AutomationView | requiresAuth |
-| `/automation/:id` | 规则详情 / 编辑 | AutomationDetailView | requiresAuth |
-| `/settings` | 系统设置 | SettingsView | requiresAuth |
-
-#### 3.1.2 路由守卫
-
-- `requiresAuth`：需 JWT Token，否则跳转 `/login`
-- `guest`：已登录时跳转 `/`
-- 页面标题：`document.title = {title} - IoT 控制平台`
-
-### 3.2 仪表盘（Dashboard）
-
-**路由**：`/`
-
-**功能**：平台整体运行状态一览。
-
-- **统计卡片**：传感器总数 / 在线、设备总数 / 在线、自动化规则数、24h 数据量
-- **传感器最新数据**：表格展示最近上报的传感器及数据
-- **设备在线状态**：饼图或统计展示
-- **最近活动日志**：操作记录列表（若有）
-
-数据来源：`/api/dashboard/stats/` 接口。
-
-### 3.3 传感器管理
-
-#### 3.3.1 传感器列表（/sensors）
-
-- 筛选：类型、在线 / 离线 / 全部
-- 卡片网格：每张卡片显示类型名、状态灯、名称、最新数据、位置、最后上报时间
-- 操作：点击卡片进入详情，删除等
-
-#### 3.3.2 传感器详情（/sensors/:sensorId）
-
-- 基本信息：ID、类型、位置、描述、MQTT 主题、最后上报时间
-- 最新数据：根据 `data_fields` 动态展示
-- 命令控制：`CommandPanel` 根据 `commands` 动态渲染
-- 历史数据：时间范围筛选 + 表格
-- 状态记录：`SensorStatusCollection` 时间线
-
-### 3.4 设备管理
-
-#### 3.4.1 设备列表（/devices）
-
-- 卡片展示：图标、名称、状态字段（布尔型用开关）、在线状态
-- 操作：控制面板、详情
-
-#### 3.4.2 设备详情（/devices/:deviceId）
-
-- 基本信息：设备 ID、类型、MQTT 主题、位置等
-- 命令控制：根据 `DeviceType.commands` 动态渲染
-- 状态记录：`DeviceData` 时间线
-
-### 3.5 自动化规则
-
-#### 3.5.1 规则列表（/automation）
-
-- 规则卡片：名称、script_id、关联设备、启用开关、编辑 / 测试 / 删除
-
-#### 3.5.2 规则编辑（/automation/:id）
-
-- 基本信息：名称、脚本 ID、描述
-- 关联设备：device_list，支持添加 / 删除
-- 脚本编辑器：textarea 编辑 Python 脚本（设计规划为 Monaco Editor）
-- 执行测试、保存
-
-### 3.6 系统设置（/settings）
-
-- MQTT 连接状态：Broker、端口、连接状态
-- 传感器类型管理：SensorType CRUD
-- 设备类型管理：DeviceType CRUD
-
----
-
-## 四、组件设计
-
-### 4.1 公共组件
-
-| 组件名 | 文件路径 | 说明 |
-|--------|---------|------|
-| CommandPanel | `components/common/CommandPanel.vue` | 通用命令面板，根据 commands 动态渲染按钮和参数 |
-
-### 4.2 业务组件
-
-| 组件名 | 文件路径 | 说明 |
-|--------|---------|------|
-| SensorCard | `components/sensors/SensorCard.vue` | 传感器卡片，状态、类型、数据、位置 |
-| SensorDetail | `components/sensors/SensorDetail.vue` | 传感器详情（部分页面复用） |
-| DeviceCard | `components/devices/DeviceCard.vue` | 设备卡片 |
-
-### 4.3 CommandPanel 核心逻辑
-
-Props：
-- `commands`：来自 SensorType.commands 或 DeviceType.commands
-- `deviceId`：设备 / 传感器 ID
-- `sendFn`：发送命令函数 `(deviceId, commandName, params, makeSure) => Promise`
-
-渲染逻辑：
-- 遍历 `commands` 的每个 key
-- 无参数：渲染按钮
-- 有参数：渲染输入框 + 执行按钮
-- 执行后显示“已确认”或“失败”
-
----
-
-## 五、样式与主题
-
-### 5.1 配色方案
-
-#### 亮色主题（默认）
-
-| 用途 | 色值 |
-|------|------|
-| 主色 | `#1A73E8` |
-| 成功 / 在线 | `#00BFA5` |
-| 警告 | `#FF9800` |
-| 危险 / 离线 | `#F44336` |
-| 背景 | `#F5F7FA` |
-| 侧边栏 | `#1E293B` |
-| 卡片 | `#FFFFFF` |
-
-#### 暗色主题
-
-| 用途 | 色值 |
-|------|------|
-| 主色 | `#409EFF` |
-| 背景 | `#0D1117` |
-| 侧边栏 | `#161B22` |
-| 卡片 | `#1C2333` |
-
-### 5.2 设计规范
-
-- **圆角**：卡片 `12px`，按钮 `8px`
-- **阴影**：`0 2px 12px rgba(0,0,0,0.08)`
-- **间距**：8px 倍数（8 / 16 / 24 / 32）
-- **字体**：Inter、PingFang SC、Microsoft YaHei
-- **变量**：`variables.scss` 中定义，`html.dark` 覆盖暗色变量
-
-### 5.3 状态指示
-
-- 在线：绿色圆点 `iot-status-dot--online`
-- 离线：灰色圆点 `iot-status-dot--offline`
-- MQTT：顶栏显示“MQTT”+ 状态点（绿色 / 灰色）
-
----
-
-## 六、目录结构
-
-```
-frontend/
-├── public/
-├── src/
-│   ├── api/                      # API 请求
-│   │   ├── index.js              # Axios 实例、Token 刷新
-│   │   ├── auth.js               # 登录、注册、个人信息、改密
-│   │   ├── sensors.js            # 传感器 / SensorType
-│   │   ├── devices.js            # 设备 / DeviceType
-│   │   ├── automation.js         # 自动化规则
-│   │   └── system.js             # MQTT 状态、仪表盘统计
-│   ├── assets/styles/
-│   │   ├── variables.scss        # CSS 变量、主题
-│   │   └── global.scss           # 全局样式
-│   ├── components/
-│   │   ├── common/               # 通用组件
-│   │   │   └── CommandPanel.vue
-│   │   ├── sensors/
-│   │   │   ├── SensorCard.vue
-│   │   │   └── SensorDetail.vue
-│   │   └── devices/
-│   │       └── DeviceCard.vue
-│   ├── layouts/
-│   │   ├── AppLayout.vue
-│   │   ├── AppSidebar.vue
-│   │   ├── AppHeader.vue
-│   │   └── AppMain.vue
-│   ├── router/index.js           # 路由 + 守卫
-│   ├── stores/
-│   │   ├── app.js                # 主题、侧边栏、抽屉
-│   │   └── user.js               # 用户信息、Token
-│   ├── utils/
-│   │   └── theme.js              # 主题初始化
-│   ├── views/
-│   │   ├── auth/                 # 登录、注册
-│   │   ├── dashboard/
-│   │   ├── sensors/
-│   │   ├── devices/
-│   │   ├── automation/
-│   │   └── settings/
-│   ├── App.vue
-│   └── main.js
-├── index.html
-├── vite.config.js
-├── package.json
-├── Dockerfile
-└── nginx.conf
+```text
+frontend/src/
+├── api/             # Axios 实例及业务 API
+├── assets/styles/   # 全局变量、主题和基础样式
+├── components/      # 通用命令、状态等组件
+├── composables/     # useWebSocket
+├── layouts/         # 主框架布局
+├── router/          # 路由与守卫
+├── stores/          # app、user、locale、project
+└── views/           # 各业务页面
 ```
 
----
+## 三、路由与页面
 
-## 七、数据流与接口
+| 路径 | 页面 | 说明 |
+|---|---|---|
+| `/login`、`/register` | 认证 | `guest: true` |
+| `/` | 仪表盘 | 平台统计和运行概览 |
+| `/sensors`、`/sensors/:sensorId` | 传感器 | 管理、最新值、历史、状态和命令 |
+| `/devices`、`/devices/:deviceId` | 设备 | 管理、状态历史和控制命令 |
+| `/automation`、`/automation/:id` | 自动化 | 自由脚本规则与 CodeMirror 编辑器 |
+| `/projects` | 项目/场景 | 项目列表和统计 |
+| `/projects/:id` | 项目工作台 | 房间导航与多视图实时监控 |
+| `/projects/:id/config` | 项目配置 | 房间、成员和视图配置 |
+| `/plugins` | 插件中心 | 已发现插件列表 |
+| `/plugins/data_viz` | 数据可视化 | 独立时序查询插件 |
+| `/settings` | 系统设置 | MQTT、平台配置和类型管理 |
 
-### 7.1 认证与请求
+业务页面继承父路由的 `requiresAuth`。路由守卫仅判断本地 Access Token 是否存在；真正的读写权限由后端 DRF 校验。
 
-- **登录**：POST `/api/auth/login/` 获取 access + refresh Token
-- **Token 存储**：`localStorage`（iot-access-token、iot-refresh-token）
-- **请求头**：`Authorization: Bearer {token}`
-- **401 处理**：优先使用 refresh Token 换取新 access Token，失败则跳转登录
+## 四、状态管理
 
-### 7.2 数据获取策略
+| Store | 职责 |
+|---|---|
+| `app.js` | 侧边栏、抽屉、亮暗模式和配色主题 |
+| `user.js` | Access/Refresh Token、用户资料和退出登录 |
+| `locale.js` | 中英文文案及静态翻译函数 |
+| `project.js` | Project layout、实时 samples、设备状态和告警统计 |
 
-| 数据类型 | 获取方式 |
-|----------|---------|
-| 列表、详情 | REST API |
-| MQTT 状态 | 轮询 `/api/mqtt/status/`（15s） |
-| 命令发送 | POST 到后端，后端转发 MQTT |
+普通传感器/设备管理页主要使用页面内 REST 状态；跨组件持续更新的 Project 数据集中存入 Project Store：
 
-当前未实现：前端 MQTT 订阅，实时数据由后端接收后经 API 或轮询提供。
+```text
+samples: Map<point_id, PointSample>
+devices: Map<device_id, DeviceState>
+layout:  Project sections + members
+```
 
-### 7.3 主要 API 模块
+`findByBinding()` 同时支持 `sensor_id` 与 `sensor_id::data_key`。
 
-- **auth**：login, refresh, register, profile, change-password
-- **sensors**：getSensors, getSensor, getSensorData, sendSensorCommand, sensor-types CRUD
-- **devices**：getDevices, getDevice, sendDeviceCommand, device-types CRUD
-- **automation**：getRules, create/update/delete, execute
-- **system**：getMqttStatus, getDashboardStats
-- **health**：`GET /health/`（无需认证，供监控系统调用）
+## 五、Project 工作台
 
----
+```text
+ProjectWorkspace
+├── 房间/工段导航
+├── 连接状态、点位数、报警数
+└── 当前房间视图
+    ├── CardDashboard
+    ├── DiagramView
+    ├── TimeseriesView
+    └── ControlSchemeView
+```
 
-## 八、侧边栏导航
+- 卡片视图：实时数值、在线/报警筛选和设备命令。
+- 流程图：Vue Flow 编辑/运行态，画布保存于 `ProjectView.config`。
+- 时序视图：ECharts 展示传感器/设备历史与事件。
+- 控制视图：管理双位、PI、PID 控制方案。
 
-| 图标 | 名称 | 路由 |
-|------|------|------|
-| Odometer | 仪表盘 | `/` |
-| Cpu | 传感器管理 | `/sensors` |
-| Monitor | 设备管理 | `/devices` |
-| SetUp | 自动化规则 | `/automation` |
-| Setting | 系统设置 | `/settings` |
+普通用户可查看；画布编辑、设备控制等多数写入口会结合 `userInfo.is_staff` 控制。项目配置路由本身仍可访问，因此后端 DRF 始终是最终权限边界。
 
----
+## 六、HTTP 与认证
+
+Axios 实例位于 `src/api/index.js`：
+
+- `baseURL = /api`
+- 自动附加 `Authorization: Bearer <access>`
+- Access Token 距过期不足 30 秒时主动刷新
+- 多个并发请求共享刷新任务
+- 收到 401 时刷新并重放原请求
+- Refresh 失败后清理 Token 并跳转登录
+
+Token 保存键：
+
+```text
+iot-access-token
+iot-refresh-token
+```
+
+主要 API 模块：
+
+| 文件 | 领域 |
+|---|---|
+| `auth.js` | 登录、注册、资料和密码 |
+| `sensors.js` | Sensor/SensorType、数据和命令 |
+| `devices.js` | Device/DeviceType、状态和命令 |
+| `automation.js` | 自由脚本规则 |
+| `controlSchemes.js` | 双位、PI、PID 控制方案 |
+| `projects.js` | Project、Section、成员、视图和时序 |
+| `plugins.js` | 插件登记与启用状态 |
+| `platformConfig.js` | 平台配置 |
+| `system.js` | MQTT 状态和仪表盘统计 |
+
+## 七、WebSocket
+
+`useWebSocket.js` 提供统一实时连接：
+
+- 自动把 Access Token 加到 `?token=` 查询串
+- 25 秒 ping/pong 心跳
+- 指数退避重连
+- 关闭码 `4001` 时刷新 Token 后重连
+- `onScopeDispose` 自动清理连接和定时器
+- 按 `{event, data}` 分发到页面 handler
+
+主要端点：
+
+```text
+/ws/sensors/             /ws/sensors/<id>/
+/ws/devices/             /ws/devices/<id>/
+/ws/automation/
+/ws/system/mqtt/
+/ws/projects/<project_id>/
+/ws/plugins/<code>/
+```
+
+页面通常先通过 REST 获取快照，再用 WebSocket 接收增量，避免首次进入时等待下一条 MQTT 消息。
+
+## 八、视觉与主题
+
+平台默认采用暖米色、珊瑚橙的 Codex 风格，并支持亮暗模式和经典配色切换。颜色、圆角、阴影和间距集中在 CSS 变量中。
+
+Project 工业场景可以使用工程蓝白图纸视觉，但仍复用平台布局、权限和数据组件。
 
 ## 九、开发与部署
 
-### 9.1 开发
+本地验证：
 
 ```bash
-npm install
+cd /Users/xhr_mac/server/iot_control_platform/frontend
 npm run dev
+npm run build
 ```
 
-- 开发地址：`http://localhost:5173`
-- API 代理：`/api` → `http://127.0.0.1:8000`
-
-### 9.2 构建与预览
+生产前端由 nginx 提供构建产物，不是 Vite dev server。源码修改后必须重建：
 
 ```bash
-npm run build    # 输出 dist/
-npm run preview  # 本地预览构建结果
+cd /Users/xhr_mac/server/iot_control_platform
+docker compose build frontend
+docker compose up -d frontend
 ```
 
-### 9.3 部署
+验证实际产物：
 
-- **Docker**：使用项目根目录 `docker compose`，详见部署文档
-- **非 Docker**：构建后由 Nginx 托管静态文件并代理 `/api`
+```bash
+docker exec iot-frontend sh -c "grep -o 'index-[A-Za-z0-9_-]*\.js' /usr/share/nginx/html/index.html"
+```
 
----
+## 十、维护约定
 
-## 十、设计规划与实现差异
-
-| 设计规划 | 当前实现 |
-|----------|----------|
-| MQTT.js 前端订阅实时数据 | 后端 MQTT + REST 轮询 / 接口 |
-| ECharts 图表 | 待实现，仪表盘以表格为主 |
-| Monaco Editor 脚本编辑 | textarea 简易编辑 |
-| StatCard、DataChart、TimeAgo 等公共组件 | 部分合并到页面或未单独抽离 |
-| 传感器 / 设备 Pinia stores | 以页面内数据请求为主 |
-
-上述差异不影响核心业务流程，可在后续迭代中逐步补齐。
+- 新 API 统一放入 `src/api/`，调用路径不重复写 `/api`。
+- 持续实时数据优先复用 `useWebSocket`。
+- Project 视图必须按 Section 限定候选成员。
+- 写操作入口结合 `is_staff` 隐藏，但不能替代后端权限。
+- 新 P&ID 普通图元优先加入 `projects/diagram/editor/symbols.js` 注册表。
+- 不在前端写入演示或生产种子数据。
 
 ---
 
-*文档更新日期：2026 年 4 月*
+*文档更新日期：2026 年 6 月*

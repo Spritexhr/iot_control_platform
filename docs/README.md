@@ -63,8 +63,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [前端设计说明](frontend/frontend_design.md) | 技术栈、布局、页面设计、组件、API、实现差异 |
-| [前端优化记录](frontend/frontend_optimization.md) | 响应式适配、移动端交互、空状态、登录页面优化 |
+| [前端设计说明](frontend/frontend_design.md) | 当前技术栈、路由、Project 工作台、状态管理、REST/WebSocket 与部署 |
 
 ---
 
@@ -83,6 +82,7 @@
 
 | 版本 | 说明 |
 |------|------|
+| [0.10 更新日志](update_notes/0.10_update_notes.md) | Project/场景原生化、四类视图、双位/PI/PID 控制、仿真平台与架构清理 |
 | [0.9 更新日志](update_notes/0.9_update_notes.md) | 自动化规则系统升级（引擎、SensorWrapper 扩展、CodeMirror 编辑器、设备选择器）；示例文件迁入 docs |
 | [0.8 更新日志](update_notes/0.8_update_notes.md) | 全平台实时化（Django Channels + Redis + WebSocket）；MQTT 客户端拆分独立进程；useWebSocket composable |
 | [0.7 更新日志](update_notes/0.7_update_notes.md) | 配置系统统一（configure 命令）；首次部署引导；系统设置页重写；Token 主动续期 |
@@ -111,12 +111,12 @@ docs/
 │   ├── hardware_code_design.md
 │   └── hardware_guide.md
 ├── frontend/                        # 前端设计
-│   ├── frontend_design.md
-│   └── frontend_optimization.md
+│   └── frontend_design.md
 ├── simulation/                      # 仿真（虚拟传感器/设备）
 │   ├── simulation_guide.md
 │   └── testing_guide.md
 └── update_notes/                    # 版本更新日志
+    ├── 0.10_update_notes.md
     ├── 0.9_update_notes.md
     ├── 0.8_update_notes.md
     ├── 0.7_update_notes.md
