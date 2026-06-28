@@ -292,4 +292,4 @@ mosquitto_sub -h 127.0.0.1 -t "iot/sensors/+/data" -v
 
 - [Docker 部署](docker.md)
 - [非 Docker 部署](not_docker.md)
-- [MQTT 服务设计](../backend_design/mqtt_service_design.md)
+- [MQTT 服务设计](../backend/backend_design/mqtt_service_design.md)

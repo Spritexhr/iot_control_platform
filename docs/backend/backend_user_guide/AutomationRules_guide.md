@@ -6,27 +6,22 @@
 
 ## 一、脚本基本结构
 
-### 1.1 Arduino 风格
+### 1.1 两种写法
 
-脚本采用 Arduino 风格：`__init__` 相当于 `setup()`，`loop()` 相当于 Arduino 的 `loop()`。引擎每次执行会实例化控制器类并调用一次 `loop()`。
+脚本可以定义带 `loop()` 方法的控制器类，也可以直接定义顶层 `loop()` 函数。引擎每次轮询都会重新执行脚本；类风格还会重新实例化控制器，因此 `__init__` 状态不会跨轮询周期保留。
 
 ### 1.2 最小模板
 
 ```python
 from engine import sensors, devices
 
-class MyController:
-    """你的控制器类，类名任意，但必须实现 loop()"""
-
-    def __init__(self):
-        """相当于 setup()：获取传感器、设备"""
-        self.sensor = sensors.get('DHT11-WEMOS-001')
-        self.device = devices.get('SG_80_01')
-
-    def loop(self) -> bool:
-        """相当于 loop()：每轮执行一次，返回 True 表示成功"""
-        # 你的逻辑
-        return True
+def loop() -> bool:
+    sensor = sensors.get('DHT11-WEMOS-001')
+    device = devices.get('SG_80_01')
+    if not sensor or not device:
+        return False
+    # 你的逻辑
+    return True
 ```
 
 ---
@@ -71,7 +66,7 @@ if sensor:
 ```python
 device = devices.get('SG_80_01')
 if device:
-    state = device.current_state  # 最新 DeviceData.data
+    state = device.current_state  # 最新 DeviceStatusCollection.data
     device.send_command('turn_on', {})           # 无参数命令
     device.send_command('set_brightness', {'val': 80})  # 带参数命令
 ```
@@ -109,25 +104,25 @@ device.send_command('set_angle', {'val': 90})
 
 ---
 
-## 四、控制器类约定
+## 四、loop 约定
 
-### 4.1 必须实现 loop()
+### 4.1 必须提供 loop()
 
 ```python
-def loop(self) -> bool:
+def loop() -> bool:
     # 返回 True：执行成功
     # 返回 False / None：视为失败
     return True
 ```
 
-### 4.2 类名与命名
+### 4.2 类风格命名
 
 - 类名任意，但**不能以 `_` 开头**
-- 引擎会查找**第一个**带 `loop()` 的类并执行
+- 引擎优先查找**第一个**带 `loop()` 的类；找不到时执行顶层 `loop()`
 
-### 4.3 __init__ 中使用 sensors / devices
+### 4.3 类风格中的初始化
 
-在 `__init__` 中调用 `sensors.get()`、`devices.get()` 并保存到实例属性，`loop()` 中直接使用。
+可以在 `__init__` 中调用 `sensors.get()`、`devices.get()` 并保存到本次执行的实例属性，但这些属性不会跨轮询周期保留。
 
 ```python
 def __init__(self):
@@ -148,8 +143,6 @@ def loop(self):
 
 ```python
 from engine import sensors, devices
-from typing import Optional
-
 class HumidityOverflowPrint:
     SENSOR_ID = 'DHT11-WEMOS-001'
     HUMIDITY_THRESHOLD = 80.0
@@ -157,7 +150,7 @@ class HumidityOverflowPrint:
     def __init__(self):
         self.sensor = sensors.get(self.SENSOR_ID)
 
-    def _get_humidity(self) -> Optional[float]:
+    def _get_humidity(self):
         if not self.sensor:
             return None
         state = self.sensor.current_state or {}
@@ -182,8 +175,6 @@ class HumidityOverflowPrint:
 
 ```python
 from engine import sensors, devices
-from typing import Optional
-
 class HumidityAlert:
     SENSOR_ID = 'DHT11-WEMOS-001'
     DEVICE_ID = 'SG_80_01'
@@ -193,7 +184,7 @@ class HumidityAlert:
         self.sensor = sensors.get(self.SENSOR_ID)
         self.device = devices.get(self.DEVICE_ID)
 
-    def _get_humidity(self) -> Optional[float]:
+    def _get_humidity(self):
         if not self.sensor:
             return None
         state = self.sensor.current_state or {}
@@ -225,8 +216,6 @@ class HumidityAlert:
 
 ```python
 from engine import sensors, devices
-from typing import Optional
-
 class TemperatureMonitor:
     TEMP_THRESHOLD = 30.0
     SENSOR_ID = 'DHT11-WEMOS-001'
@@ -236,7 +225,7 @@ class TemperatureMonitor:
         self.sensor = sensors.get(self.SENSOR_ID)
         self.led = devices.get(self.LED_ID)
 
-    def _get_temperature(self) -> Optional[float]:
+    def _get_temperature(self):
         if not self.sensor:
             return None
         state = self.sensor.current_state or {}

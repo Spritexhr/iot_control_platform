@@ -1,85 +1,48 @@
 # 自动化规则设计文档
 
-本文档描述物联网控制平台的自动化规则实现，涵盖 `AutomationRule` 模型、`engine` 执行引擎与 `head_files`（sensors、devices）的协作方式。
-
----
+本文档说明自由脚本规则 `AutomationRule` 的模型、执行引擎、包装 API、调度机制和完整示例。结构化双位/PI/PID 控制方案请同时参阅 [Project 模块设计](project_design.md) 与 [Project 使用指南](../backend_user_guide/project_guide.md)。
 
 ## 一、架构概览
 
 | 组件 | 路径 | 职责 |
-|-----|------|------|
-| AutomationRule | `automation.models` | 存储规则、脚本、device_list、轮询状态及最后执行时间 |
-| engine | `automation.engine` | 注入 sensors/devices，执行脚本，查找并调用控制器类的 loop() |
-| scheduler | `automation.scheduler` | 后台守护线程，负责定期扫描并触发执行处于轮询状态的规则 |
-| head_files.sensors | `automation.head_files.sensors` | 构建 sensors 代理，提供 `sensors.get(device_id)` 获取传感器包装对象 |
-| head_files.devices | `automation.head_files.devices` | 构建 devices 代理，提供 `devices.get(device_id)` 获取设备包装对象及 send_command |
+|---|---|---|
+| `AutomationRule` | `automation/models.py` | 存储脚本、资源清单和轮询状态 |
+| 执行引擎 | `automation/engine.py` | 注入资源、建立受限命名空间、查找并执行 `loop()` |
+| 调度器 | `automation/scheduler.py` | 定期执行已启动规则，并与结构化控制方案共享单实例循环 |
+| SensorWrapper | `automation/head_files/sensors.py` | 最新值、历史、均值、在线状态 |
+| DeviceWrapper | `automation/head_files/devices.py` | 最新状态、在线状态和命令发送 |
+| REST API | `automation/views.py` | CRUD、启动、停止、单次执行、可选资源 |
 
+```text
+AutomationRule
+  ├── script + device_list
+  ├── poll_interval + process_status
+  └── scheduler
+        → engine.execute_rule(rule)
+            → build_sensors / build_devices
+            → 受限 Python 命名空间
+            → 控制器类 loop() 或顶层 loop()
+            → 读取 SensorData / DeviceStatusCollection
+            → DeviceWrapper.send_command()
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         AutomationRule                                       │
-│  script, device_list, poll_interval, last_run_time                           │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      ▲ (检查与更新状态)
-                                      │
-┌─────────────────────────────────────┴───────────────────────────────────────┐
-│                        scheduler (后台守护线程)                              │
-│  1. 每秒扫描 `is_launched=True` 且 `process_status='running'` 的规则           │
-│  2. 检查 `当前时间 - last_run_time >= poll_interval`                          │
-│  3. 满足条件则更新 `last_run_time` 并调用 `engine.execute_rule(rule)`           │
-│  4. 若执行抛出异常，更新状态为 `error_stopped` 并记录 `error_message`           │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │ (触发执行)
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  engine.execute_rule(rule)                                                   │
-│    1. build_sensors(device_list) / build_devices(device_list)                │
-│    2. 构造 engine 模块（sensors, devices）                                   │
-│    3. 自定义 __import__ 使 from engine import sensors, devices 生效          │
-│    4. exec(rule.script)                                                       │
-│    5. 查找带 loop() 的控制器类 → 实例化 → 执行一次 loop()                      │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                    ┌──────────────────┴──────────────────┐
-                    ▼                                     ▼
-┌──────────────────────────────┐         ┌──────────────────────────────┐
-│  head_files.sensors          │         │  head_files.devices          │
-│  build_sensors(device_list)  │         │  build_devices(device_list)   │
-│  → sensors.get(sensor_id)    │         │  → devices.get(device_id)     │
-│  返回 SensorWrapper:         │         │  返回 DeviceWrapper:          │
-│  - device_id                 │         │  - device_id                  │
-│  - current_state (只读)      │         │  - current_state (只读)       │
-│  - model (Sensor)            │         │  - send_command(name,params)│
-│                              │         │  - model (Device)            │
-└──────────────────────────────┘         └──────────────────────────────┘
-         │ 读 SensorData.data                      │ 读 DeviceData.data
-         │                                        │ 发 DeviceType.commands
-         ▼                                        ▼
-┌──────────────────┐                    ┌──────────────────┐
-│  sensors.Sensor  │                    │  devices.Device   │
-│  SensorData      │                    │  DeviceData       │
-└──────────────────┘                    └──────────────────┘
-```
-
----
 
 ## 二、AutomationRule 模型
 
-### 2.1 字段说明
+| 字段 | 说明 |
+|---|---|
+| `name` | 规则名称 |
+| `description` | 规则描述 |
+| `script_id` | 唯一脚本 ID |
+| `script` | 存储在数据库中的 Python 代码 |
+| `device_list` | 本规则可访问的传感器和设备白名单 |
+| `project` | 可选的 Project 场景关联 |
+| `is_launched` | 是否进入后台轮询 |
+| `poll_interval` | 轮询间隔，单位秒 |
+| `process_status` | `idle` / `running` / `stopped_by_user` / `error_stopped` |
+| `error_message` | 最近错误信息 |
+| `last_run_time` | 最近调度时间 |
 
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| name | CharField(100) | 规则名称 |
-| description | TextField | 规则描述 |
-| script_id | CharField(50), unique | 脚本唯一ID，供 `execute_by_script_id()` 调用 |
-| script | TextField | Python 脚本内容 |
-| device_list | JSONField | 关联设备与传感器列表 |
-| is_launched | BooleanField | 是否启动轮询 |
-| poll_interval | PositiveIntegerField | 轮询间隔（秒），默认 30 |
-| process_status | CharField | idle / running / stopped_by_user / error_stopped |
-| error_message | TextField | 错误详情（error_stopped 时） |
-| last_run_time | DateTimeField | 最后执行时间（供调度器计算下次执行时间） |
-
-### 2.2 device_list 格式
+`device_list` 示例：
 
 ```json
 [
@@ -88,181 +51,292 @@
 ]
 ```
 
-- `device_id`：传感器对应 `Sensor.sensor_id`，设备对应 `Device.device_id`
-- `device_type`：`"Sensor"` 或 `"Device"`，决定由 `build_sensors` 还是 `build_devices` 处理
+只有清单内的资源会注册到脚本的 `sensors` / `devices` 代理中。未声明的 ID 调用 `get()` 时返回 `None`。
 
-### 2.3 方法
+## 三、执行引擎
 
-| 方法 | 说明 |
-|-----|------|
-| `rule.execute()` | 执行一次脚本，返回 True/False |
-| `AutomationRule.execute_by_script_id(script_id)` | 按 script_id 执行规则 |
-| `AutomationRule.execute_by_script_id_with_timed_polling(script_id, interval_seconds)` | 定时轮询执行，Ctrl+C 停止 |
-| `rule.get_device_count()` | 关联设备/传感器数量 |
-| `rule.get_device_summary()` | 简要摘要，如 "DHT11-WEMOS-001(Sensor), SG_80_01(Device)" |
+### 3.1 执行流程
 
----
+`execute_rule(rule)` 每次执行：
 
-## 三、engine 执行引擎
+1. 根据 `device_list` 构建 SensorWrapper 和 DeviceWrapper。
+2. 创建临时 `engine` 模块并注入 `sensors`、`devices`。
+3. 使用受限内置函数和自定义 import 执行数据库中的脚本。
+4. 优先查找第一个包含 `loop()` 的控制器类。
+5. 找不到控制器类时，查找顶层 `loop()` 函数。
+6. 执行一次并返回布尔结果。
 
-### 3.1 execute_rule(rule) 流程
+引擎每一拍都会重新执行脚本并重新实例化控制器，因此 `__init__` 中的内存状态不会跨轮询周期保留。需要持久状态时应使用数据库模型；简单规则优先使用顶层 `loop()`。
 
-1. **构建 sensors、devices**
-   ```python
-   sensors = build_sensors(rule.device_list)
-   devices = build_devices(rule.device_list)
-   ```
+### 3.2 两种脚本形式
 
-2. **构造 engine 模块**
-   ```python
-   engine = types.ModuleType('engine')
-   engine.sensors = sensors
-   engine.devices = devices
-   ```
-
-3. **自定义 __import__ 与安全沙箱**
-   - 脚本中 `from engine import sensors, devices` 时，返回注入的 engine，从而获取 sensors、devices
-   - **白名单 import**：仅允许导入 `engine` 和 `automation.head_files` 下的模块，其余一律拒绝
-   - **禁用危险内置函数**：`open`, `eval`, `exec`, `compile`, `__import__`(原始), `globals`, `locals`, `breakpoint`, `input`
-   - 脚本在受限命名空间中执行，无法进行文件/进程/动态代码操作
-
-4. **执行脚本**
-   ```python
-   exec(compile(rule.script, '<rule:name>', 'exec'), namespace)
-   ```
-
-5. **查找控制器并执行**
-   - 从 namespace 查找第一个满足条件的类：非内置、有 `loop()` 方法
-   - 实例化：`controller = controller_cls()`（相当于 setup）
-   - 执行一次：`controller.loop()`（相当于 Arduino loop）
-
-### 3.2 控制器类约定
-
-- 类名不限，但不能以 `_` 开头
-- 必须实现 `loop()` 方法，无参数，返回值用于表示是否成功（True/False/None→False）
-- `__init__` 相当于 Arduino 的 setup，可用于 `sensors.get()`、`devices.get()`
-
-### 3.3 脚本可用的导入
-
-| 导入 | 说明 |
-|-----|------|
-| `from engine import sensors, devices` | 核心依赖，由引擎注入 |
-| `from typing import Optional` | 已注入到 namespace |
-| `from automation.head_files import ...` | 白名单允许的辅助模块 |
-| 其他标准库 | 正常 `import time` 等均可使用 |
-
-### 3.4 安全沙箱
-
-脚本执行在受限命名空间中，具备以下安全策略：
-
-| 策略 | 说明 |
-|-----|------|
-| 白名单 import | 仅允许 `engine` 和 `automation.head_files` 前缀匹配的模块 |
-| 禁用危险内置 | `open`, `eval`, `exec`, `compile`, `__import__`, `globals`, `locals`, `breakpoint`, `input` |
-| 受限命名空间 | 脚本只能访问注入的 `__builtins__`（已移除危险函数） |
-| 异常捕获 | `ImportError` 单独捕获并记录，其他异常也会记录但不会崩溃 |
-
-```
-脚本中的 import 请求
-    → _custom_import(name)
-    → name == 'engine' ? 返回注入的 engine 模块
-    → name 在白名单前缀中 ? 调用 real_import
-    → 否则抛出 ImportError
-```
-
----
-
-## 四、head_files：sensors 与 devices
-
-### 4.1 build_sensors(device_list)
-
-从 device_list 中筛选 `device_type == "Sensor"` 的项，为每个 `device_id` 查询 `Sensor.objects.get(sensor_id=device_id)`，构建包装对象并注册到 sensors 代理。
-
-**SensorWrapper 属性：**
-
-| 属性 | 类型 | 说明 |
-|-----|------|------|
-| device_id | str | 传感器 ID |
-| current_state | dict | 最新一条 SensorData.data，如 `{"temperature": 25.5, "humidity": 60}` |
-| model | Sensor \| None | Sensor 模型实例，不存在时为 None |
-
-**使用方式：** `sensor = sensors.get('DHT11-WEMOS-001')`
-
-### 4.2 build_devices(device_list)
-
-从 device_list 中筛选 `device_type == "Device"` 的项，为每个 `device_id` 查询 `Device.objects.get(device_id=device_id)`，构建包装对象。
-
-**DeviceWrapper 属性：**
-
-| 属性 | 类型 | 说明 |
-|-----|------|------|
-| device_id | str | 设备 ID |
-| current_state | dict | 最新一条 DeviceData.data |
-| send_command(name, params) | callable | 发送控制命令，内部调用 `device_command_send_service.send_custom_command_with_make_sure` |
-| model | Device \| None | Device 模型实例 |
-
-**send_command 说明：**
-- `name`：命令名，需在 `DeviceType.commands` 中定义
-- `params`：参数字典，如 `{"val": 80}`，对应 mqtt_message 中的占位符 `{val}`
-- 默认等待 3 秒确认，失败返回 False
-
-### 4.3 数据来源与命令发送
-
-| 类型 | 数据来源 | 可发送命令 |
-|-----|---------|-----------|
-| Sensor | SensorData 最新一条 data | 否（仅读） |
-| Device | DeviceData 最新一条 data | 是，通过 send_command |
-
----
-
-## 五、执行方式
-
-### 5.1 单次执行
+类风格适合拆分辅助方法：
 
 ```python
-rule = AutomationRule.objects.get(script_id='humidity_alert')
-rule.execute()
+from engine import sensors, devices
 
-# 或
-AutomationRule.execute_by_script_id('humidity_alert')
+class MyController:
+    def loop(self) -> bool:
+        sensor = sensors.get('DHT11-WEMOS-001')
+        return sensor is not None
 ```
 
-### 5.2 定时轮询执行
+函数风格适合短规则：
 
 ```python
-AutomationRule.execute_by_script_id_with_timed_polling('humidity_alert', interval_seconds=30)
-# 每 30 秒执行一次 loop()，Ctrl+C 停止
+from engine import sensors, devices
+
+def loop() -> bool:
+    sensor = sensors.get('DHT11-WEMOS-001')
+    return sensor is not None
 ```
 
-### 5.3 后台守护轮询 (Scheduler)
+### 3.3 安全边界
 
-自动化规则的轮询通过 `automation.scheduler` 模块中的后台线程实现：
-- 线程在 Django 启动时（`apps.py` 的 `ready()` 方法）自动启动。
-- 每秒钟扫描一次 `AutomationRule` 表，查找所有标记为运行状态 (`is_launched=True` 且 `process_status='running'`) 的规则。
-- 对比 `last_run_time` 与当前时间，如果超过 `poll_interval`，则调用 `execute_rule`，并更新 `last_run_time`。
-- 如果执行中发生严重异常，调度器将自动把 `process_status` 置为 `error_stopped`，记录错误并停止该规则的轮询，保护系统稳定。
+脚本运行在受限命名空间中：
 
-### 5.4 通过 API / 管理后台
+- 允许 `from engine import sensors, devices`。
+- 允许平台明确放行的辅助模块。
+- 禁止任意文件、进程、网络或动态代码能力。
+- 移除 `open`、`eval`、`exec`、`compile`、原始 `__import__`、`globals`、`locals`、`breakpoint` 和 `input` 等危险内置函数。
+- import 失败和脚本运行异常会被捕获、记录日志并返回 `False`；只有调度器自身出现未被引擎吸收的异常时，才会把规则切换为 `error_stopped`。
 
-规则可由 views (`/api/automation-rules/{id}/launch/`) 触发状态更新。前端只负责修改状态并定期查询结果，由后台调度器接管实际的执行循环。
+这是一层应用级约束，不应把数据库脚本执行能力开放给不可信用户。规则增删改仅限超级用户。
 
----
+## 四、脚本资源 API
 
-## 六、文件结构
+### 4.1 SensorWrapper
 
+| 属性/方法 | 说明 |
+|---|---|
+| `device_id` | 传感器 ID |
+| `current_state` | 最新 `SensorData.data`，同一拍内缓存 |
+| `refresh()` | 强制刷新最新值 |
+| `history(field, n=10)` | 最近 N 条字段值，按时间升序 |
+| `average(field, minutes=5)` | 时间窗口平均值，无有效数据时返回 `None` |
+| `is_online` | 按平台在线口径判断当前是否在线 |
+| `model` | 对应 `Sensor` 实例 |
+
+### 4.2 DeviceWrapper
+
+| 属性/方法 | 说明 |
+|---|---|
+| `device_id` | 设备 ID |
+| `current_state` | 最新 `DeviceStatusCollection.data`，同一拍内缓存 |
+| `refresh()` | 强制刷新最新状态 |
+| `is_online` | 按平台在线口径判断当前是否在线 |
+| `send_command(name, params)` | 复用设备命令服务发送命令并等待确认 |
+| `model` | 对应 `Device` 实例 |
+
+命令名必须存在于 `DeviceType.commands`，参数名必须与命令模板一致：
+
+```python
+device.send_command('turn_on', {})
+device.send_command('set_angle', {'val': 90})
 ```
-automation/
-├── models.py              # AutomationRule 模型
-├── engine.py              # execute_rule、_find_controller_class
-├── scheduler.py           # 后台守护线程轮询器
-├── apps.py                # 注册启动 scheduler
-├── head_files/
-│   ├── __init__.py
-│   ├── sensors.py         # build_sensors、SensorWrapper
-│   └── devices.py         # build_devices、DeviceWrapper、send_command
-└── script/                # 示例脚本（仅供参考，规则脚本存在 DB）
-    ├── sample_file.txt
-    ├── humidity_alert.py
-    ├── humidity_overflow_print.py
-    └── rotation_sensor_control_sg90.py
+
+## 五、调度与权限
+
+调度器每秒扫描一次：
+
+- `AutomationRule(is_launched=True, process_status='running')`
+- `ControlScheme(is_enabled=True, status='running')`
+
+到达各自执行间隔后运行一拍。自由脚本抛出严重异常时会切换为 `error_stopped`；控制方案异常时会被停用并切换为 `error`。
+
+生产环境中调度器只在单实例 `iot-mqtt-runner` 容器运行。`iot-backend` 设置 `IOT_MQTT_RUNNER=false`，不会在多个 ASGI worker 中重复执行规则或重复下发命令。本地 `runserver` 仅在主进程启动调度器。
+
+| 操作 | 权限 |
+|---|---|
+| 查看规则 | 已登录用户 |
+| 新建、修改、删除规则 | 超级用户 |
+| 单次执行、启动、停止 | 工作人员 |
+
+主要接口：
+
+| 接口 | 说明 |
+|---|---|
+| `GET/POST /api/automation-rules/` | 列表与创建 |
+| `POST /api/automation-rules/<id>/execute/` | 单次执行并返回输出 |
+| `POST /api/automation-rules/<id>/launch/` | 启动后台轮询 |
+| `POST /api/automation-rules/<id>/stop/` | 停止轮询 |
+| `GET /api/automation-rules/available-sources/` | 可选传感器、字段、设备和命令 |
+
+## 六、完整脚本示例
+
+以下内容由原独立示例文件合并而来。示例 ID 和命令仅用于说明，使用时必须替换为数据库中的真实资源。
+
+### 6.1 通用模板：类风格与函数风格
+
+```python
+from engine import sensors, devices
+
+
+class TemperatureMonitor:
+    """温度超过阈值时开启 LED。"""
+
+    TEMP_THRESHOLD = 30.0
+    SENSOR_ID = 'DHT11-WEMOS-001'
+    LED_ID = 'SG_80_01'
+
+    def loop(self) -> bool:
+        sensor = sensors.get(self.SENSOR_ID)
+        led = devices.get(self.LED_ID)
+        if not sensor or not led:
+            return False
+
+        temp = sensor.current_state.get('temperature')
+        if temp is None:
+            return False
+
+        if float(temp) > self.TEMP_THRESHOLD:
+            return bool(led.send_command('high', {}))
+        return True
+
+
+# 简单逻辑也可以不用类：
+# def loop() -> bool:
+#     sensor = sensors.get('DHT11-WEMOS-001')
+#     led = devices.get('SG_80_01')
+#     if not sensor or not led:
+#         return False
+#     temp = sensor.current_state.get('temperature', 0)
+#     if float(temp) > 30:
+#         return bool(led.send_command('high', {}))
+#     return True
 ```
+
+### 6.2 湿度告警并控制设备
+
+```python
+from engine import sensors, devices
+
+
+class HumidityAlert:
+    """湿度超过 70% 时发送 high，否则发送 low。"""
+
+    SENSOR_ID = 'DHT11-WEMOS-001'
+    DEVICE_ID = 'SG_80_001'
+    HUMIDITY_THRESHOLD = 70.0
+
+    def loop(self) -> bool:
+        sensor = sensors.get(self.SENSOR_ID)
+        device = devices.get(self.DEVICE_ID)
+        if not sensor or not device:
+            return False
+
+        humidity = (sensor.current_state or {}).get('humidity')
+        try:
+            humidity = float(humidity)
+        except (TypeError, ValueError):
+            return False
+
+        command = 'high' if humidity > self.HUMIDITY_THRESHOLD else 'low'
+        return bool(device.send_command(command, {}))
+```
+
+### 6.3 湿度超限打印
+
+```python
+from engine import sensors, devices
+
+
+class HumidityOverflowPrint:
+    """湿度超过 80% 时打印告警，不控制设备。"""
+
+    SENSOR_ID = 'DHT11-WEMOS-001'
+    HUMIDITY_THRESHOLD = 80.0
+
+    def loop(self) -> bool:
+        sensor = sensors.get(self.SENSOR_ID)
+        if not sensor:
+            return False
+
+        humidity = (sensor.current_state or {}).get('humidity')
+        try:
+            humidity = float(humidity)
+        except (TypeError, ValueError):
+            return False
+
+        if humidity > self.HUMIDITY_THRESHOLD:
+            print('[湿度超 80%%] 传感器 %s 当前湿度: %s%%' % (self.SENSOR_ID, humidity))
+        return True
+```
+
+### 6.4 旋转传感器控制 SG90
+
+```python
+from engine import sensors, devices
+
+
+class RotationSensorControlSG90:
+    """把旋转传感器角度映射为舵机角度。"""
+
+    SENSOR_ID = 'Rotation-001'
+    DEVICE_ID = 'sg90_001'
+
+    def loop(self) -> bool:
+        sensor = sensors.get(self.SENSOR_ID)
+        device = devices.get(self.DEVICE_ID)
+        if not sensor or not device:
+            return False
+
+        angle = (sensor.current_state or {}).get('angle')
+        try:
+            angle = float(angle)
+        except (TypeError, ValueError):
+            return False
+
+        if 0 <= angle <= 180:
+            return bool(device.send_command('set_angle', {'val': angle}))
+        return False
+```
+
+### 6.5 历史均值与趋势判断
+
+```python
+from engine import sensors, devices
+
+
+def loop() -> bool:
+    sensor = sensors.get('DHT11-WEMOS-001')
+    fan = devices.get('fan_001')
+    if not sensor or not fan or not sensor.is_online:
+        return False
+
+    average = sensor.average('temperature', minutes=5)
+    history = sensor.history('temperature', n=10)
+    if average is None or len(history) < 3:
+        return False
+
+    rising = history[-1] > history[-3] + 2
+    if average > 30 or rising:
+        return bool(fan.send_command('turn_on', {}))
+    return True
+```
+
+## 七、编写与排查建议
+
+- 不要在 `loop()` 中使用 `sleep()`；执行频率由 `poll_interval` 控制。
+- 所有外部值先处理 `None` 并进行数值转换。
+- 优先使用卫语句，避免在资源离线时继续执行。
+- 下发命令后使用 `send_command()` 返回值判断是否确认成功。
+- 单次执行会捕获 `print()` 和相关应用日志，适合启用轮询前调试。
+- 脚本报 `get()` 返回 `None` 时，先检查 `device_list` 的 ID 和类型。
+- 运行中规则持续异常时会自动停止，应查看 `error_message` 与后端日志。
+
+## 八、关键代码位置
+
+```text
+iot_control_platform/automation/
+├── models.py
+├── engine.py
+├── scheduler.py
+├── views.py
+├── serializers.py
+└── head_files/
+    ├── sensors.py
+    └── devices.py
+```
+
+示例不再以独立生产文件保存在仓库中；本章是其唯一维护位置。

@@ -69,7 +69,7 @@ iot/devices/{device_id}/status   — 状态上报（发布）
 | 文件 | 说明 |
 |-----|------|
 | `mqtt_command_form.txt` | 后端下发的命令格式（与 DeviceType.commands 对应） |
-| `mqtt_status_form.txt` | 状态上报格式（与 DeviceData.data 对应） |
+| `mqtt_status_form.txt` | 状态上报格式（与 DeviceStatusCollection.data 对应） |
 
 ---
 

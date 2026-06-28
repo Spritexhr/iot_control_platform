@@ -6,15 +6,23 @@
 
 ## 一、启动 Shell
 
+生产环境必须进入 backend 容器，连接实际 MySQL：
+
 ```bash
-# 在项目根目录
-python manage.py shell
+docker exec -it iot-backend python manage.py shell
+```
+
+本地脱机开发才使用 conda 环境：
+
+```bash
+# 在 iot_control_platform/ 后端目录
+/Users/xhr_mac/miniconda3/envs/iot_platform_env/bin/python manage.py shell
 ```
 
 或使用 iPython（如已安装）以获得更好体验：
 
 ```bash
-python manage.py shell -i ipython
+/Users/xhr_mac/miniconda3/envs/iot_platform_env/bin/python manage.py shell -i ipython
 ```
 
 ---
@@ -22,11 +30,16 @@ python manage.py shell -i ipython
 ## 二、常用导入
 
 ```python
+from datetime import timedelta
 from django.utils import timezone
-from devices.models import DeviceType, Device, DeviceData
+from devices.models import DeviceType, Device, DeviceStatusCollection
 from sensors.models import SensorType, Sensor, SensorData, SensorStatusCollection
-from automation.models import AutomationRule
-from platform_settings.models import PlatformConfig
+from projects.models import (
+    Project, ProjectSection, ProjectSensorMember,
+    ProjectDeviceMember, ProjectView,
+)
+from automation.models import AutomationRule, ControlScheme
+from platform_settings.models import PlatformConfig, Plugin
 ```
 
 平台配置详细用法见 [platform_settings_guide.md](./platform_settings_guide.md)。
@@ -61,8 +74,8 @@ dt = DeviceType.objects.create(
     DeviceType_id='LED-01',
     name='LED灯',
     description='可调亮度LED',
-    state_fields=['power_state', 'brightness'],
-    config_parameters=['heartbeat_interval'],
+    # 原 state_fields 已合并到 config_parameters
+    config_parameters=['power_state', 'brightness', 'heartbeat_interval'],
     commands={
         'turn_on': {'mqtt_message': {'command': 'power_on'}, 'description': '打开', 'params': []},
         'turn_off': {'mqtt_message': {'command': 'power_off'}, 'description': '关闭', 'params': []},
@@ -74,8 +87,7 @@ dt = DeviceType.objects.create(
 **方法调用**
 
 ```python
-dt.get_state_fields()      # 返回状态字段列表
-dt.get_config_parameters()# 返回配置参数列表
+dt.get_config_parameters()   # 返回全部可读状态/配置字段
 dt.get_heartbeat_interval()  # 返回 60（默认）
 
 # 反向关联：该类型下所有设备
@@ -116,7 +128,7 @@ dev = Device.objects.create(
     location='客厅',
     device_type=dt
 )
-# save 时自动写入 mqtt_topic_data / mqtt_topic_control（字段为 None 时自动生成，空字符串视为主动清空）
+# save 时若 topic 为空，会自动写入 mqtt_topic_data / mqtt_topic_control
 ```
 
 **访问关联**
@@ -124,9 +136,9 @@ dev = Device.objects.create(
 ```python
 dev.device_type           # DeviceType 实例
 dev.device_type.name      # 类型名称
-dev.data_records          # 反向关联：DeviceData QuerySet，按 timestamp 倒序
-dev.data_records.all()
-dev.data_records.first()  # 最新一条
+dev.status_records          # 反向关联：DeviceStatusCollection QuerySet
+dev.status_records.all()
+dev.status_records.first()  # 最新一条（模型默认按 timestamp 倒序）
 ```
 
 **方法调用**
@@ -141,27 +153,30 @@ dev.get_data_count(hours=7)    # 近 7 小时
 
 ---
 
-### 3.3 DeviceData（设备数据记录）
+### 3.3 DeviceStatusCollection（设备状态记录）
 
 **查询**
 
 ```python
 # 某设备最新 10 条
-DeviceData.objects.filter(device__device_id='SG_80_01').order_by('-timestamp')[:10]
+DeviceStatusCollection.objects.filter(
+    device__device_id='SG_80_01'
+).order_by('-timestamp')[:10]
 
 # 通过设备反向查询
 dev = Device.objects.get(device_id='SG_80_01')
-dev.data_records.all()[:10]
-dev.data_records.filter(timestamp__gte='2025-02-01')  # 某时间之后
+dev.status_records.all()[:10]
+dev.status_records.filter(timestamp__gte=timezone.now() - timedelta(days=1))
 ```
 
 **创建**
 
 ```python
 dev = Device.objects.get(device_id='SG_80_01')
-DeviceData.objects.create(
+DeviceStatusCollection.objects.create(
     device=dev,
-    data={'power_state': True, 'brightness': 80, 'event': 'heartbeat'},
+    data={'power_state': True, 'brightness': 80},
+    event_name='heartbeat',
     timestamp=timezone.now()
 )
 # 保存时会调用 dev.update_heartbeat()
@@ -170,9 +185,10 @@ DeviceData.objects.create(
 **访问数据内容**
 
 ```python
-record = dev.data_records.first()
+record = dev.status_records.first()
 record.data              # dict，如 {'power_state': True, 'brightness': 80}
 record.data.get('brightness')
+record.event_name        # 如 heartbeat / online / offline
 record.timestamp
 record.device.device_id
 ```
@@ -341,6 +357,7 @@ rule = AutomationRule.objects.create(
     ],
     poll_interval=30
 )
+# 如需归属场景，可额外传 project=Project.objects.get(code='HOME')
 ```
 
 **方法调用**
@@ -382,9 +399,60 @@ for item in rule.device_list:
 
 ---
 
-## 六、综合查询示例
+## 六、Project 项目/场景模块（projects）
 
-### 6.1 获取传感器最新一条采集数据
+Project 成员同时包含 `project` 与 `section` 外键，直接 ORM 写入容易制造不一致数据。生产配置优先使用前端或 REST API；Shell 更适合查询和排障。完整操作见 [Project 场景使用指南](project_guide.md)。
+
+**查询项目与房间**
+
+```python
+p = Project.objects.get(code='HOME')
+p.sections.all()
+p.sensor_members.select_related('sensor', 'section').all()
+p.device_members.select_related('device', 'section').all()
+p.views.select_related('section').all()
+p.automation_rules.all()   # 可选归属此项目的自由脚本规则
+p.control_schemes.all()    # 结构化双位/PI/PID 控制方案
+```
+
+**按房间查询成员和视图**
+
+```python
+section = ProjectSection.objects.get(project=p, name='客厅')
+section.sensor_members.select_related('sensor').all()
+section.device_members.select_related('device').all()
+section.views.all()
+section.control_schemes.all()
+```
+
+**查看传感器场景点位**
+
+```python
+member = section.sensor_members.select_related('sensor').first()
+member.sensor.sensor_id
+member.data_key
+member.point_id       # sensor_id 或 sensor_id::data_key
+member.hi_threshold
+member.lo_threshold
+```
+
+**从主模型反查所属场景**
+
+```python
+s = Sensor.objects.get(sensor_id='DHT11-WEMOS-001')
+s.project_members.select_related('project', 'section').all()
+
+dev = Device.objects.get(device_id='SG_80_01')
+dev.project_members.select_related('project', 'section').all()
+```
+
+> 删除项目、房间、Sensor 或 Device 前应先检查 `ControlScheme`。方案对成员使用 `PROTECT`，存在引用时删除会抛出 `ProtectedError`。
+
+---
+
+## 七、综合查询示例
+
+### 7.1 获取传感器最新一条采集数据
 
 ```python
 s = Sensor.objects.get(sensor_id='DHT11-WEMOS-001')
@@ -393,14 +461,14 @@ if latest:
     print(latest.data)  # {'temperature': 25.5, 'humidity': 60.0}
 ```
 
-### 6.2 获取设备近 24 小时数据条数
+### 7.2 获取设备近 24 小时状态条数
 
 ```python
 dev = Device.objects.get(device_id='SG_80_01')
 count = dev.get_data_count(24)
 ```
 
-### 6.3 批量检查设备在线状态
+### 7.3 批量检查设备在线状态
 
 ```python
 for dev in Device.objects.filter(is_online=True):
@@ -408,7 +476,7 @@ for dev in Device.objects.filter(is_online=True):
         print(f"{dev.device_id} 已离线")
 ```
 
-### 6.4 按类型统计设备数量
+### 7.4 按类型统计设备数量
 
 ```python
 from django.db.models import Count
@@ -417,24 +485,24 @@ DeviceType.objects.annotate(cnt=Count('devices')).values('name', 'cnt')
 
 ---
 
-## 七、常用 ORM 片段速查
+## 八、常用 ORM 片段速查
 
 | 需求 | 示例 |
 |-----|------|
 | 按 ID 查询 | `Device.objects.get(device_id='SG_80_01')` |
 | 过滤 | `Sensor.objects.filter(is_online=True)` |
-| 反向关联 | `dt.devices.all()` / `dev.data_records.all()` |
+| 反向关联 | `dt.devices.all()` / `dev.status_records.all()` |
 | 预加载 | `Device.objects.select_related('device_type')` |
-| 最新 N 条 | `dev.data_records.all()[:10]` |
-| 时间范围 | `dev.data_records.filter(timestamp__gte=start, timestamp__lte=end)` |
+| 最新 N 条 | `dev.status_records.all()[:10]` |
+| 时间范围 | `dev.status_records.filter(timestamp__gte=start, timestamp__lte=end)` |
 | 存在性 | `Sensor.objects.filter(sensor_id='xxx').exists()` |
 | 计数 | `Sensor.objects.count()` / `dev.get_data_count(24)` |
 
 ---
 
-## 八、平台配置模块 (platform_settings)
+## 九、平台配置模块 (platform_settings)
 
-### 8.1 PlatformConfig（平台配置）
+### 9.1 PlatformConfig（平台配置）
 
 **查询**
 
@@ -453,7 +521,7 @@ cfg.value = '192.168.1.100'
 cfg.save()
 ```
 
-**统一读取（优先数据库，回退环境变量）**
+**统一读取（数据库中不存在时使用调用方默认值）**
 
 ```python
 from config.platform_config import get_config
@@ -461,4 +529,16 @@ broker = get_config('mqtt_broker', '127.0.0.1')
 port = get_config('mqtt_port', 1883, int)
 ```
 
-**初始化命令**：`python manage.py configure --init` 将 `platform_settings/defaults.py` 中的默认值写入数据库；`python manage.py configure` 进入交互式 wizard 修改。详见 [platform_settings_guide.md](./platform_settings_guide.md)。
+**初始化命令**：`/Users/xhr_mac/miniconda3/envs/iot_platform_env/bin/python manage.py configure --init` 将 `platform_settings/defaults.py` 中的默认值写入数据库；不带参数运行 `configure` 可进入交互式 wizard。详见 [platform_settings_guide.md](./platform_settings_guide.md)。
+
+### 9.2 Plugin（插件登记）
+
+```python
+Plugin.objects.all()
+Plugin.objects.filter(enabled=True)
+plugin = Plugin.objects.get(name='data_viz')
+plugin.enabled = False
+plugin.save(update_fields=['enabled', 'updated_at'])
+```
+
+插件启用状态影响启动时的路由挂载，修改后需要重启 Django 容器或进程。

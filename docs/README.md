@@ -26,9 +26,10 @@
 
 | 文档 | 说明 |
 |------|------|
-| [Django 模型设计](backend/backend_design/djange_models_design.md) | DeviceType、Device、DeviceData、SensorType、Sensor、AutomationRule |
+| [Django 模型设计](backend/backend_design/djange_models_design.md) | Sensor/Device、Project 场景成员、AutomationRule、ControlScheme 与删除语义 |
 | [MQTT 服务设计](backend/backend_design/mqtt_service_design.md) | mqtt_service、BaseCommandSendService 基类、send_service、handler 架构与自动重连 |
-| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、脚本执行流程、安全沙箱 |
+| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、脚本执行流程、安全沙箱与完整示例 |
+| [Project 场景模块设计](backend/backend_design/project_design.md) | 项目/房间/成员模型、实时链路、四类视图与结构化控制 |
 | [平台配置设计](backend/backend_design/platform_settings_design.md) | PlatformConfig、get_config、seed、安全配置、分批清理 |
 | [插件系统设计](backend/backend_design/plugins_design.md) | plugins/ 目录约定、Plugin 登记表、发现/启用/挂载生命周期、data_viz 内置插件 |
 | [日志系统设计](backend/backend_design/logsystem_design.md) | 按模块分离、轮转、Logger 配置 |
@@ -42,6 +43,7 @@
 | [Django 模型使用](backend/backend_user_guide/django_models_guide.md) | Shell 中 CRUD、关联查询、方法调用 |
 | [MQTT 服务使用](backend/backend_user_guide/mqtt_service_guide.md) | 命令发送、手动初始化、自动重连、主题速览 |
 | [自动化规则脚本](backend/backend_user_guide/AutomationRules_guide.md) | 编写符合规范的自动化脚本 |
+| [Project 场景使用](backend/backend_user_guide/project_guide.md) | 创建场景、导入点位、配置视图、P&ID 图元与控制方案 |
 | [平台配置使用](backend/backend_user_guide/platform_settings_guide.md) | 配置 CRUD、健康检查、数据清理、节流 |
 | [插件开发指南](backend/backend_user_guide/plugins_guide.md) | 5 分钟添加 hello 插件、目录骨架、与前端联调、常见坑位 |
 | [日志系统使用](backend/backend_user_guide/logsystem_guide.md) | 查看日志、级别、常见问题 |
@@ -77,35 +79,6 @@
 
 ---
 
-## 自动化规则
-
-| 文档 | 说明 |
-|------|------|
-| [示例脚本](automation/examples/sample_file.txt) | 类风格与函数风格完整示例、API 速查 |
-| [湿度告警示例](automation/examples/humidity_alert.py) | 湿度超阈值 → 设备命令（含 send_command 用法） |
-| [湿度打印示例](automation/examples/humidity_overflow_print.py) | 湿度超阈值 → 终端输出（无设备依赖，适合新手） |
-| [旋转传感器控制示例](automation/examples/rotation_sensor_control_sg90.py) | 传感器值直接映射到设备命令参数 |
-
----
-
-## 插件
-
-| 文档 | 说明 |
-|------|------|
-| [P&ID 画板添加图标指南](plugins/plant_diagram/HOW_TO_ADD_ICONS.md) | 扩展工艺符号库（静态符号/独立组件两条路径）、三文件修改流程、常见坑位 |
-
----
-
-## 功能方案文档
-
-| 文档 | 说明 |
-|------|------|
-| [EB 装置 IoT 监测方案](development_plans/EB装置IoT辅助监测预警系统方案.md) | EB 乙苯装置大屏的业务背景与功能设计 |
-| [P&ID 画板编辑器方案](development_plans/工厂PID画板编辑器方案.md) | plant_diagram 插件的设计方案与技术选型 |
-| [苯乙烯装置实验方案](development_plans/苯乙烯装置监测系统实验方案.md) | 实验室环境下的监测部署方案 |
-
----
-
 ## 更新日志
 
 | 版本 | 说明 |
@@ -127,14 +100,13 @@
 docs/
 ├── README.md                        # 本文件：文档索引
 ├── PROJECT_DOCUMENTATION.md         # 项目主文档
-├── EB装置大屏使用手册.md              # EB 大屏操作手册
 ├── deployment/                      # 部署
 │   ├── before_deploy.md
 │   ├── docker.md
 │   └── not_docker.md
 ├── backend/                         # 后端
-│   ├── backend_design/              # 设计文档
-│   └── backend_user_guide/          # 使用指南
+│   ├── backend_design/              # 设计文档（含 Project、自动化示例）
+│   └── backend_user_guide/          # 使用指南（含 Project 场景操作）
 ├── hardware/                        # 硬件与嵌入式
 │   ├── hardware_code_design.md
 │   └── hardware_guide.md
@@ -144,19 +116,6 @@ docs/
 ├── simulation/                      # 仿真（虚拟传感器/设备）
 │   ├── simulation_guide.md
 │   └── testing_guide.md
-├── automation/                      # 自动化规则
-│   └── examples/                    # 示例脚本
-│       ├── sample_file.txt
-│       ├── humidity_alert.py
-│       ├── humidity_overflow_print.py
-│       └── rotation_sensor_control_sg90.py
-├── plugins/                         # 插件文档
-│   └── plant_diagram/
-│       └── HOW_TO_ADD_ICONS.md
-├── development_plans/               # 功能方案文档
-│   ├── EB装置IoT辅助监测预警系统方案.md
-│   ├── 工厂PID画板编辑器方案.md
-│   └── 苯乙烯装置监测系统实验方案.md
 └── update_notes/                    # 版本更新日志
     ├── 0.9_update_notes.md
     ├── 0.8_update_notes.md

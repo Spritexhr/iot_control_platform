@@ -76,7 +76,8 @@ docker compose exec backend python manage.py createsuperuser
 | 项目概述 | [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) |
 | 文档中心 | [docs/README.md](docs/README.md) |
 | 部署 | [before_deploy](docs/deployment/before_deploy.md) · [Docker](docs/deployment/docker.md) · [非 Docker](docs/deployment/not_docker.md) |
-| 后端设计 | [Django 模型](docs/backend/backend_design/djange_models_design.md) · [MQTT 服务](docs/backend/backend_design/mqtt_service_design.md) · [自动化规则](docs/backend/backend_design/AutomationRules_design.md) |
+| 后端设计 | [Django 模型](docs/backend/backend_design/djange_models_design.md) · [MQTT 服务](docs/backend/backend_design/mqtt_service_design.md) · [自动化规则](docs/backend/backend_design/AutomationRules_design.md) · [Project 场景](docs/backend/backend_design/project_design.md) |
+| 使用指南 | [Project 场景](docs/backend/backend_user_guide/project_guide.md) |
 | 硬件 | [硬件设计](docs/hardware_code/hardware_code_design.md) · [嵌入式编写指南](docs/hardware_code/hardware_guide.md) |
 
 ---

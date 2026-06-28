@@ -55,7 +55,7 @@ class AutomationRule(models.Model):
         from engine import sensors, devices（由引擎注入）
         loop() 返回 True 表示执行成功，False 表示条件未满足。
 
-        完整示例参见 docs/automation/examples/sample_file.txt
+        完整示例参见 docs/backend/backend_design/AutomationRules_design.md
         """
     )
 

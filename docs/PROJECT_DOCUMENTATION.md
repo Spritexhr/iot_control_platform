@@ -129,9 +129,9 @@
 *   **SensorStatusCollection**：存储传感器自身的运行状态（如心跳间隔、布防状态）。
 
 #### 2.3.2 设备模块 (Devices)
-*   **DeviceType**：定义执行器元数据（如 SG90 舵机），包含 `state_fields` 和可用的控制命令集。
+*   **DeviceType**：定义执行器元数据（如 SG90 舵机），包含 `config_parameters` 和可用控制命令集。
 *   **Device**：设备实例，关联 MQTT 控制主题与状态反馈主题。
-*   **DeviceData**：设备操作与状态变更的历史记录。
+*   **DeviceStatusCollection**：设备状态和事件的历史记录。
 
 #### 2.3.3 自动化模块 (Automation)
 *   **AutomationRule**：自动化逻辑的核心。
@@ -139,6 +139,13 @@
     *   `device_list`：规则关联的设备与传感器 ID 列表。
     *   `is_launched`：标识规则是否在后台引擎中运行。
     *   `poll_interval`：脚本执行的检查频率。
+*   **ControlScheme**：绑定 Project 成员的双位、PI、PID 结构化闭环控制。
+
+#### 2.3.4 项目/场景模块 (Projects)
+*   **Project**：工业装置、智能家居等业务场景的顶层容器。
+*   **ProjectSection**：项目内的房间、区域或工段。
+*   **ProjectSensorMember / ProjectDeviceMember**：在不污染主模型的前提下保存位号、阈值、单位等场景元数据。
+*   **ProjectView**：卡片、P&ID、时序趋势和自动化控制视图。
 
 ---
 
@@ -148,9 +155,10 @@
 
 | 文档 | 说明 |
 |------|------|
-| [Django 模型设计](backend/backend_design/djange_models_design.md) | DeviceType、Device、SensorType、Sensor、AutomationRule |
+| [Django 模型设计](backend/backend_design/djange_models_design.md) | Sensor/Device、Project 场景成员、AutomationRule、ControlScheme 与删除语义 |
 | [MQTT 服务设计](backend/backend_design/mqtt_service_design.md) | mqtt_service、BaseCommandSendService 基类、handler 架构、自动重连 |
-| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、安全沙箱、脚本执行流程 |
+| [自动化规则设计](backend/backend_design/AutomationRules_design.md) | engine、head_files、安全沙箱、脚本执行流程与完整示例 |
+| [Project 场景模块设计](backend/backend_design/project_design.md) | 项目/房间/成员模型、实时通道、视图与控制方案 |
 | [平台配置设计](backend/backend_design/platform_settings_design.md) | PlatformConfig、安全配置、分批清理 |
 | [日志系统设计](backend/backend_design/logsystem_design.md) | 日志配置、按模块分离 |
 
@@ -161,6 +169,7 @@
 | [Django 模型使用](backend/backend_user_guide/django_models_guide.md) | Shell 中 CRUD、关联查询 |
 | [MQTT 服务使用](backend/backend_user_guide/mqtt_service_guide.md) | 命令发送、手动初始化、自动重连 |
 | [自动化规则脚本](backend/backend_user_guide/AutomationRules_guide.md) | 编写符合规范的自动化脚本 |
+| [Project 场景使用](backend/backend_user_guide/project_guide.md) | 创建场景、点位绑定、视图、P&ID 和控制方案 |
 | [平台配置使用](backend/backend_user_guide/platform_settings_guide.md) | 配置管理、健康检查、数据清理 |
 | [日志系统使用](backend/backend_user_guide/logsystem_guide.md) | 查看日志、级别、排查 |
 
@@ -179,8 +188,8 @@
 | [部署前准备](deployment/before_deploy.md) | EMQX 安装、环境配置 |
 | [Docker 部署](deployment/docker.md) | 容器化一键部署 |
 | [非 Docker 部署](deployment/not_docker.md) | 传统方式部署 |
-| [硬件程序设计](hardware_code/hardware_code_design.md) | MQTT 连接、form 文件作用 |
-| [嵌入式编写指南](hardware_code/hardware_guide.md) | 符合后端规范的固件编写 |
+| [硬件程序设计](hardware/hardware_code_design.md) | MQTT 连接、form 文件作用 |
+| [嵌入式编写指南](hardware/hardware_guide.md) | 符合后端规范的固件编写 |
 
 ---
 *文档更新日期：2026年4月*

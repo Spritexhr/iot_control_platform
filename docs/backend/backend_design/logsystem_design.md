@@ -1,6 +1,6 @@
 # 日志系统设计文档
 
-本文档描述物联网控制平台的日志架构，基于 Django `LOGGING` 配置，实现按模块分离、文件持久化与轮转。设计来源见 [docs/design/logging.md](../design/logging.md)。
+本文档描述物联网控制平台的日志架构，基于 Django `LOGGING` 配置，实现按模块分离、文件持久化与轮转；当前实现以 `config/logging_config.py` 为准。
 
 ---
 
