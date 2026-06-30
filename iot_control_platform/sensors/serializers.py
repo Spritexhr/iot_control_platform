@@ -70,6 +70,7 @@ class SensorListSerializer(serializers.ModelSerializer):
     sensor_type_info = SensorTypeBriefSerializer(source='sensor_type', read_only=True)
     latest_data = serializers.SerializerMethodField()
     is_online = serializers.SerializerMethodField()
+    folder_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Sensor
@@ -79,8 +80,13 @@ class SensorListSerializer(serializers.ModelSerializer):
             'is_online', 'last_seen',
             'sort_order',
             'created_at', 'updated_at',
-            'sensor_type', 'sensor_type_info', 'latest_data',
+            'sensor_type', 'sensor_type_info', 'latest_data', 'folder', 'folder_info',
         ]
+
+    def get_folder_info(self, obj):
+        if not obj.folder_id:
+            return None
+        return {'id': obj.folder_id, 'name': obj.folder.name, 'parent': obj.folder.parent_id}
 
     def get_is_online(self, obj):
         """根据 last_seen 实时计算在线状态：3分钟内有数据视为在线"""
@@ -133,8 +139,13 @@ class SensorCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sensor
         fields = [
-            'sensor_id', 'name', 'description', 'location', 'sensor_type',
+            'sensor_id', 'name', 'description', 'location', 'sensor_type', 'folder',
         ]
+
+    def validate_folder(self, value):
+        if value is not None and value.resource_type != 'sensor':
+            raise serializers.ValidationError('请选择传感器文件夹')
+        return value
 
 
 class SensorDataSerializer(serializers.ModelSerializer):

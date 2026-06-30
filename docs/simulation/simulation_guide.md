@@ -19,7 +19,8 @@ simulation/
 ├── run.py                    统一启动器，加载 manifests/ 下的清单（节点模块自动发现）
 ├── manifests/                节点清单目录（提交到 git，按项目分文件）
 │   ├── default.yaml          默认清单：常规测试节点
-│   └── st_plant.yaml         苯乙烯(ST)装置清单：6 路传感器 + 2 台泵
+│   ├── st_plant.yaml         苯乙烯(ST)装置清单：6 路传感器 + 2 台泵
+│   └── luyben_eb.yaml        Luyben 乙苯清单：38 路传感器 + 15 个执行器
 ├── common/
 │   ├── mqtt_node.py          基类：连接/重连/订阅/心跳/check_code 回传
 │   ├── waveforms.py          数据波形 + WAVEFORM_SCHEMAS（参数元数据与校验）
@@ -126,6 +127,7 @@ python simulation/run.py
 # 加载指定清单（manifest 名 = 文件名去掉 .yaml）
 python simulation/run.py --manifest st_plant
 python simulation/run.py -m st_plant            # 短写法
+python simulation/run.py -m luyben_eb            # Luyben 乙苯教学场景
 
 # 同时加载多份清单（会合并并检测重复的 module+id）
 python simulation/run.py -m default -m st_plant
@@ -135,6 +137,7 @@ python simulation/run.py -m ./my_custom_manifest.yaml
 
 # 只校验清单（不连 broker 不启动节点；CI / 改完配置先检查用）
 python simulation/run.py --check -m st_plant
+python simulation/run.py --check -m luyben_eb
 ```
 
 `Ctrl-C` 会优雅停止所有节点。
@@ -147,6 +150,9 @@ python simulation/run.py --check -m st_plant
 - **按需启动**：跑苯乙烯装置时只需 `-m st_plant`，不会被无关节点污染。
 - **组合启动**：调试时可以叠加，比如 `-m default -m st_plant`。重复的 `(module, id)` 会直接报错，避免 client_id 冲突。
 - **共享进 git**：manifest 不含敏感凭据（凭据走 broker 级默认或节点级覆盖），团队成员 clone 下来就能跑。
+
+`luyben_eb.yaml` 使用 `FI0101`、`PI0101`、`TI0101`、`LI0101` 等正式场景 ID，
+不要与同样占用这些 ID 的 `test-sample.yaml` 同时启动，否则 MQTT client_id 和主题会冲突。
 
 ### 方式 2：单独跑一个节点
 
@@ -198,7 +204,7 @@ python simulation/devices/pump/pump.py \
 | Module | 说明 | 关键命令 |
 |--------|------|---------|
 | `generic_sensor` | 数据字段完全由配置定义：每个字段配 `waveform` + `precision` + `unit`（仅展示）。协议 envelope 与"真"传感器一致，Django 侧无法区分 | enable/disable/set_interval/set_status_interval |
-| `generic_device` | 状态字段完全由配置定义：`type`(bool/float) + `initial` + `min/max` 限幅 | **set_state {field, val}**/current_status/set_status_interval |
+| `generic_device` | 状态字段完全由配置定义：`type`(bool/float) + `initial` + `min/max` 限幅 | **set_state {field, val}**；工业别名 **set_opening / set_duty / set_setpoint**；current_status/set_status_interval |
 
 ```yaml
 # 想模拟一个水质传感器？不用写任何 Python：
@@ -257,6 +263,10 @@ python simulation/devices/pump/pump.py \
 ```
 
 `manifests/st_plant.yaml` 是一个用 phase 错相、按真实工艺数值（反应器进/出口温压、进料/蒸汽流量等）配置波形的完整范例，可直接参考。
+
+`manifests/luyben_eb.yaml` 采用 Luyben 论文稳态值附近的小幅独立正弦波：循环苯
+969.4 kmol/h、新鲜苯/乙烯 630.6 kmol/h、R1 433.7 K、C1/C2 控制板温度
+365.8/394.5 K、DEB 回流 251.2 kmol/h。它只提供教学信号，不建立执行器到传感器的过程耦合。
 
 **不写 waveforms 字段**：每个传感器 `.py` 顶部都有一个 `DEFAULT_WAVEFORMS` 常量提供合理默认值，单独跑（不通过 `run.py`）时就用这套默认。
 

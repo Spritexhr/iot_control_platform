@@ -47,7 +47,7 @@ export function stopAutomationRule(id, reason = 'user', errorMessage = '') {
   })
 }
 
-/** 获取所有可关联的传感器和设备（供选择器使用） */
-export function getAvailableSources() {
-  return request.get('/automation-rules/available-sources/')
+/** 获取可关联资源；传 project + section 时仅返回该房间已导入成员 */
+export function getAvailableSources(params = {}) {
+  return request.get('/automation-rules/available-sources/', { params })
 }

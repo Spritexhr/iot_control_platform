@@ -398,8 +398,12 @@ async function moveSensor(row) {
   }
 }
 async function removeSensor(row) {
-  await deleteSensorMember(row.id)
-  await Promise.all([loadMembers(), loadBindable()])
+  try {
+    await deleteSensorMember(row.id)
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (error) {
+    await showMemberDeleteError(error, '传感器')
+  }
 }
 
 // ---------- 设备成员 ----------
@@ -426,8 +430,30 @@ async function moveDevice(row) {
   }
 }
 async function removeDevice(row) {
-  await deleteDeviceMember(row.id)
-  await Promise.all([loadMembers(), loadBindable()])
+  try {
+    await deleteDeviceMember(row.id)
+    await Promise.all([loadMembers(), loadBindable()])
+  } catch (error) {
+    await showMemberDeleteError(error, '设备')
+  }
+}
+
+async function showMemberDeleteError(error, resourceLabel) {
+  const data = error.response?.data
+  if (error.response?.status === 409) {
+    const schemes = Array.isArray(data?.blockers) ? data.blockers : []
+    const names = schemes.map((item) => {
+      const state = item.is_enabled ? '运行中' : '已停用'
+      return `「${item.name}」（${state}）`
+    }).join('、')
+    const message = names ? `${data.detail}\n占用方案：${names}` : data.detail
+    await ElMessageBox.alert(message, `无法移除${resourceLabel}`, {
+      type: 'warning',
+      confirmButtonText: '知道了',
+    })
+    return
+  }
+  ElMessage.error(error.response?.data?.detail || `${resourceLabel}移除失败`)
 }
 
 // ---------- 视图 ----------

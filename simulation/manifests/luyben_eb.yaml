@@ -1,0 +1,389 @@
+# Luyben 乙苯流程教学模拟节点
+#
+# 范围：EB Project 的 01 制乙苯车间 + 02 乙苯分离车间。
+# 目标：为 P&ID、趋势、ControlScheme 和 AutomationRule 提供独立虚拟信号。
+# 注意：各传感器波形彼此独立，执行器命令只更新自身状态，不建立工艺耦合。
+#
+# 校验：python simulation/run.py --check -m luyben_eb
+# 启动：python simulation/run.py -m luyben_eb
+
+name: luyben_eb
+description: Luyben 乙苯两反应器、两精馏塔教学模拟（38 个传感器 + 15 个执行器）
+
+nodes:
+
+  # ========================================================================
+  # 01 制乙苯车间 - 流量（按物料方向 0101 → 0106）
+  # ========================================================================
+
+  - module: generic_sensor
+    id: FI0101
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 960.0, max: 978.8, period: 1800, jitter: 1.0, phase: 0}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0102
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 625.0, max: 636.2, period: 1800, jitter: 0.8, phase: 120}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0103
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 625.0, max: 636.2, period: 1800, jitter: 0.8, phase: 240}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0104
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 1680.0, max: 1712.0, period: 1800, jitter: 1.5, phase: 360}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0105
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 245.0, max: 257.0, period: 1800, jitter: 0.6, phase: 480}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0106
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 1860.0, max: 1904.0, period: 1800, jitter: 2.0, phase: 600}, precision: 1, unit: kmol/h}
+
+  # 01 制乙苯车间 - 压力
+
+  - module: generic_sensor
+    id: PI0101
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 19.7, max: 20.1, period: 1500, jitter: 0.03, phase: 0}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0102
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 19.7, max: 20.1, period: 1500, jitter: 0.03, phase: 100}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0103
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 19.8, max: 20.2, period: 1500, jitter: 0.03, phase: 200}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0104
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 19.8, max: 20.2, period: 1500, jitter: 0.03, phase: 300}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0105
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 18.7, max: 19.1, period: 1500, jitter: 0.03, phase: 400}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0106
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 18.8, max: 19.2, period: 1500, jitter: 0.03, phase: 500}, precision: 2, unit: atm}
+
+  - module: generic_sensor
+    id: PI0107
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 2.45, max: 2.55, period: 1200, jitter: 0.01, phase: 0}, precision: 2, unit: atm}
+
+  # 01 制乙苯车间 - 温度
+
+  - module: generic_sensor
+    id: TI0101
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 312.0, max: 316.0, period: 1800, jitter: 0.2, phase: 0}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0102
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 318.0, max: 322.0, period: 1800, jitter: 0.2, phase: 100}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0103
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 318.0, max: 322.0, period: 1800, jitter: 0.2, phase: 200}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0104
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 432.7, max: 434.7, period: 1800, jitter: 0.15, phase: 300}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0105
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 405.0, max: 409.0, period: 1800, jitter: 0.2, phase: 400}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0106
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 431.0, max: 433.0, period: 1800, jitter: 0.15, phase: 500}, precision: 1, unit: K}
+
+  # 01 制乙苯车间 - 液位与组分
+
+  - module: generic_sensor
+    id: LI0101
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 0}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: LI0102
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 300}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: AI0101
+    sampling_interval: 10
+    status_report_interval: 30
+    fields:
+      deb_mol_fraction: {waveform: {type: sine, min: 0.0, max: 0.002, period: 3600, jitter: 0.0001, phase: 0}, precision: 5, unit: mol_fraction}
+
+  # ========================================================================
+  # 02 乙苯分离车间 - C1/C2 流量
+  # ========================================================================
+
+  - module: generic_sensor
+    id: FI0201
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 1860.0, max: 1904.0, period: 1800, jitter: 2.0, phase: 600}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0202
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 805.0, max: 825.0, period: 1800, jitter: 1.0, phase: 720}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0203
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 960.0, max: 978.8, period: 1800, jitter: 1.0, phase: 840}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0204
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 900.0, max: 925.6, period: 1800, jitter: 1.2, phase: 960}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0205
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 410.0, max: 426.0, period: 1800, jitter: 0.8, phase: 1080}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0206
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 625.0, max: 636.2, period: 1800, jitter: 0.8, phase: 1200}, precision: 1, unit: kmol/h}
+
+  - module: generic_sensor
+    id: FI0207
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      flow_rate: {waveform: {type: sine, min: 245.0, max: 257.0, period: 1800, jitter: 0.6, phase: 1320}, precision: 1, unit: kmol/h}
+
+  # 02 乙苯分离车间 - 压力、温度、液位、产品组分
+
+  - module: generic_sensor
+    id: PI0201
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 0.295, max: 0.305, period: 1200, jitter: 0.001, phase: 0}, precision: 3, unit: atm}
+
+  - module: generic_sensor
+    id: PI0202
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      pressure: {waveform: {type: sine, min: 0.098, max: 0.102, period: 1200, jitter: 0.0005, phase: 300}, precision: 3, unit: atm}
+
+  - module: generic_sensor
+    id: TI0201
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 364.8, max: 366.8, period: 1800, jitter: 0.1, phase: 0}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: TI0202
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      temperature: {waveform: {type: sine, min: 393.5, max: 395.5, period: 1800, jitter: 0.1, phase: 450}, precision: 1, unit: K}
+
+  - module: generic_sensor
+    id: LI0201
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 0}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: LI0202
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 200}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: LI0203
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 400}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: LI0204
+    sampling_interval: 5
+    status_report_interval: 30
+    fields:
+      level: {waveform: {type: sine, min: 48.0, max: 52.0, period: 1200, jitter: 0.2, phase: 600}, precision: 1, unit: "%"}
+
+  - module: generic_sensor
+    id: AI0201
+    sampling_interval: 10
+    status_report_interval: 30
+    fields:
+      eb_mol_fraction: {waveform: {type: sine, min: 0.9985, max: 0.9995, period: 3600, jitter: 0.00005, phase: 300}, precision: 5, unit: mol_fraction}
+
+  # ========================================================================
+  # 执行器 - 命令只更新自身状态并回传 check_code，不反向改变传感器波形
+  # ========================================================================
+
+  - module: generic_device
+    id: FV0102
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: FV0103
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0101
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0102
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: PIC0107
+    status_report_interval: 30
+    state_fields:
+      setpoint: {type: float, initial: 414.9, min: 350.0, max: 450.0}
+
+  - module: generic_device
+    id: PV0201
+    status_report_interval: 30
+    state_fields:
+      duty: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0201
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0202
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: TV0201
+    status_report_interval: 30
+    state_fields:
+      duty: {type: float, initial: 1990000.0, min: 0.0, max: 6600000.0}
+
+  - module: generic_device
+    id: FV0202
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: PV0202
+    status_report_interval: 30
+    state_fields:
+      duty: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0203
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: LV0204
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}
+
+  - module: generic_device
+    id: TV0202
+    status_report_interval: 30
+    state_fields:
+      duty: {type: float, initial: 2420000.0, min: 0.0, max: 6600000.0}
+
+  - module: generic_device
+    id: FV0205
+    status_report_interval: 30
+    state_fields:
+      opening: {type: float, initial: 50.0, min: 0.0, max: 100.0}

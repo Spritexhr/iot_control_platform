@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "sensors",
     "automation",
     "projects",
+    "resource_folders",
     "platform_settings",
     "services.realtime.apps.RealtimeConfig",
 ]

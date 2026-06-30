@@ -55,8 +55,13 @@ export function getDeviceStatus(deviceId, params = {}) {
 }
 
 /** 批量更新设备显示顺序，order 是 device_id 数组 */
-export function reorderDevices(order) {
-  return request.post('/devices/reorder/', { order })
+export function reorderDevices(order, context = {}) {
+  return request.post('/devices/reorder/', { order, ...context })
+}
+
+/** 批量移动设备到文件夹；folder 为 null 时移到未分类。 */
+export function bulkMoveDevices(deviceIds, folder) {
+  return request.post('/devices/bulk-move/', { device_ids: deviceIds, folder })
 }
 
 /** 向设备发送命令 */

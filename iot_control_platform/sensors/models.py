@@ -176,6 +176,14 @@ class Sensor(models.Model):
         related_name='sensors',
         verbose_name="传感器类型"
     )
+    folder = models.ForeignKey(
+        "resource_folders.ResourceFolder",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sensors",
+        verbose_name="管理文件夹",
+    )
 
     class Meta:
         verbose_name = "传感器"

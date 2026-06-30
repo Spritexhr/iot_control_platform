@@ -202,7 +202,7 @@ SensorData post_save
 
 ECharts 根据 `/series/` 返回值动态生成曲线，支持多个字段、快捷时间范围、自定义时间和状态事件线。心跳事件在前端过滤，不显示为事件标记。
 
-## 七、结构化控制方案
+## 七、自动化控制
 
 `ControlScheme` 位于 automation app，与自由脚本 `AutomationRule` 并存。
 
@@ -234,6 +234,12 @@ ProjectSection
 
 调度器只在生产 `iot-mqtt-runner` 单实例运行，避免多 worker 重复控制。API 提供模板、CRUD、启用、停用和单拍测试。
 
+### 7.3 房间脚本规则
+
+自由脚本 `AutomationRule` 可同时关联 `project` 与 `section`，作为房间级脚本规则。两者必须同时存在且匹配，创建后不允许迁移作用域。项目控制视图按 `project + section` 过滤规则，全局自动化列表仍展示这些规则并返回项目、房间名称。
+
+项目脚本的 `device_list` 保存时必须属于当前 section 的 `ProjectSensorMember` 或 `ProjectDeviceMember`。手动执行、启动轮询和每次引擎执行都会重新核对成员关系；成员移除后脚本无法继续访问对应主资源。删除 section 会级联删除房间脚本。
+
 ## 八、权限与删除语义
 
 | 操作 | 权限 |
@@ -243,6 +249,9 @@ ProjectSection
 | 查看 ControlScheme | 已登录用户 |
 | ControlScheme 启停与单拍 | 工作人员 |
 | ControlScheme 增删改 | 超级用户 |
+| 查看 AutomationRule 与脚本 | 已登录用户 |
+| AutomationRule 启停与单次执行 | 工作人员 |
+| AutomationRule 增删改 | 超级用户 |
 
 删除关系：
 

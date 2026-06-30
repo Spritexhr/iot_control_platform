@@ -15,6 +15,7 @@ from .serializers import (
     ControlSchemeSerializer,
     ControlSchemeCreateUpdateSerializer,
 )
+from .resources import RuleResourceUnavailable, effective_device_list
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
     自动化规则 CRUD API
     创建、修改、删除仅限超级用户；执行、启动、停止仅限工作人员；非工作人员仅可查看
     """
-    queryset = AutomationRule.objects.all()
+    queryset = AutomationRule.objects.select_related('project', 'section').all()
 
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy'):
@@ -67,12 +68,28 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
                 | Q(script_id__icontains=search)
                 | Q(description__icontains=search)
             )
+        project = self.request.query_params.get('project')
+        section = self.request.query_params.get('section')
+        if project:
+            qs = qs.filter(project_id=project)
+        if section:
+            qs = qs.filter(section_id=section)
         return qs
+
+    def _ensure_resources_available(self, rule):
+        try:
+            effective_device_list(rule)
+        except RuleResourceUnavailable as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return None
 
     @action(detail=True, methods=['post'], url_path='launch')
     def launch(self, request, pk=None):
         """启动轮询：标记规则为持续轮询状态，可附带轮询间隔"""
         rule = self.get_object()
+        invalid_response = self._ensure_resources_available(rule)
+        if invalid_response:
+            return invalid_response
         poll_interval = request.data.get('poll_interval')
         if poll_interval is not None:
             try:
@@ -117,9 +134,59 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='available-sources')
     def available_sources(self, request):
-        """返回所有传感器和设备的简要信息，供前端关联设备选择器使用"""
+        """返回全局资源，或指定项目房间中已导入的资源。"""
         from sensors.models import Sensor
         from devices.models import Device
+        from projects.models import ProjectSection
+
+        project_id = request.query_params.get('project')
+        section_id = request.query_params.get('section')
+        if bool(project_id) != bool(section_id):
+            return Response(
+                {'detail': 'project 与 section 必须同时提供'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if project_id and section_id:
+            try:
+                section = ProjectSection.objects.get(pk=section_id, project_id=project_id)
+            except (ProjectSection.DoesNotExist, ValueError):
+                return Response({'detail': '项目或房间不存在'}, status=status.HTTP_404_NOT_FOUND)
+            sensor_members = section.sensor_members.select_related(
+                'sensor', 'sensor__sensor_type'
+            ).order_by('sort_order', 'id')
+            device_members = section.device_members.select_related(
+                'device', 'device__device_type'
+            ).order_by('sort_order', 'id')
+
+            sensors_data = []
+            seen_sensors = set()
+            for member in sensor_members:
+                sensor = member.sensor
+                if sensor.sensor_id in seen_sensors:
+                    continue
+                seen_sensors.add(sensor.sensor_id)
+                fields = sensor.sensor_type.data_fields if sensor.sensor_type_id else []
+                sensors_data.append({
+                    'id': sensor.sensor_id,
+                    'name': member.tag or sensor.name,
+                    'data_fields': fields,
+                })
+
+            devices_data = []
+            for member in device_members:
+                device = member.device
+                commands = (
+                    list(device.device_type.commands.keys())
+                    if device.device_type_id and isinstance(device.device_type.commands, dict)
+                    else []
+                )
+                devices_data.append({
+                    'id': device.device_id,
+                    'name': member.tag or device.name,
+                    'commands': commands,
+                })
+            return Response({'sensors': sensors_data, 'devices': devices_data})
 
         sensors_data = []
         for s in Sensor.objects.select_related('sensor_type').order_by('name'):
@@ -147,6 +214,9 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
         手动执行一次规则，捕获 print 输出和 WARNING+ 日志并返回
         """
         rule = self.get_object()
+        invalid_response = self._ensure_resources_available(rule)
+        if invalid_response:
+            return invalid_response
 
         stdout_capture = io.StringIO()
         log_capture = _LogCaptureHandler()

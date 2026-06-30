@@ -16,6 +16,7 @@ cp simulation/config.yaml.example simulation/config.yaml   # 改 broker.host
 
 python simulation/run.py                       # 加载 manifests/default.yaml
 python simulation/run.py -m st_plant           # 苯乙烯装置清单
+python simulation/run.py -m luyben_eb           # Luyben 乙苯装置：38 传感器 + 15 执行器
 python simulation/run.py --check -m default    # 只校验清单不启动
 ```
 

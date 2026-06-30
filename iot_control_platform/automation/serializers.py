@@ -1,15 +1,20 @@
 from rest_framework import serializers
 from .models import AutomationRule, ControlScheme
+from .resources import normalize_device_list, validate_scoped_resources
 
 
 class AutomationRuleListSerializer(serializers.ModelSerializer):
     """自动化规则列表序列化器"""
     device_count = serializers.SerializerMethodField()
+    project_name = serializers.CharField(source='project.name', read_only=True, default='')
+    project_code = serializers.CharField(source='project.code', read_only=True, default='')
+    section_name = serializers.CharField(source='section.name', read_only=True, default='')
 
     class Meta:
         model = AutomationRule
         fields = [
             'id', 'name', 'description', 'script_id',
+            'project', 'project_name', 'project_code', 'section', 'section_name',
             'device_list', 'device_count',
             'is_launched', 'poll_interval', 'process_status', 'error_message',
             'created_at', 'updated_at',
@@ -33,9 +38,37 @@ class AutomationRuleCreateUpdateSerializer(serializers.ModelSerializer):
         model = AutomationRule
         fields = [
             'id', 'name', 'description', 'script_id',
-            'script', 'device_list', 'poll_interval',
+            'project', 'section', 'script', 'device_list', 'poll_interval',
         ]
         read_only_fields = ['id']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        project = attrs.get('project', getattr(instance, 'project', None))
+        section = attrs.get('section', getattr(instance, 'section', None))
+
+        if instance is not None:
+            if 'project' in attrs and attrs['project'] != instance.project:
+                raise serializers.ValidationError({'project': '规则创建后不能修改所属项目'})
+            if 'section' in attrs and attrs['section'] != instance.section:
+                raise serializers.ValidationError({'section': '规则创建后不能修改所属房间'})
+
+        if bool(project) != bool(section):
+            field = 'section' if project else 'project'
+            raise serializers.ValidationError({field: '项目脚本必须同时指定项目和房间'})
+        if project and section.project_id != project.id:
+            raise serializers.ValidationError({'section': '该房间不属于所选项目'})
+
+        device_list = attrs.get('device_list', getattr(instance, 'device_list', []))
+        try:
+            device_list = normalize_device_list(device_list)
+            if section:
+                validate_scoped_resources(device_list, section)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({'device_list': exc.detail}) from exc
+        attrs['device_list'] = device_list
+        return attrs
 
 
 # ============================================================================

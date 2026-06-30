@@ -78,7 +78,7 @@
                     v-model="item.device_id"
                     filterable
                     clearable
-                    allow-create
+                    :allow-create="!rule.project"
                     default-first-option
                     placeholder="搜索或输入 ID"
                     size="small"
@@ -377,7 +377,10 @@ const availableSources = ref({ sensors: [], devices: [] })
 
 async function fetchAvailableSources() {
   try {
-    availableSources.value = await getAvailableSources()
+    const params = rule.value?.project && rule.value?.section
+      ? { project: rule.value.project, section: rule.value.section }
+      : {}
+    availableSources.value = await getAvailableSources(params)
   } catch {
     // 加载失败不影响主功能，选择器降级为手动输入
   }
@@ -483,7 +486,7 @@ async function handleExecute() {
     if (errData?.logs?.length) {
       errData.logs.forEach((log) => appendTerminal(logLevelToType(log.level), log.message))
     }
-    appendTerminal('error', `执行异常: ${errData?.error || err.message || '未知错误'}`)
+    appendTerminal('error', `执行异常: ${errData?.detail || errData?.error || err.message || '未知错误'}`)
     return { success: false, fatalError: true }
   } finally {
     executing.value = false
@@ -505,8 +508,8 @@ async function startPolling() {
     rule.value.process_status = res.process_status
     rule.value.poll_interval = res.poll_interval
     appendTerminal('info', `▶ 后台轮询已启动，间隔 ${pollInterval.value} 秒`)
-  } catch {
-    ElMessage.error('启动轮询失败')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.detail || '启动轮询失败')
   }
 }
 
@@ -622,9 +625,9 @@ class MyController:
 }
 
 // ==================== 初始化 ====================
-onMounted(() => {
-  fetchRule()
-  fetchAvailableSources()
+onMounted(async () => {
+  await fetchRule()
+  await fetchAvailableSources()
 })
 </script>
 

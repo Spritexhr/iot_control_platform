@@ -15,6 +15,8 @@ from .serializers import (
     SensorDataSerializer,
     SensorStatusSerializer,
 )
+from resource_folders.models import ResourceFolder
+from resource_folders.pagination import ResourcePageNumberPagination
 
 
 class SensorTypeViewSet(viewsets.ModelViewSet):
@@ -34,13 +36,14 @@ class SensorViewSet(viewsets.ModelViewSet):
     支持按 sensor_id 查找、筛选、搜索
     创建/修改/删除/发送命令仅限工作人员，非工作人员仅可查看
     """
-    queryset = Sensor.objects.select_related('sensor_type').prefetch_related(
+    queryset = Sensor.objects.select_related('sensor_type', 'folder').prefetch_related(
         'data_records'
     ).all()
     lookup_field = 'sensor_id'
+    pagination_class = ResourcePageNumberPagination
 
     def get_permissions(self):
-        if self.action in ('create', 'update', 'partial_update', 'destroy', 'send_command'):
+        if self.action in ('create', 'update', 'partial_update', 'destroy', 'send_command', 'bulk_move'):
             return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated()]
 
@@ -69,7 +72,33 @@ class SensorViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(sensor_id__icontains=search))
+        folder = self.request.query_params.get('folder')
+        if folder == 'unfiled':
+            qs = qs.filter(folder__isnull=True)
+        elif folder:
+            if not folder.isdigit():
+                return qs.none()
+            qs = qs.filter(folder_id=int(folder), folder__resource_type=ResourceFolder.SENSOR)
         return qs
+
+    @action(detail=False, methods=['post'], url_path='bulk-move')
+    def bulk_move(self, request):
+        sensor_ids = request.data.get('sensor_ids')
+        folder_id = request.data.get('folder')
+        if not isinstance(sensor_ids, list) or not sensor_ids or not all(isinstance(x, str) for x in sensor_ids):
+            return Response({'detail': 'sensor_ids 必须是非空字符串数组'}, status=400)
+        folder = None
+        if folder_id is not None:
+            try:
+                folder = ResourceFolder.objects.get(pk=folder_id, resource_type=ResourceFolder.SENSOR)
+            except ResourceFolder.DoesNotExist:
+                return Response({'detail': '传感器文件夹不存在'}, status=400)
+        unique_ids = set(sensor_ids)
+        qs = Sensor.objects.filter(sensor_id__in=unique_ids)
+        if qs.count() != len(unique_ids):
+            return Response({'detail': '包含不存在的传感器'}, status=400)
+        updated = qs.update(folder=folder)
+        return Response({'updated': updated})
 
     @action(detail=True, methods=['get'], url_path='data')
     def sensor_data(self, request, sensor_id=None):
@@ -110,9 +139,42 @@ class SensorViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            for index, sensor_id in enumerate(order, start=1):
-                Sensor.objects.filter(sensor_id=sensor_id).update(sort_order=index)
+        page = request.data.get('page')
+        page_size = request.data.get('page_size')
+        folder = request.data.get('folder')
+        if page is not None or page_size is not None:
+            try:
+                page = int(page)
+                page_size = int(page_size)
+                if page < 1 or page_size < 1 or page_size > 96:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return Response({'detail': 'page/page_size 参数无效'}, status=400)
+
+            scope = Sensor.objects.all()
+            if folder == 'unfiled' or folder is None:
+                scope = scope.filter(folder__isnull=True)
+            else:
+                scope = scope.filter(folder_id=folder)
+            all_ids = list(
+                scope.order_by('sort_order', '-created_at').values_list('sensor_id', flat=True)
+            )
+            start = (page - 1) * page_size
+            page_ids = all_ids[start:start + page_size]
+            if len(order) != len(page_ids) or set(order) != set(page_ids):
+                return Response({'detail': '排序内容与当前页资源不一致，请刷新后重试'}, status=409)
+            all_ids[start:start + len(page_ids)] = order
+            rows = list(Sensor.objects.filter(sensor_id__in=all_ids))
+            row_map = {row.sensor_id: row for row in rows}
+            for index, sensor_id in enumerate(all_ids, start=1):
+                row_map[sensor_id].sort_order = index
+            with transaction.atomic():
+                Sensor.objects.bulk_update(rows, ['sort_order'])
+        else:
+            # 兼容旧客户端：仅更新请求中给出的顺序。
+            with transaction.atomic():
+                for index, sensor_id in enumerate(order, start=1):
+                    Sensor.objects.filter(sensor_id=sensor_id).update(sort_order=index)
         return Response({'updated': len(order)})
 
     @action(detail=True, methods=['post'], url_path='command')

@@ -62,6 +62,13 @@
                 <span v-if="!isEditing" class="info-item__value">{{ sensor.description || ls.t('common.none') }}</span>
                 <el-input v-else v-model="editForm.description" size="small" placeholder="无" clearable />
               </div>
+              <div class="info-item">
+                <span class="info-item__label">{{ ls.t('resourceFolders.folder') }}</span>
+                <span v-if="!isEditing" class="info-item__value">{{ sensor.folder_info?.name || ls.t('resourceFolders.unfiled') }}</span>
+                <el-select v-else v-model="editForm.folder" size="small" clearable :placeholder="ls.t('resourceFolders.unfiled')">
+                  <el-option v-for="folder in folders" :key="folder.id" :label="folder.name" :value="folder.id" />
+                </el-select>
+              </div>
               <div class="info-item info-item--full">
                 <span class="info-item__label">名称</span>
                 <span v-if="!isEditing" class="info-item__value">{{ sensor.name }}</span>
@@ -216,6 +223,7 @@ import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { getSensor, getSensorData, getSensorStatus, sendSensorCommand, patchSensor } from '@/api/sensors'
+import { getResourceFolders } from '@/api/resourceFolders'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
@@ -227,17 +235,19 @@ const router = useRouter()
 // ==================== 传感器详情 ====================
 const sensor = ref(null)
 const pageLoading = ref(false)
+const folders = ref([])
 
 // ==================== 内联编辑 ====================
 const isEditing = ref(false)
 const saving = ref(false)
-const editForm = ref({ name: '', description: '', location: '' })
+const editForm = ref({ name: '', description: '', location: '', folder: null })
 
 function startEdit() {
   editForm.value = {
     name: sensor.value.name || '',
     description: sensor.value.description || '',
     location: sensor.value.location || '',
+    folder: sensor.value.folder ?? null,
   }
   isEditing.value = true
 }
@@ -253,10 +263,14 @@ async function saveEdit() {
       name: editForm.value.name,
       description: editForm.value.description,
       location: editForm.value.location,
+      folder: editForm.value.folder ?? null,
     })
     sensor.value.name = updated.name ?? editForm.value.name
     sensor.value.description = updated.description ?? editForm.value.description
     sensor.value.location = updated.location ?? editForm.value.location
+    sensor.value.folder = updated.folder ?? null
+    const folder = folders.value.find((item) => item.id === sensor.value.folder)
+    sensor.value.folder_info = folder ? { id: folder.id, name: folder.name, parent: folder.parent } : null
     isEditing.value = false
     ElMessage.success('已保存')
   } catch {
@@ -414,7 +428,8 @@ const ws = useWebSocket(
 
 // ==================== 初始化 ====================
 onMounted(async () => {
-  await fetchSensorDetail()
+  const [, folderData] = await Promise.all([fetchSensorDetail(), getResourceFolders('sensor').catch(() => [])])
+  folders.value = folderData.results || folderData
   if (sensor.value) {
     fetchDataRecords()
     fetchStatusRecords()

@@ -88,7 +88,7 @@
               :can-edit="isStaff"
               @saved="onViewSaved"
             />
-            <ControlSchemeView
+            <AutomationDesignView
               v-else-if="t.type === 'control'"
               :project-id="projectId"
               :section-id="activeRoomId"
@@ -124,7 +124,7 @@ import {
 import CardDashboard from './views/CardDashboard.vue'
 import DiagramView from './views/DiagramView.vue'
 import TimeseriesView from './views/TimeseriesView.vue'
-import ControlSchemeView from './views/ControlSchemeView.vue'
+import AutomationDesignView from './views/AutomationDesignView.vue'
 import { getProject, listViews, buildProjectWsPath } from '@/api/projects'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 import { useProjectStore } from '@/stores/project'
@@ -560,4 +560,3 @@ watch(displayStatus, (v) => { store.wsStatus = v }, { immediate: true })
   }
 }
 </style>
-

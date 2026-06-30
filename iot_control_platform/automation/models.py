@@ -36,6 +36,15 @@ class AutomationRule(models.Model):
         verbose_name="所属项目",
         help_text="留空表示全局规则（不归属任何项目）",
     )
+    section = models.ForeignKey(
+        "projects.ProjectSection",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="automation_rules",
+        verbose_name="所属房间",
+        help_text="项目脚本必须归属一个房间；可用资源仅限该房间已导入成员",
+    )
     script_id = models.CharField(
         max_length=50,
         unique=True,

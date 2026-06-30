@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/", include("devices.urls")),
     path("api/", include("automation.urls")),
     path("api/", include("projects.urls")),
+    path("api/", include("resource_folders.urls")),
     path("api/", include("platform_settings.urls")),
     path("api/mqtt/status/", mqtt_status, name="mqtt-status"),
     path("api/dashboard/stats/", dashboard_stats, name="dashboard-stats"),

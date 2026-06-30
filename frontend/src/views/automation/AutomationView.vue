@@ -41,6 +41,9 @@
               <el-tag v-if="rule.script_id" size="small" type="info" class="rule-card__script-id">
                 {{ rule.script_id }}
               </el-tag>
+              <el-tag v-if="rule.project" size="small" type="warning" effect="plain">
+                {{ rule.project_code || rule.project_name }} / {{ rule.section_name }}
+              </el-tag>
               <el-tag
                 :type="getStatusTagType(rule)"
                 size="small"
@@ -250,8 +253,8 @@ async function handleLaunch(rule) {
     rule.poll_interval = res.poll_interval
     rule.error_message = ''
     ElMessage.success(`${rule.name} - ${ls.t('automation.launchSuccess')}`)
-  } catch {
-    ElMessage.error(ls.t('automation.launchFailed'))
+  } catch (err) {
+    ElMessage.error(err.response?.data?.detail || ls.t('automation.launchFailed'))
   } finally {
     launchLoading.value[rule.id] = false
   }
@@ -308,7 +311,7 @@ async function handleExecute(rule) {
   } catch (err) {
     execResult.value[rule.id] = {
       success: false,
-      error: err.response?.data?.error || 'execution error',
+      error: err.response?.data?.detail || err.response?.data?.error || 'execution error',
       output: err.response?.data?.output || '',
     }
   } finally {

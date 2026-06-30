@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.db.models.deletion import ProtectedError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -311,6 +312,57 @@ class _ProjectScopedViewSet(_AdminWritePermission, viewsets.ModelViewSet):
             raise ValidationError({"section": "房间不存在"})
 
 
+class _ControlSchemeProtectedDestroyMixin:
+    """把控制方案的 PROTECT 约束转换为前端可处理的 409 响应。"""
+
+    resource_type = "resource"
+    resource_label = "资源"
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        schemes = instance.control_schemes.select_related("section").order_by("id")
+        blockers = [
+            {
+                "id": scheme.id,
+                "name": scheme.name,
+                "control_type": scheme.control_type,
+                "is_enabled": scheme.is_enabled,
+                "status": scheme.status,
+                "section_id": scheme.section_id,
+                "section_name": scheme.section.name,
+            }
+            for scheme in schemes
+        ]
+        if blockers:
+            return Response(
+                {
+                    "code": "control_scheme_in_use",
+                    "detail": (
+                        f"该{self.resource_label}仍被控制方案引用，请先删除相关控制方案，"
+                        f"或修改方案的{self.resource_label}绑定。"
+                    ),
+                    "resource_type": self.resource_type,
+                    "member_id": instance.pk,
+                    "blockers": blockers,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            # 兜底并发写入或未来新增的 PROTECT 引用，避免再暴露 500 堆栈。
+            return Response(
+                {
+                    "code": "resource_in_use",
+                    "detail": f"该{self.resource_label}正在被其他配置引用，暂时不能删除。",
+                    "resource_type": self.resource_type,
+                    "member_id": instance.pk,
+                    "blockers": [],
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+
 class ProjectSectionViewSet(_ProjectScopedViewSet):
     queryset = ProjectSection.objects.all()
     serializer_class = ProjectSectionSerializer
@@ -326,10 +378,12 @@ class ProjectSectionViewSet(_ProjectScopedViewSet):
         return Response({"ok": True})
 
 
-class ProjectSensorMemberViewSet(_ProjectScopedViewSet):
+class ProjectSensorMemberViewSet(_ControlSchemeProtectedDestroyMixin, _ProjectScopedViewSet):
     queryset = ProjectSensorMember.objects.select_related("sensor", "sensor__sensor_type", "section").all()
     serializer_class = ProjectSensorMemberSerializer
     section_scoped = True
+    resource_type = "sensor"
+    resource_label = "传感器成员"
 
     def create(self, request, *args, **kwargs):
         """单条或批量导入到某房间(section)：
@@ -373,10 +427,12 @@ class ProjectSensorMemberViewSet(_ProjectScopedViewSet):
         return super().create(request, *args, **kwargs)
 
 
-class ProjectDeviceMemberViewSet(_ProjectScopedViewSet):
+class ProjectDeviceMemberViewSet(_ControlSchemeProtectedDestroyMixin, _ProjectScopedViewSet):
     queryset = ProjectDeviceMember.objects.select_related("device", "device__device_type", "section").all()
     serializer_class = ProjectDeviceMemberSerializer
     section_scoped = True
+    resource_type = "device"
+    resource_label = "设备成员"
 
     def create(self, request, *args, **kwargs):
         device_ids = request.data.get("device_ids")

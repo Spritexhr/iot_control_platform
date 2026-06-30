@@ -62,6 +62,13 @@
                 <span v-if="!isEditing" class="info-item__value">{{ device.description || ls.t('common.none') }}</span>
                 <el-input v-else v-model="editForm.description" size="small" placeholder="无" clearable />
               </div>
+              <div class="info-item">
+                <span class="info-item__label">{{ ls.t('resourceFolders.folder') }}</span>
+                <span v-if="!isEditing" class="info-item__value">{{ device.folder_info?.name || ls.t('resourceFolders.unfiled') }}</span>
+                <el-select v-else v-model="editForm.folder" size="small" clearable :placeholder="ls.t('resourceFolders.unfiled')">
+                  <el-option v-for="folder in folders" :key="folder.id" :label="folder.name" :value="folder.id" />
+                </el-select>
+              </div>
               <div class="info-item info-item--full">
                 <span class="info-item__label">名称</span>
                 <span v-if="!isEditing" class="info-item__value">{{ device.name }}</span>
@@ -176,6 +183,7 @@ import CommandPanel from '@/components/common/CommandPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { getDevice, getDeviceStatus, sendDeviceCommand, patchDevice } from '@/api/devices'
+import { getResourceFolders } from '@/api/resourceFolders'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const ls = useLocaleStore()
@@ -187,17 +195,19 @@ const router = useRouter()
 // ==================== 设备详情 ====================
 const device = ref(null)
 const pageLoading = ref(false)
+const folders = ref([])
 
 // ==================== 内联编辑 ====================
 const isEditing = ref(false)
 const saving = ref(false)
-const editForm = ref({ name: '', description: '', location: '' })
+const editForm = ref({ name: '', description: '', location: '', folder: null })
 
 function startEdit() {
   editForm.value = {
     name: device.value.name || '',
     description: device.value.description || '',
     location: device.value.location || '',
+    folder: device.value.folder ?? null,
   }
   isEditing.value = true
 }
@@ -213,10 +223,14 @@ async function saveEdit() {
       name: editForm.value.name,
       description: editForm.value.description,
       location: editForm.value.location,
+      folder: editForm.value.folder ?? null,
     })
     device.value.name = updated.name ?? editForm.value.name
     device.value.description = updated.description ?? editForm.value.description
     device.value.location = updated.location ?? editForm.value.location
+    device.value.folder = updated.folder ?? null
+    const folder = folders.value.find((item) => item.id === device.value.folder)
+    device.value.folder_info = folder ? { id: folder.id, name: folder.name, parent: folder.parent } : null
     isEditing.value = false
     ElMessage.success('已保存')
   } catch {
@@ -340,7 +354,8 @@ const ws = useWebSocket(
 
 // ==================== 初始化 ====================
 onMounted(async () => {
-  await fetchDeviceDetail()
+  const [, folderData] = await Promise.all([fetchDeviceDetail(), getResourceFolders('device').catch(() => [])])
+  folders.value = folderData.results || folderData
   if (device.value) {
     fetchStatusRecords()
     ws.start()

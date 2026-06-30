@@ -8,7 +8,8 @@
     </div>
 
     <!-- ==================== 设备类型管理 ==================== -->
-    <div class="iot-card iot-mb-lg">
+    <details class="iot-card iot-mb-lg type-details">
+      <summary class="type-summary">{{ ls.t('devices.typeManagement') }}<span>{{ ls.t('resourceFolders.expandConfig') }}</span></summary>
       <div class="iot-card__header">
         <span class="section-title">{{ ls.t('devices.typeManagement') }}</span>
         <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openDeviceTypeDialog(null)">
@@ -61,12 +62,24 @@
           </el-table-column>
         </el-table>
       </div>
-    </div>
+    </details>
+
+    <ResourceFolderBrowser
+      ref="folderBrowserRef"
+      resource-type="device"
+      :mode="browseMode"
+      :current-folder-id="currentFolderId"
+      :is-staff="isStaff"
+      :dragging-count="draggingIds.length"
+      @navigate="handleFolderNavigate"
+      @loaded="handleFoldersLoaded"
+      @drop-resources="handleFolderDrop"
+    />
 
     <!-- 筛选栏 -->
-    <div class="iot-card iot-mb-lg">
+    <div class="iot-card iot-mb-lg resource-tools-card">
       <div class="filter-bar">
-        <el-select v-model="filterType" :placeholder="ls.t('devices.filterType')" style="width: 200px" clearable @change="fetchDevices">
+        <el-select v-model="filterType" :placeholder="ls.t('devices.filterType')" style="width: 200px" clearable @change="handleFilterChange">
           <el-option :label="ls.t('common.allTypes')" value="" />
           <el-option
             v-for="t in deviceTypes"
@@ -75,7 +88,7 @@
             :value="t.id"
           />
         </el-select>
-        <el-select v-model="filterOnline" :placeholder="ls.t('devices.filterStatus')" style="width: 140px" clearable @change="fetchDevices">
+        <el-select v-model="filterOnline" :placeholder="ls.t('devices.filterStatus')" style="width: 140px" clearable @change="handleFilterChange">
           <el-option :label="ls.t('common.all')" value="" />
           <el-option :label="ls.t('common.online')" value="true" />
           <el-option :label="ls.t('common.offline')" value="false" />
@@ -85,43 +98,89 @@
           :placeholder="ls.t('devices.searchPlaceholder')"
           style="width: 260px"
           clearable
-          @clear="fetchDevices"
-          @keyup.enter="fetchDevices"
+          @clear="handleFilterChange"
+          @keyup.enter="handleFilterChange"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
         <el-button :icon="Refresh" circle @click="fetchDevices" />
+        <el-checkbox v-if="isStaff && devices.length" class="select-page-check" :model-value="allPageSelected" @change="toggleSelectPage">
+          {{ ls.t('resourceFolders.selectCurrentPage') }}
+        </el-checkbox>
+        <el-button v-if="isStaff && selectedIds.length" class="selected-move-button" @click="moveDialogVisible = true">
+          {{ ls.t('resourceFolders.moveSelected') }}（{{ selectedIds.length }}）
+        </el-button>
         <el-button v-if="isStaff && devices.length" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('devices.addDevice') }}</el-button>
       </div>
     </div>
 
+    <div class="resource-list-heading">
+      <div>
+        <h2>{{ currentViewTitle }}</h2>
+        <p>{{ ls.t('resourceFolders.listHint') }}</p>
+      </div>
+      <span v-if="selectedIds.length" class="selected-summary">
+        {{ ls.t('resourceFolders.selectedCount').replace('{count}', selectedIds.length) }}
+      </span>
+    </div>
+
     <!-- 卡片网格 / 空状态 -->
-    <div v-loading="loading">
+    <div v-loading="loading" class="resource-content">
       <draggable
         v-if="devices.length"
         v-model="devices"
         :item-key="'device_id'"
-        :disabled="!isStaff || hasActiveFilter"
+        :disabled="!isStaff"
+        :sort="canReorder"
         :animation="200"
         ghost-class="drag-ghost"
+        chosen-class="drag-chosen"
+        drag-class="drag-active"
         handle=".device-drag-handle, .iot-card"
         class="iot-grid iot-grid--cards"
+        @start="handleDragStart"
         @end="handleReorderEnd"
       >
         <template #item="{ element: d }">
-          <DeviceCard
-            :device="d"
-            @click="goDetail(d)"
-            @delete="handleDeleteDevice"
-          />
+          <div
+            class="resource-card-shell"
+            :class="{
+              'is-selected': selectedIds.includes(d.device_id),
+              'is-drag-bundle': draggingIds.includes(d.device_id),
+            }"
+            :data-resource-id="d.device_id"
+          >
+            <el-checkbox
+              v-if="isStaff"
+              class="resource-selector"
+              :model-value="selectedIds.includes(d.device_id)"
+              @click.stop
+              @change="(checked) => toggleSelection(d.device_id, checked)"
+            />
+            <span v-if="dragAnchorId === d.device_id && draggingIds.length > 1" class="drag-count-badge">
+              {{ draggingIds.length }}
+            </span>
+            <DeviceCard :device="d" @click="goDetail(d)" @delete="handleDeleteDevice" />
+          </div>
         </template>
       </draggable>
       <div v-if="!devices.length" class="iot-card empty-card">
         <el-empty :description="loading ? ls.t('common.loading') : ls.t('devices.noDevices')">
           <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openAddDialog">{{ ls.t('devices.addDevice') }}</el-button>
         </el-empty>
+      </div>
+      <div v-if="total > 0" class="pagination-row">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[24, 48, 96]"
+          :total="total"
+          layout="total, sizes, prev, pager, next"
+          @current-change="fetchDevices"
+          @size-change="handlePageSizeChange"
+        />
       </div>
     </div>
 
@@ -192,6 +251,11 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item :label="ls.t('resourceFolders.folder')">
+          <el-select v-model="addForm.folder" clearable :placeholder="ls.t('resourceFolders.unfiled')" style="width: 100%">
+            <el-option v-for="option in folderOptions" :key="option.id" :label="option.label" :value="option.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="位置">
           <el-input v-model="addForm.location" :placeholder="ls.t('devices.locationPlaceholder')" />
         </el-form-item>
@@ -204,6 +268,16 @@
         <el-button type="primary" :loading="addSaving" @click="handleAddDevice">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="moveDialogVisible" :title="ls.t('resourceFolders.moveSelected')" width="460px">
+      <el-select v-model="moveTargetFolder" clearable :placeholder="ls.t('resourceFolders.unfiled')" style="width: 100%">
+        <el-option v-for="option in folderOptions" :key="option.id" :label="option.label" :value="option.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="moveDialogVisible = false">{{ ls.t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="moveSaving" @click="handleBulkMove">{{ ls.t('resourceFolders.confirmMove') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -214,9 +288,10 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType, reorderDevices } from '@/api/devices'
+import { getDevices, createDevice, deleteDevice, getDeviceTypes, createDeviceType, updateDeviceType, deleteDeviceType, reorderDevices, bulkMoveDevices } from '@/api/devices'
 import draggable from 'vuedraggable'
 import DeviceCard from '@/components/devices/DeviceCard.vue'
+import ResourceFolderBrowser from '@/components/resources/ResourceFolderBrowser.vue'
 import { useWebSocket, buildWsUrl } from '@/composables/useWebSocket'
 
 const router = useRouter()
@@ -229,25 +304,135 @@ const filterType = ref('')
 const filterOnline = ref('')
 const searchText = ref('')
 
+// ==================== 文件夹与分页 ====================
+const browseMode = ref('folder')
+const currentFolderId = ref(null)
+const folders = ref([])
+const page = ref(1)
+const pageSize = ref(24)
+const total = ref(0)
+const selectedIds = ref([])
+const moveDialogVisible = ref(false)
+const moveTargetFolder = ref(null)
+const moveSaving = ref(false)
+const folderBrowserRef = ref(null)
+const draggingIds = ref([])
+const dragAnchorId = ref(null)
+const folderDropActive = ref(false)
+
+const folderMap = computed(() => new Map(folders.value.map((item) => [item.id, item])))
+function folderPath(folder) {
+  const names = [folder.name]
+  let parent = folder.parent ? folderMap.value.get(folder.parent) : null
+  while (parent) {
+    names.unshift(parent.name)
+    parent = parent.parent ? folderMap.value.get(parent.parent) : null
+  }
+  return names.join(' / ')
+}
+const folderOptions = computed(() => folders.value.map((item) => ({ ...item, label: folderPath(item) })))
+const currentViewTitle = computed(() => {
+  if (browseMode.value === 'all') return ls.t('resourceFolders.allResources')
+  if (browseMode.value === 'unfiled' || !currentFolderId.value) return ls.t('resourceFolders.unfiledResources')
+  return folderMap.value.get(currentFolderId.value)?.name || ls.t('resourceFolders.currentResources')
+})
+
 // ==================== 数据 ====================
 const devices = ref([])
 const deviceTypes = ref([])
 const loading = ref(false)
 const deviceTypesLoading = ref(false)
+const allPageSelected = computed(() => devices.value.length > 0 && devices.value.every((item) => selectedIds.value.includes(item.device_id)))
 
 async function fetchDevices() {
   loading.value = true
   try {
     const params = {}
+    params.page = page.value
+    params.page_size = pageSize.value
     if (filterType.value) params.device_type = filterType.value
     if (filterOnline.value) params.online = filterOnline.value
     if (searchText.value) params.search = searchText.value
+    if (browseMode.value === 'unfiled' || (browseMode.value === 'folder' && !currentFolderId.value)) {
+      params.folder = 'unfiled'
+    } else if (browseMode.value === 'folder' && currentFolderId.value) {
+      params.folder = currentFolderId.value
+    }
     const data = await getDevices(params)
     devices.value = data.results || data
+    total.value = data.count ?? devices.value.length
+    selectedIds.value = selectedIds.value.filter((id) => devices.value.some((item) => item.device_id === id))
   } catch {
     ElMessage.error(ls.t('devices.fetchListFailed'))
   } finally {
     loading.value = false
+  }
+}
+
+function handleFilterChange() {
+  page.value = 1
+  selectedIds.value = []
+  fetchDevices()
+}
+
+function handlePageSizeChange() {
+  page.value = 1
+  selectedIds.value = []
+  fetchDevices()
+}
+
+function handleFolderNavigate({ mode, folderId }) {
+  browseMode.value = mode
+  currentFolderId.value = folderId ?? null
+  page.value = 1
+  selectedIds.value = []
+  fetchDevices()
+}
+
+function handleFoldersLoaded(items) {
+  folders.value = items
+}
+
+function toggleSelection(deviceId, checked) {
+  if (checked && !selectedIds.value.includes(deviceId)) selectedIds.value.push(deviceId)
+  if (!checked) selectedIds.value = selectedIds.value.filter((id) => id !== deviceId)
+}
+
+function toggleSelectPage(checked) {
+  selectedIds.value = checked ? devices.value.map((item) => item.device_id) : []
+}
+
+async function handleBulkMove() {
+  await moveDevicesToFolder([...selectedIds.value], moveTargetFolder.value ?? null, true)
+}
+
+async function moveDevicesToFolder(ids, folderId, closeDialog = false) {
+  if (!ids.length) return
+  moveSaving.value = true
+  try {
+    await bulkMoveDevices(ids, folderId)
+    ElMessage.success(ls.t('resourceFolders.moved'))
+    if (closeDialog) moveDialogVisible.value = false
+    selectedIds.value = []
+    await fetchDevices()
+    await folderBrowserRef.value?.refresh()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || ls.t('resourceFolders.moveFailed'))
+  } finally {
+    moveSaving.value = false
+  }
+}
+
+async function handleFolderDrop({ folderId }) {
+  const ids = [...draggingIds.value]
+  if (!ids.length) return
+  folderDropActive.value = true
+  try {
+    await moveDevicesToFolder(ids, folderId)
+  } finally {
+    draggingIds.value = []
+    dragAnchorId.value = null
+    folderDropActive.value = false
   }
 }
 
@@ -360,12 +545,35 @@ async function handleDeleteDeviceType(id) {
 const hasActiveFilter = computed(() =>
   Boolean(filterType.value || filterOnline.value || searchText.value)
 )
+const canReorder = computed(() =>
+  isStaff.value && browseMode.value === 'folder' && !hasActiveFilter.value
+)
+
+function handleDragStart(evt) {
+  const device = devices.value[evt.oldIndex]
+  if (!device) return
+  dragAnchorId.value = device.device_id
+  draggingIds.value = selectedIds.value.includes(device.device_id)
+    ? [...selectedIds.value]
+    : [device.device_id]
+}
 
 async function handleReorderEnd(evt) {
-  if (evt && evt.oldIndex === evt.newIndex) return
+  if (folderDropActive.value) {
+    draggingIds.value = []
+    dragAnchorId.value = null
+    return
+  }
+  draggingIds.value = []
+  dragAnchorId.value = null
+  if (!canReorder.value || (evt && evt.oldIndex === evt.newIndex)) return
   const order = devices.value.map(d => d.device_id)
   try {
-    await reorderDevices(order)
+    await reorderDevices(order, {
+      page: page.value,
+      page_size: pageSize.value,
+      folder: currentFolderId.value ?? 'unfiled',
+    })
   } catch {
     ElMessage.error(ls.t('devices.reorderFailed') || '排序保存失败')
     fetchDevices()
@@ -392,6 +600,7 @@ async function handleDeleteDevice(device) {
     await deleteDevice(device.device_id)
     ElMessage.success(ls.t('devices.deviceDeleted'))
     fetchDevices()
+    folderBrowserRef.value?.refresh()
   } catch {
     ElMessage.error(ls.t('common.deleteFailed'))
   }
@@ -407,6 +616,7 @@ const addForm = ref({
   device_type: null,
   location: '',
   description: '',
+  folder: null,
 })
 
 const addRules = computed(() => ({
@@ -416,7 +626,8 @@ const addRules = computed(() => ({
 }))
 
 function openAddDialog() {
-  addForm.value = { device_id: '', name: '', device_type: null, location: '', description: '' }
+  const defaultFolder = browseMode.value === 'folder' ? currentFolderId.value : null
+  addForm.value = { device_id: '', name: '', device_type: null, location: '', description: '', folder: defaultFolder }
   addDialogVisible.value = true
 }
 
@@ -432,6 +643,7 @@ async function handleAddDevice() {
     ElMessage.success(ls.t('devices.deviceAdded'))
     addDialogVisible.value = false
     fetchDevices()
+    folderBrowserRef.value?.refresh()
   } catch (err) {
     const detail = err.response?.data
     const msg = typeof detail === 'object' ? Object.values(detail).flat().join('；') : ls.t('common.addFailed')
@@ -474,6 +686,27 @@ onMounted(() => {
   font-size: var(--iot-font-size-md);
 }
 
+.type-details { overflow: hidden; border-color: var(--iot-border-color-light); box-shadow: none; }
+.type-summary { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px; color: var(--iot-text-regular); font-weight: 600; cursor: pointer; list-style-position: inside; transition: background .18s; }
+.type-summary:hover { background: var(--iot-bg-card-hover); }
+.type-summary span { color: var(--iot-text-secondary); font-size: 12px; font-weight: 400; }
+.resource-tools-card { overflow: hidden; border-color: var(--iot-border-color-light); box-shadow: var(--iot-shadow-sm); }
+.resource-list-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 2px 2px 14px; }
+.resource-list-heading h2 { margin: 0; color: var(--iot-text-primary); font-size: 18px; }
+.resource-list-heading p { margin: 5px 0 0; color: var(--iot-text-secondary); font-size: 12px; }
+.selected-summary { flex: 0 0 auto; padding: 6px 11px; border: 1px solid rgba(217,119,87,.28); border-radius: 999px; color: var(--iot-color-primary-dark); background: var(--iot-color-primary-bg); font-size: 12px; font-weight: 600; }
+.selected-move-button { border-color: rgba(217,119,87,.36); color: var(--iot-color-primary-dark); background: var(--iot-color-primary-bg); }
+.select-page-check { padding: 0 4px; }
+.resource-content { min-height: 140px; }
+.resource-card-shell { position: relative; min-width: 0; border-radius: var(--iot-radius-lg); transition: transform .18s, filter .18s; }
+.resource-selector { position: absolute; z-index: 6; top: 14px; left: 14px; margin: 0; padding: 3px; border-radius: 6px; background: color-mix(in srgb, var(--iot-bg-card) 90%, transparent); box-shadow: 0 1px 5px rgba(54,41,32,.1); }
+.resource-card-shell :deep(.device-card__header) { padding-left: 30px; }
+.resource-card-shell.is-selected :deep(.device-card) { border-color: var(--iot-color-primary); background: linear-gradient(145deg, var(--iot-bg-card), var(--iot-color-primary-bg)); box-shadow: 0 0 0 2px var(--iot-color-primary-bg), var(--iot-shadow-md); }
+.resource-card-shell.is-selected::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(217,119,87,.42); border-radius: var(--iot-radius-lg); pointer-events: none; }
+.resource-card-shell.is-drag-bundle { filter: saturate(1.04); }
+.drag-count-badge { position: absolute; z-index: 9; top: -9px; right: -7px; display: grid; min-width: 26px; height: 26px; padding: 0 7px; place-items: center; border: 2px solid var(--iot-bg-card); border-radius: 999px; color: white; background: var(--iot-color-primary); box-shadow: 0 5px 14px rgba(151,75,48,.28); font-size: 12px; font-weight: 700; }
+.pagination-row { display: flex; justify-content: center; padding: 26px 0 8px; overflow-x: auto; }
+
 .field-tag {
   margin: 2px 4px 2px 0;
   background-color: var(--iot-color-primary-bg) !important;
@@ -511,9 +744,15 @@ html.dark .field-tag {
 }
 
 .drag-ghost {
-  opacity: 0.4;
-  background: var(--iot-color-fill-light, rgba(0, 0, 0, 0.04));
+  opacity: 0.34;
+  background: var(--iot-color-primary-bg);
   border: 2px dashed var(--iot-color-primary, #d97757);
   border-radius: var(--iot-border-radius-md, 8px);
+}
+.drag-chosen { transform: translateY(-2px); }
+.drag-active { transform: rotate(.7deg) scale(1.015); filter: drop-shadow(0 14px 20px rgba(79,53,38,.16)); }
+@media (max-width: 700px) {
+  .resource-list-heading { align-items: flex-start; flex-direction: column; }
+  .filter-bar :deep(.el-select), .filter-bar :deep(.el-input) { width: 100% !important; }
 }
 </style>

@@ -60,8 +60,13 @@ export function getSensorStatus(deviceId, params = {}) {
 }
 
 /** 批量更新传感器显示顺序，order 是 sensor_id 数组 */
-export function reorderSensors(order) {
-  return request.post('/sensors/reorder/', { order })
+export function reorderSensors(order, context = {}) {
+  return request.post('/sensors/reorder/', { order, ...context })
+}
+
+/** 批量移动传感器到文件夹；folder 为 null 时移到未分类。 */
+export function bulkMoveSensors(sensorIds, folder) {
+  return request.post('/sensors/bulk-move/', { sensor_ids: sensorIds, folder })
 }
 
 /** 向传感器发送命令 */

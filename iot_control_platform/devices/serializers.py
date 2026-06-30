@@ -40,6 +40,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
     device_type_info = DeviceTypeBriefSerializer(source='device_type', read_only=True)
     latest_data = serializers.SerializerMethodField()
     is_online = serializers.SerializerMethodField()
+    folder_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Device
@@ -49,8 +50,13 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'is_online', 'last_seen',
             'sort_order',
             'created_at', 'updated_at',
-            'device_type', 'device_type_info', 'latest_data',
+            'device_type', 'device_type_info', 'latest_data', 'folder', 'folder_info',
         ]
+
+    def get_folder_info(self, obj):
+        if not obj.folder_id:
+            return None
+        return {'id': obj.folder_id, 'name': obj.folder.name, 'parent': obj.folder.parent_id}
 
     def get_is_online(self, obj):
         """根据 last_seen 和心跳间隔实时计算在线状态"""
@@ -101,8 +107,13 @@ class DeviceCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Device
         fields = [
-            'device_id', 'name', 'description', 'location', 'device_type',
+            'device_id', 'name', 'description', 'location', 'device_type', 'folder',
         ]
+
+    def validate_folder(self, value):
+        if value is not None and value.resource_type != 'device':
+            raise serializers.ValidationError('请选择设备文件夹')
+        return value
 
 
 class DeviceStatusSerializer(serializers.ModelSerializer):

@@ -14,6 +14,9 @@ manifest 示例：
 
 支持命令：
   set_state {field, val}      —— 设置某个状态字段（bool 接受 true/false/1/0，float 自动夹到 min/max）
+  set_opening {value|val}     —— set_state 的工业阀门别名，写 opening
+  set_duty {value|val}        —— set_state 的热负荷别名，写 duty
+  set_setpoint {value|val}    —— set_state 的控制器设定值别名，写 setpoint
   current_status              —— 上报当前状态
   set_status_interval {interval}
 
@@ -40,6 +43,14 @@ class GenericDevice(MqttNode):
 
     DEFAULT_STATUS_REPORT_INTERVAL = 60
 
+    # 与主平台 DeviceType.commands 的常用工业命令对齐。只有 manifest 声明了
+    # 对应状态字段时才接受，避免一个阀门节点意外吞掉 set_duty 等无关命令。
+    COMMAND_FIELD_ALIASES = {
+        "set_opening": "opening",
+        "set_duty": "duty",
+        "set_setpoint": "setpoint",
+    }
+
     PARAMS_SCHEMA = [
         ParamSpec("status_report_interval", "int", label="心跳间隔(秒)",
                   default=DEFAULT_STATUS_REPORT_INTERVAL, min=5, max=86400),
@@ -50,6 +61,12 @@ class GenericDevice(MqttNode):
     SUPPORTED_COMMANDS = [
         {"command": "set_state", "label": "设置状态",
          "args": [{"name": "field", "type": "str"}, {"name": "val", "type": "str"}]},
+        {"command": "set_opening", "label": "设置阀门开度",
+         "args": [{"name": "value", "type": "float"}]},
+        {"command": "set_duty", "label": "设置热/冷负荷",
+         "args": [{"name": "value", "type": "float"}]},
+        {"command": "set_setpoint", "label": "设置控制器设定值",
+         "args": [{"name": "value", "type": "float"}]},
         {"command": "current_status", "label": "查询状态"},
         {"command": "set_status_interval", "label": "设置心跳间隔",
          "args": [{"name": "interval", "type": "int", "min": 30, "max": 600}]},
@@ -117,22 +134,34 @@ class GenericDevice(MqttNode):
             value = min(float(hi), value)
         return value
 
+    def _update_state(self, field_name: str, raw, event: str,
+                      check_code: Optional[str]) -> bool:
+        """校验并更新一个状态字段，成功时立即回传带 check_code 的状态。"""
+        if field_name not in self.states:
+            log.warning(
+                f"[{self.node_id}] ✗ 未配置状态字段 {field_name!r}，"
+                f"可用: {list(self.states.keys())}"
+            )
+            return False
+        value = self._coerce(field_name, raw)
+        if value is None:
+            log.warning(f"[{self.node_id}] ✗ {field_name} 值非法: {raw!r}")
+            return False
+        self.states[field_name] = value
+        log.info(f"[{self.node_id}] ✓ {field_name} → {value}")
+        self.publish_status(event, check_code)
+        return True
+
     def handle_command(self, command: str, payload: dict, check_code: Optional[str]) -> None:
         if command == "set_state":
             field_name = payload.get("field")
-            if field_name not in self.states:
-                log.warning(
-                    f"[{self.node_id}] ✗ 未知状态字段 {field_name!r}，"
-                    f"可用: {list(self.states.keys())}"
-                )
-                return
-            value = self._coerce(field_name, payload.get("val"))
-            if value is None:
-                log.warning(f"[{self.node_id}] ✗ set_state val 非法: {payload.get('val')!r}")
-                return
-            self.states[field_name] = value
-            log.info(f"[{self.node_id}] ✓ {field_name} → {value}")
-            self.publish_status("state_updated", check_code)
+            self._update_state(field_name, payload.get("val"), "state_updated", check_code)
+
+        elif command in self.COMMAND_FIELD_ALIASES:
+            field_name = self.COMMAND_FIELD_ALIASES[command]
+            # 主平台模板使用 value；Web UI/手工命令也兼容 val。
+            raw = payload.get("value", payload.get("val"))
+            self._update_state(field_name, raw, f"{field_name}_updated", check_code)
 
         elif command == "current_status":
             self.publish_status("check_current_status", check_code)

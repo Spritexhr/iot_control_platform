@@ -75,9 +75,11 @@ def execute_rule(rule) -> bool:
 
     from automation.head_files.sensors import build_sensors
     from automation.head_files.devices import build_devices
+    from automation.resources import effective_device_list
 
-    sensors = build_sensors(rule.device_list)
-    devices = build_devices(rule.device_list)
+    device_list = effective_device_list(rule)
+    sensors = build_sensors(device_list)
+    devices = build_devices(device_list)
 
     # 构造 engine 模块，支持 from engine import sensors, devices
     engine = types.ModuleType('engine')

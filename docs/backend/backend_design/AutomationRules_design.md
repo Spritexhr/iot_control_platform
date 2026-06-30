@@ -36,6 +36,7 @@ AutomationRule
 | `script` | 存储在数据库中的 Python 代码 |
 | `device_list` | 本规则可访问的传感器和设备白名单 |
 | `project` | 可选的 Project 场景关联 |
+| `section` | 可选的 ProjectSection；项目脚本必须与 project 同时设置 |
 | `is_launched` | 是否进入后台轮询 |
 | `poll_interval` | 轮询间隔，单位秒 |
 | `process_status` | `idle` / `running` / `stopped_by_user` / `error_stopped` |
@@ -52,6 +53,8 @@ AutomationRule
 ```
 
 只有清单内的资源会注册到脚本的 `sensors` / `devices` 代理中。未声明的 ID 调用 `get()` 时返回 `None`。
+
+全局规则的 `project`、`section` 均为空。项目规则必须同时绑定项目和房间，其资源清单只能引用该房间已经导入的成员。保存、手动执行、启动轮询以及引擎每一拍都会校验这一边界，避免资源移出房间后脚本仍可访问主模型。
 
 ## 三、执行引擎
 
@@ -160,7 +163,8 @@ device.send_command('set_angle', {'val': 90})
 | `POST /api/automation-rules/<id>/execute/` | 单次执行并返回输出 |
 | `POST /api/automation-rules/<id>/launch/` | 启动后台轮询 |
 | `POST /api/automation-rules/<id>/stop/` | 停止轮询 |
-| `GET /api/automation-rules/available-sources/` | 可选传感器、字段、设备和命令 |
+| `GET /api/automation-rules/available-sources/` | 全局可选传感器、字段、设备和命令 |
+| `GET /api/automation-rules/available-sources/?project=<id>&section=<id>` | 当前房间已导入资源 |
 
 ## 六、完整脚本示例
 
