@@ -15,6 +15,8 @@ export const useProjectStore = defineStore('project', () => {
   const currentProjectId = ref(null)
   const samples = ref(new Map())
   const devices = ref(new Map())
+  const automationRules = ref(new Map())
+  const controlSchemes = ref(new Map())
   const layout = ref({ sections: [] })
   const lastUpdateTs = ref(0)
   const wsStatus = ref('idle')
@@ -23,6 +25,8 @@ export const useProjectStore = defineStore('project', () => {
     currentProjectId.value = projectId
     samples.value = new Map()
     devices.value = new Map()
+    automationRules.value = new Map()
+    controlSchemes.value = new Map()
     layout.value = { sections: [] }
     lastUpdateTs.value = 0
   }
@@ -65,6 +69,37 @@ export const useProjectStore = defineStore('project', () => {
     })
     devices.value = m
     lastUpdateTs.value = Date.now()
+  }
+
+  function _upsertMapItem(targetRef, item) {
+    if (!item?.id) return
+    const key = String(item.id)
+    const next = new Map(targetRef.value)
+    next.set(key, { ...(next.get(key) || {}), ...item })
+    targetRef.value = next
+  }
+
+  /** 将图元候选的脚本规则 / 控制方案合并进实时 store。 */
+  function upsertAutomationControls(rules = [], schemes = []) {
+    for (const rule of rules) _upsertMapItem(automationRules, rule)
+    for (const scheme of schemes) _upsertMapItem(controlSchemes, scheme)
+  }
+
+  function applyAutomationRule(payload) {
+    if (payload?.project && Number(payload.project) !== Number(currentProjectId.value)) return
+    _upsertMapItem(automationRules, payload)
+  }
+
+  function applyControlScheme(payload) {
+    if (payload?.project && Number(payload.project) !== Number(currentProjectId.value)) return
+    _upsertMapItem(controlSchemes, payload)
+  }
+
+  function findAutomationControl(kind, id) {
+    if (!id) return null
+    if (kind === 'automation_rule') return automationRules.value.get(String(id)) || null
+    if (kind === 'control_scheme') return controlSchemes.value.get(String(id)) || null
+    return null
   }
 
   function applyLayout(payload) {
@@ -129,6 +164,8 @@ export const useProjectStore = defineStore('project', () => {
     currentProjectId,
     samples,
     devices,
+    automationRules,
+    controlSchemes,
     layout,
     lastUpdateTs,
     wsStatus,
@@ -137,11 +174,15 @@ export const useProjectStore = defineStore('project', () => {
     applySnapshot,
     applySample,
     applyDeviceStatus,
+    upsertAutomationControls,
+    applyAutomationRule,
+    applyControlScheme,
     applyLayout,
     loadLayout,
     loadSnapshot,
     findByBinding,
     findDevice,
+    findAutomationControl,
     getSection,
     sectionMembers,
   }

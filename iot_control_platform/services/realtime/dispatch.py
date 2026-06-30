@@ -11,7 +11,7 @@ Group 命名规则（按"资源 × 资源ID"）：
 - sensors.all              全部传感器（列表/Dashboard 用）
 - devices.{device_id}      单设备订阅
 - devices.all              全部设备
-- automation.rules         自动化规则状态变更
+- automation.rules         自动化脚本 / 结构化控制状态变更
 - system.mqtt              MQTT broker 连接状态
 - plugins.{plugin_code}    插件自定义流（如 EB 大屏）
 
@@ -20,6 +20,7 @@ Consumer 内必须有匹配的 broadcast_* handler：
 - type=broadcast.sensor.status                  broadcast_sensor_status
 - type=broadcast.device.status                  broadcast_device_status
 - type=broadcast.automation.rule                broadcast_automation_rule
+- type=broadcast.automation.control             broadcast_automation_control
 - type=broadcast.system.mqtt                    broadcast_system_mqtt
 - type=broadcast.plugin.sample                  broadcast_plugin_sample
 """
@@ -100,6 +101,10 @@ def publish_device_status(device_id: str, payload: dict) -> None:
 
 def publish_automation_rule(payload: dict) -> None:
     _safe_send(g_automation(), {"type": "broadcast.automation.rule", "payload": payload})
+
+
+def publish_control_scheme(payload: dict) -> None:
+    _safe_send(g_automation(), {"type": "broadcast.automation.control", "payload": payload})
 
 
 def publish_mqtt_system(payload: dict) -> None:

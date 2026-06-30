@@ -172,7 +172,7 @@ class MqttSystemConsumer(_BaseAuthedConsumer):
 
 # ==================== 自动化规则 ====================
 class AutomationConsumer(_BaseAuthedConsumer):
-    """自动化规则全量订阅。
+    """自动化脚本与结构化控制方案全量订阅。
 
     URL: /ws/automation/
     任何规则的 is_launched / process_status / error_message / last_run_time 变化
@@ -183,3 +183,6 @@ class AutomationConsumer(_BaseAuthedConsumer):
 
     async def broadcast_automation_rule(self, event):
         await self.send_json({"event": "automation.rule", "data": event["payload"]})
+
+    async def broadcast_automation_control(self, event):
+        await self.send_json({"event": "automation.control", "data": event["payload"]})

@@ -34,13 +34,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import DiagramEditor from '../diagram/editor/DiagramEditor.vue'
 import DiagramRuntime from '../diagram/runtime/DiagramRuntime.vue'
 import { useProjectStore } from '@/stores/project'
 import { updateView } from '@/api/projects'
+import { getAutomationRules } from '@/api/automation'
+import { listControlSchemes } from '@/api/controlSchemes'
 
 const props = defineProps({
   // ProjectView 对象：{ id, name, view_type:'diagram', config(canvas) }
@@ -78,6 +80,8 @@ const canvas = ref(
 const mode = ref('view')
 const dirty = ref(false)
 const saving = ref(false)
+const automationRules = ref([])
+const controlSchemes = ref([])
 
 // DiagramEditor / DiagramRuntime 期望 { id, canvas } 形态的 diagram 对象
 const diagramObj = computed(() => ({ id: props.view.id, canvas: canvas.value }))
@@ -94,11 +98,49 @@ const targets = computed(() => {
       sensors.push({ id: s.point_id, name: s.sensor_name || s.tag, tag: s.tag, data_key: s.data_key, unit: s.unit })
     }
     for (const d of sec.devices || []) {
-      devices.push({ id: d.device_id, name: d.device_name || d.tag, tag: d.tag })
+      devices.push({
+        id: d.device_id,
+        name: d.device_name || d.tag,
+        tag: d.tag,
+        data_fields: d.data_fields || [],
+      })
     }
   }
-  return { sensors, devices }
+  return {
+    sensors,
+    devices,
+    automationRules: automationRules.value,
+    controlSchemes: controlSchemes.value,
+  }
 })
+
+function asArray(payload) {
+  return payload?.results || payload || []
+}
+
+async function loadControlTargets() {
+  if (!props.view.project || !props.view.section) return
+  try {
+    const [rulesPayload, schemesPayload] = await Promise.all([
+      getAutomationRules({ project: props.view.project, section: props.view.section }),
+      listControlSchemes(props.view.project, props.view.section),
+    ])
+    automationRules.value = asArray(rulesPayload)
+    // 此图元对应用户指定的标准 PI / PID；双位控制仍在原控制页管理。
+    controlSchemes.value = asArray(schemesPayload).filter(
+      (scheme) => scheme.control_type === 'pi' || scheme.control_type === 'pid',
+    )
+    store.upsertAutomationControls(automationRules.value, controlSchemes.value)
+  } catch (error) {
+    console.error('[diagram] 加载自动化图元候选项失败', error)
+  }
+}
+
+watch(
+  () => [props.view.project, props.view.section],
+  loadControlTargets,
+  { immediate: true },
+)
 
 function toggleMode() {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'

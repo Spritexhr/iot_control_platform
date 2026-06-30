@@ -128,18 +128,19 @@ class ProjectDeviceMemberSerializer(_SectionScopedSerializerMixin, serializers.M
     device_name = serializers.CharField(source="device.name", read_only=True)
     device_type = serializers.SerializerMethodField()
     commands = serializers.SerializerMethodField()
+    data_fields = serializers.SerializerMethodField()
     section_name = serializers.CharField(source="section.name", read_only=True, default="")
 
     class Meta:
         model = ProjectDeviceMember
         fields = [
-            "id", "project", "device", "device_id", "device_name", "device_type", "commands",
+            "id", "project", "device", "device_id", "device_name", "device_type", "commands", "data_fields",
             "section", "section_name",
             "tag", "area", "sort_order", "is_visible",
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "project", "device_id", "device_name", "device_type", "commands",
+            "id", "project", "device_id", "device_name", "device_type", "commands", "data_fields",
             "section_name", "created_at", "updated_at",
         ]
 
@@ -148,6 +149,13 @@ class ProjectDeviceMemberSerializer(_SectionScopedSerializerMixin, serializers.M
 
     def get_commands(self, obj):
         return public_command_schema(obj.device)
+
+    def get_data_fields(self, obj):
+        """设备图元可选的只读状态变量，来源于 DeviceType.config_parameters。"""
+        if not obj.device.device_type_id:
+            return []
+        fields = obj.device.device_type.config_parameters
+        return fields if isinstance(fields, list) else []
 
 
 class ProjectViewSerializer(_SectionScopedSerializerMixin, serializers.ModelSerializer):

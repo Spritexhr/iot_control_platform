@@ -40,7 +40,8 @@
         </div>
         <div class="monitor-divider"></div>
         <div class="monitor-actions">
-          <el-button 
+          <el-button
+            v-if="isStaff"
             type="primary" 
             plain 
             :icon="Setting" 
@@ -256,6 +257,15 @@ const { displayStatus } = useWebSocket(
   },
 )
 watch(displayStatus, (v) => { store.wsStatus = v }, { immediate: true })
+
+// P&ID 自动化图元复用全局自动化流；store 会按当前项目丢弃无关事件。
+useWebSocket(
+  () => buildWsUrl('/ws/automation/'),
+  {
+    'automation.rule': (data) => store.applyAutomationRule(data),
+    'automation.control': (data) => store.applyControlScheme(data),
+  },
+)
 </script>
 
 <style scoped lang="scss">

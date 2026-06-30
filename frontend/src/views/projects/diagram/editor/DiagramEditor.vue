@@ -7,6 +7,7 @@
         v-model:nodes="nodes"
         v-model:edges="edges"
         :node-types="nodeTypes"
+        :edge-types="edgeTypes"
         :default-viewport="defaultViewport"
         :snap-to-grid="true"
         :snap-grid="[10, 10]"
@@ -50,6 +51,7 @@ import '@vue-flow/controls/dist/style.css'
 import ToolboxPanel from './ToolboxPanel.vue'
 import PropertiesPanel from './PropertiesPanel.vue'
 import { buildNodeTypes } from './nodeTypes'
+import { buildEdgeTypes, getPidEdgeStyle, normalizeEdgeData } from '../edgeTypes'
 
 const props = defineProps({
   diagram: { type: Object, required: true },
@@ -59,8 +61,9 @@ const emit = defineEmits(['change'])
 
 // 节点类型映射（type -> 组件），由图元注册表自动生成
 const nodeTypes = buildNodeTypes()
+const edgeTypes = buildEdgeTypes()
 
-const { project, screenToFlowCoordinate, updateNode, updateNodeInternals } = useVueFlow()
+const { project, screenToFlowCoordinate, updateNode, updateNodeInternals, setEdges } = useVueFlow()
 
 // ============ canvas <-> Vue Flow 互转 ============
 // canvas.nodes 形如：{ id, type, position, size, binding, data }
@@ -72,18 +75,21 @@ function canvasToFlow(canvas) {
     position: { x: n.position?.x || 0, y: n.position?.y || 0 },
     data: { ...(n.data || {}), binding: n.binding || { kind: 'none', id: '' }, size: n.size },
   }))
-  const edges = (canvas?.edges || []).map((e) => ({
-    id: e.id,
-    source: e.source,
-    sourceHandle: e.sourcePort || e.sourceHandle || 'right',
-    target: e.target,
-    targetHandle: e.targetPort || e.targetHandle || 'left',
-    type: 'smoothstep',
-    data: { label: e.data?.label || '', kind: e.data?.kind || 'process', medium: e.data?.medium || '' },
-    label: e.data?.label || '',
-    style: edgeStyle(e.data?.kind),
-    markerEnd: 'arrowclosed',
-  }))
+  const edges = (canvas?.edges || []).map((e) => {
+    const data = normalizeEdgeData(e.data)
+    return {
+      id: e.id,
+      source: e.source,
+      sourceHandle: e.sourcePort || e.sourceHandle || 'right',
+      target: e.target,
+      targetHandle: e.targetPort || e.targetHandle || 'left',
+      type: 'pid',
+      data,
+      label: data.label,
+      style: getPidEdgeStyle(data.kind),
+      markerEnd: 'arrowclosed',
+    }
+  })
   return { nodes, edges }
 }
 
@@ -104,7 +110,7 @@ function flowToCanvas() {
       source: e.source, sourcePort: e.sourceHandle || 'right',
       target: e.target, targetPort: e.targetHandle || 'left',
       type: 'process_line',
-      data: e.data || {},
+      data: normalizeEdgeData(e.data),
     })),
   }
 }
@@ -113,15 +119,6 @@ function stripBindingAndSize(data) {
   if (!data) return {}
   const { binding, size, ...rest } = data
   return rest
-}
-
-function edgeStyle(kind) {
-  switch (kind) {
-    case 'utility': return { stroke: '#2a2a2a', strokeWidth: 1.2, strokeDasharray: '6 4' }
-    case 'signal':  return { stroke: '#888',    strokeWidth: 1,   strokeDasharray: '2 3' }
-    case 'process':
-    default:        return { stroke: '#2a2a2a', strokeWidth: 2 }
-  }
 }
 
 // ============ state ============
@@ -156,15 +153,17 @@ function onViewportChange(v) {
 
 function onConnect(connection) {
   const id = `e_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+  const data = normalizeEdgeData()
   edges.value.push({
     id,
     source: connection.source,
     sourceHandle: connection.sourceHandle || 'right',
     target: connection.target,
     targetHandle: connection.targetHandle || 'left',
-    type: 'smoothstep',
-    data: { label: '', kind: 'process', medium: '' },
-    style: edgeStyle('process'),
+    type: 'pid',
+    data,
+    label: data.label,
+    style: getPidEdgeStyle(data.kind),
     markerEnd: 'arrowclosed',
   })
   emitCanvas()
@@ -199,16 +198,17 @@ function applyNodePatch({ id, patch }) {
 function applyEdgePatch({ id, patch }) {
   const idx = edges.value.findIndex((e) => e.id === id)
   if (idx < 0) return
-  const old = edges.value[idx]
-  const data = { ...old.data, ...patch.data }
-  edges.value.splice(idx, 1, {
-    ...old,
+  const data = normalizeEdgeData({ ...edges.value[idx].data, ...patch.data })
+  const nextEdges = edges.value.map((edge) => edge.id === id ? {
+    ...edge,
     data,
-    label: data.label || '',
-    style: edgeStyle(data.kind),
-  })
+    label: data.label,
+    style: getPidEdgeStyle(data.kind),
+  } : edge)
+  // setEdges 同步更新 Vue Flow 内部状态，避免 data 与顶层 label/style 出现双份状态漂移。
+  setEdges(nextEdges)
   if (selection.value?.kind === 'edge' && selection.value.payload.id === id) {
-    selection.value = { kind: 'edge', payload: edges.value[idx] }
+    selection.value = { kind: 'edge', payload: nextEdges[idx] }
   }
   emitCanvas()
 }

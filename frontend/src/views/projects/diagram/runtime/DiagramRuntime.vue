@@ -4,6 +4,7 @@
       v-model:nodes="nodes"
       v-model:edges="edges"
       :node-types="nodeTypes"
+      :edge-types="edgeTypes"
       :default-viewport="defaultViewport"
       :nodes-draggable="false"
       :nodes-connectable="false"
@@ -29,6 +30,7 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 
 import { buildNodeTypes } from '../editor/nodeTypes'
+import { buildEdgeTypes, getPidEdgeStyle, normalizeEdgeData } from '../edgeTypes'
 
 const props = defineProps({
   diagram: { type: Object, required: true },
@@ -36,14 +38,7 @@ const props = defineProps({
 
 // 节点类型映射（type -> 组件），与编辑态共用同一图元注册表
 const nodeTypes = buildNodeTypes()
-
-function edgeStyle(kind) {
-  switch (kind) {
-    case 'utility': return { stroke: '#2a2a2a', strokeWidth: 1.2, strokeDasharray: '6 4' }
-    case 'signal':  return { stroke: '#888',    strokeWidth: 1,   strokeDasharray: '2 3' }
-    default:        return { stroke: '#2a2a2a', strokeWidth: 2 }
-  }
-}
+const edgeTypes = buildEdgeTypes()
 
 function canvasToFlow(canvas) {
   const nodes = (canvas?.nodes || []).map((n) => ({
@@ -52,15 +47,19 @@ function canvasToFlow(canvas) {
     position: { x: n.position?.x || 0, y: n.position?.y || 0 },
     data: { ...(n.data || {}), binding: n.binding || { kind: 'none', id: '' }, size: n.size },
   }))
-  const edges = (canvas?.edges || []).map((e) => ({
-    id: e.id,
-    source: e.source, sourceHandle: e.sourcePort || 'right',
-    target: e.target, targetHandle: e.targetPort || 'left',
-    type: 'smoothstep',
-    label: e.data?.label || '',
-    style: edgeStyle(e.data?.kind),
-    markerEnd: 'arrowclosed',
-  }))
+  const edges = (canvas?.edges || []).map((e) => {
+    const data = normalizeEdgeData(e.data)
+    return {
+      id: e.id,
+      source: e.source, sourceHandle: e.sourcePort || 'right',
+      target: e.target, targetHandle: e.targetPort || 'left',
+      type: 'pid',
+      data,
+      label: data.label,
+      style: getPidEdgeStyle(data.kind),
+      markerEnd: 'arrowclosed',
+    }
+  })
   return { nodes, edges }
 }
 

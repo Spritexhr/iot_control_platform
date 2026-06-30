@@ -13,7 +13,8 @@
  *   stroke -> 描边（默认 #2a2a2a）
  *   text/anchor/size -> 仅 el:'text' 用（文本内容 / text-anchor / font-size）
  *
- * 仪表(instrument)、容器(vessel) 有各自的专用节点组件（实时取值 / 可缩放），
+ * 仪表(instrument)、设备变量(device_indicator)、自动化控制(control_indicator)
+ * 有各自的专用节点组件（实时取值 / 运行状态），
  * 不走 SIMPLE_SYMBOLS，只在 PALETTE 里给一个工具箱预览。
  */
 
@@ -177,6 +178,40 @@ const SPECIAL = {
       ],
     },
   },
+
+  device_indicator: {
+    label: '设备变量', group: '动设备',
+    defaultData: { label: '设备变量', dataKey: '', unit: '' },
+    bindable: ['device'],
+    rotatable: false,
+    glyph: {
+      viewBox: '0 0 48 40',
+      draw: [
+        { el: 'rect', x: 2, y: 5, width: 44, height: 30, rx: 2 },
+        { el: 'line', x1: 2, y1: 16, x2: 46, y2: 16, sw: 0.6 },
+        { el: 'text', x: 24, y: 13, text: '阀门开度', anchor: 'middle', size: 6 },
+        { el: 'text', x: 20, y: 30, text: '68.0', anchor: 'middle', size: 10 },
+        { el: 'text', x: 39, y: 30, text: '%', anchor: 'middle', size: 6 },
+      ],
+    },
+  },
+
+  control_indicator: {
+    label: '自动化控制', group: '自动化',
+    defaultData: { label: '自动化控制' },
+    bindable: ['automation'],
+    rotatable: false,
+    glyph: {
+      viewBox: '0 0 48 40',
+      draw: [
+        { el: 'rect', x: 2, y: 5, width: 44, height: 30, rx: 2 },
+        { el: 'line', x1: 2, y1: 17, x2: 46, y2: 17, sw: 0.6 },
+        { el: 'text', x: 24, y: 14, text: 'PID-01', anchor: 'middle', size: 6 },
+        { el: 'circle', cx: 11, cy: 26, r: 2.2, fill: '#4d9b68' },
+        { el: 'text', x: 28, y: 29, text: '运行中', anchor: 'middle', size: 7 },
+      ],
+    },
+  },
 }
 
 // 按 type 查图元的注册表条目（label/group/defaultData/bindable/rotatable 等）
@@ -186,7 +221,8 @@ export function getNodeMeta(type) {
 
 // 工具箱显示顺序
 const ORDER = [
-  'instrument', 'vessel', 'storage_tank', 'column',
+  'instrument', 'device_indicator', 'control_indicator',
+  'vessel', 'storage_tank', 'column',
   'pump', 'compressor', 'mixer',
   'heat_exchanger', 'filter',
   'valve', 'label',

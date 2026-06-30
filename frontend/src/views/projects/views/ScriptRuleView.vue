@@ -8,7 +8,7 @@
           {{ availableSources.sensors.length }} 个传感器 · {{ availableSources.devices.length }} 个设备
         </span>
       </div>
-      <el-button v-if="isSuperuser" type="primary" :icon="Plus" @click="openCreate">新建脚本</el-button>
+      <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openCreate">新建脚本</el-button>
     </div>
 
     <el-table v-if="rules.length" v-loading="loading" :data="rules" stripe class="psr__table psr__table--desktop">
@@ -52,10 +52,10 @@
         <template #default="{ row }">
           <el-button v-if="isStaff" link type="success" :icon="VideoPlay"
                      :loading="executeLoading[row.id]" @click="execute(row)">测试</el-button>
-          <el-button link type="primary" :icon="isSuperuser ? Edit : View" @click="openEdit(row)">
-            {{ isSuperuser ? '编辑' : '查看' }}
+          <el-button link type="primary" :icon="isStaff ? Edit : View" @click="openEdit(row)">
+            {{ isStaff ? '编辑' : '查看' }}
           </el-button>
-          <el-button v-if="isSuperuser" link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+          <el-button v-if="isStaff" link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -91,10 +91,10 @@
           <div class="psr-mobile-rule__actions">
             <el-button v-if="isStaff" link type="success" :icon="VideoPlay"
                        :loading="executeLoading[row.id]" @click="execute(row)">测试</el-button>
-            <el-button link type="primary" :icon="isSuperuser ? Edit : View" @click="openEdit(row)">
-              {{ isSuperuser ? '编辑' : '查看' }}
+            <el-button link type="primary" :icon="isStaff ? Edit : View" @click="openEdit(row)">
+              {{ isStaff ? '编辑' : '查看' }}
             </el-button>
-            <el-button v-if="isSuperuser" link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+            <el-button v-if="isStaff" link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
           </div>
         </div>
       </article>
@@ -107,40 +107,40 @@
       <div v-loading="detailLoading" class="psr-editor">
         <el-form :model="form" label-position="top" class="psr-editor__meta">
           <el-form-item label="规则名称" required>
-            <el-input v-model="form.name" :disabled="!isSuperuser" placeholder="如：高温联锁控制" />
+            <el-input v-model="form.name" :disabled="!isStaff" placeholder="如：高温联锁控制" />
           </el-form-item>
           <el-form-item label="脚本 ID" required>
-            <el-input v-model="form.script_id" :disabled="!isSuperuser" placeholder="如：room_temp_interlock" />
+            <el-input v-model="form.script_id" :disabled="!isStaff" placeholder="如：room_temp_interlock" />
           </el-form-item>
           <el-form-item label="轮询周期">
-            <el-input-number v-model="form.poll_interval" :disabled="!isSuperuser" :min="1" :max="86400"
+            <el-input-number v-model="form.poll_interval" :disabled="!isStaff" :min="1" :max="86400"
                              controls-position="right" />
             <span class="psr__unit">秒</span>
           </el-form-item>
           <el-form-item label="描述">
-            <el-input v-model="form.description" :disabled="!isSuperuser" type="textarea" :rows="2" />
+            <el-input v-model="form.description" :disabled="!isStaff" type="textarea" :rows="2" />
           </el-form-item>
         </el-form>
 
         <section class="psr-editor__section">
           <div class="psr-editor__section-head">
             <h3>可用资源</h3>
-            <el-button v-if="isSuperuser" size="small" :icon="Plus" @click="addResource">添加资源</el-button>
+            <el-button v-if="isStaff" size="small" :icon="Plus" @click="addResource">添加资源</el-button>
           </div>
           <div v-if="form.device_list.length" class="psr-resource-list">
             <div v-for="(item, index) in form.device_list" :key="index" class="psr-resource-row">
-              <el-select v-model="item.device_type" :disabled="!isSuperuser" class="psr-resource-row__type"
+              <el-select v-model="item.device_type" :disabled="!isStaff" class="psr-resource-row__type"
                          @change="item.device_id = ''; item.name = ''">
                 <el-option label="传感器" value="Sensor" />
                 <el-option label="设备" value="Device" />
               </el-select>
-              <el-select v-model="item.device_id" :disabled="!isSuperuser" filterable class="psr-resource-row__source"
+              <el-select v-model="item.device_id" :disabled="!isStaff" filterable class="psr-resource-row__source"
                          placeholder="选择当前房间已导入的资源" @change="syncResourceName(item)">
                 <el-option v-for="source in sourceOptions(item.device_type)" :key="source.id"
                            :label="`${source.name} (${source.id})`" :value="source.id" />
               </el-select>
               <span class="psr-resource-row__hint">{{ sourceHint(item) }}</span>
-              <el-button v-if="isSuperuser" :icon="Delete" circle text type="danger"
+              <el-button v-if="isStaff" :icon="Delete" circle text type="danger"
                          title="移除资源" @click="form.device_list.splice(index, 1)" />
             </div>
           </div>
@@ -152,10 +152,10 @@
             <h3>Python 脚本</h3>
             <div class="psr-editor__code-actions">
               <span class="psr__muted">{{ scriptLineCount }} 行</span>
-              <el-button v-if="isSuperuser && !form.script" size="small" @click="insertTemplate">插入模板</el-button>
+              <el-button v-if="isStaff && !form.script" size="small" @click="insertTemplate">插入模板</el-button>
             </div>
           </div>
-          <Codemirror v-model="form.script" :disabled="!isSuperuser" :extensions="cmExtensions"
+          <Codemirror v-model="form.script" :disabled="!isStaff" :extensions="cmExtensions"
                       :style="{ minHeight: '360px', fontSize: '13px' }" class="psr-codemirror" />
         </section>
 
@@ -175,7 +175,7 @@
         <el-button @click="dialogVisible = false">关闭</el-button>
         <el-button v-if="form.id && isStaff" type="success" plain :icon="VideoPlay"
                    :loading="dialogExecuting" @click="execute(form, true)">执行测试</el-button>
-        <el-button v-if="isSuperuser" type="primary" :icon="Check" :loading="saving" @click="save">保存</el-button>
+        <el-button v-if="isStaff" type="primary" :icon="Check" :loading="saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -201,7 +201,6 @@ const props = defineProps({
 })
 
 const userStore = useUserStore()
-const isSuperuser = computed(() => userStore.userInfo?.is_superuser === true)
 const isStaff = computed(() => userStore.userInfo?.is_staff === true)
 const cmExtensions = [python(), oneDark]
 const asArray = (value) => value?.results || value || []
@@ -225,7 +224,7 @@ function emptyForm() {
 }
 const form = ref(emptyForm())
 
-const dialogTitle = computed(() => form.value.id ? `${isSuperuser.value ? '编辑' : '查看'}脚本规则` : '新建脚本规则')
+const dialogTitle = computed(() => form.value.id ? `${isStaff.value ? '编辑' : '查看'}脚本规则` : '新建脚本规则')
 const scriptLineCount = computed(() => form.value.script ? form.value.script.split('\n').length : 0)
 const emptyText = computed(() => {
   if (!availableSources.value.sensors.length && !availableSources.value.devices.length) {

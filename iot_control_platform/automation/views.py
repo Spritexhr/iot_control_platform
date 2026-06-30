@@ -40,13 +40,25 @@ class _LogCaptureHandler(logging.Handler):
 class AutomationRuleViewSet(viewsets.ModelViewSet):
     """
     自动化规则 CRUD API
-    创建、修改、删除仅限超级用户；执行、启动、停止仅限工作人员；非工作人员仅可查看
+    项目/房间脚本由工作人员管理；全局脚本仍仅超级用户可改。
+    执行、启动、停止仅限工作人员；普通登录用户仅可查看。
     """
     queryset = AutomationRule.objects.select_related('project', 'section').all()
 
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy'):
-            return [IsAuthenticated(), IsSuperuser()]
+            # 项目脚本属于项目/场景配置：is_staff 可管理。
+            # 全局脚本不受项目资源隔离，保留 is_superuser 级别。
+            if self.action == 'create':
+                is_project_rule = bool(
+                    self.request.data.get('project') and self.request.data.get('section')
+                )
+            else:
+                is_project_rule = AutomationRule.objects.filter(
+                    pk=self.kwargs.get('pk'), project__isnull=False, section__isnull=False,
+                ).exists()
+            permission = IsAdminUser() if is_project_rule else IsSuperuser()
+            return [IsAuthenticated(), permission]
         if self.action in ('execute', 'launch', 'stop'):
             return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated()]
@@ -251,7 +263,7 @@ class AutomationRuleViewSet(viewsets.ModelViewSet):
 class ControlSchemeViewSet(viewsets.ModelViewSet):
     """
     控制方案（双位 / PI / PID）CRUD + 启停 + 单拍测试 + 模板。
-    增删改仅限超级用户；启停/试运行仅限工作人员；非工作人员仅可查看。
+    增删改、启停和试运行仅限工作人员；普通登录用户仅可查看。
     """
     queryset = ControlScheme.objects.select_related(
         'sensor_member__sensor', 'device_member__device', 'project', 'section'
@@ -259,7 +271,7 @@ class ControlSchemeViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy'):
-            return [IsAuthenticated(), IsSuperuser()]
+            return [IsAuthenticated(), IsAdminUser()]
         if self.action in ('enable', 'disable', 'step'):
             return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated()]

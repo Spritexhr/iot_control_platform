@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
+import { useUserStore } from '@/stores/user'
 
 const routes = [
   // ==================== 认证页面（无需登录） ====================
@@ -80,7 +81,7 @@ const routes = [
         path: 'projects/:id/config',
         name: 'ProjectConfig',
         component: () => import('@/views/projects/ProjectConfigView.vue'),
-        meta: { title: '项目配置' },
+        meta: { title: '项目配置', requiresStaff: true },
       },
       {
         path: 'plugins',
@@ -117,13 +118,32 @@ const router = createRouter({
 })
 
 // ==================== 路由守卫 ====================
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('iot-access-token')
 
   // 需要登录但未登录 → 跳转登录页
   if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
     return
+  }
+
+  // 项目配置等管理页：普通访客回到可读的项目工作台。
+  if (to.matched.some((r) => r.meta.requiresStaff)) {
+    const userStore = useUserStore()
+    if (!userStore.userInfo) {
+      try {
+        await userStore.fetchUserInfo()
+      } catch {
+        next({ name: 'Projects' })
+        return
+      }
+    }
+    if (userStore.userInfo?.is_staff !== true) {
+      next(to.params.id
+        ? { name: 'ProjectWorkspace', params: { id: to.params.id } }
+        : { name: 'Projects' })
+      return
+    }
   }
 
   // 已登录却访问登录/注册页 → 跳转首页

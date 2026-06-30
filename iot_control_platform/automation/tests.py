@@ -8,7 +8,7 @@ from devices.models import Device, DeviceType
 from projects.models import Project, ProjectDeviceMember, ProjectSection, ProjectSensorMember
 from sensors.models import Sensor, SensorType
 
-from .models import AutomationRule
+from .models import AutomationRule, ControlScheme
 from .resources import RuleResourceUnavailable, effective_device_list
 from .scheduler import _process_automation_rules
 
@@ -188,7 +188,7 @@ class ProjectAutomationRuleApiTests(APITestCase):
         self.assertEqual(rule.process_status, "error_stopped")
         self.assertIn("不属于规则所在房间", rule.error_message)
 
-    def test_staff_cannot_write_but_can_execute(self):
+    def test_staff_can_manage_project_rule_and_execute(self):
         rule = self.create_rule(device_list=[])
         self.client.force_authenticate(self.staff)
         create_response = self.client.post(
@@ -196,8 +196,88 @@ class ProjectAutomationRuleApiTests(APITestCase):
         )
         execute_response = self.client.post(reverse("automation-rule-execute", args=[rule.id]))
 
-        self.assertEqual(create_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
         self.assertEqual(execute_response.status_code, status.HTTP_200_OK)
+
+        created_id = create_response.data["id"]
+        self.client.force_authenticate(self.viewer)
+        read_response = self.client.get(reverse("automation-rule-detail", args=[created_id]))
+        forbidden_response = self.client.patch(
+            reverse("automation-rule-detail", args=[created_id]),
+            {"name": "访客修改"},
+            format="json",
+        )
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(forbidden_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(self.staff)
+        update_response = self.client.patch(
+            reverse("automation-rule-detail", args=[created_id]),
+            {"name": "管理人员修改"},
+            format="json",
+        )
+        delete_response = self.client.delete(
+            reverse("automation-rule-detail", args=[created_id])
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK, update_response.data)
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_staff_cannot_create_global_rule(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            reverse("automation-rule-list"),
+            {
+                "name": "全局脚本",
+                "script_id": "staff_global_rule",
+                "script": "def loop(): return True",
+                "device_list": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_control_scheme_is_read_only_for_viewer_and_editable_by_staff(self):
+        payload = {
+            "name": "房间 PI 控制",
+            "project": self.project.id,
+            "section": self.section.id,
+            "sensor_member": self.sensor_member.id,
+            "data_key": "temperature",
+            "device_member": self.device_member.id,
+            "control_type": "pi",
+            "setpoint": 25,
+            "action": "cool",
+            "sample_interval": 5,
+            "output_mode": "analog",
+            "params": {"analog": {"command": "turn_on"}},
+        }
+
+        self.client.force_authenticate(self.staff)
+        create_response = self.client.post(
+            reverse("control-scheme-list"), payload, format="json"
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        scheme_id = create_response.data["id"]
+
+        self.client.force_authenticate(self.viewer)
+        read_response = self.client.get(reverse("control-scheme-detail", args=[scheme_id]))
+        update_response = self.client.patch(
+            reverse("control-scheme-detail", args=[scheme_id]),
+            {"name": "访客修改"},
+            format="json",
+        )
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(self.staff)
+        update_response = self.client.patch(
+            reverse("control-scheme-detail", args=[scheme_id]),
+            {**payload, "name": "管理人员修改"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK, update_response.data)
+        self.assertEqual(ControlScheme.objects.get(pk=scheme_id).name, "管理人员修改")
 
     def test_global_rule_keeps_global_resource_behavior(self):
         self.client.force_authenticate(self.superuser)

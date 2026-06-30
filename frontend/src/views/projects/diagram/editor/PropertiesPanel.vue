@@ -12,11 +12,19 @@
           <el-input v-model="local.data.label" @input="emitChange" />
         </el-form-item>
 
-        <el-form-item v-if="bindableKinds.length" label="绑定">
+        <el-form-item v-if="resourceBindableKinds.length" label="绑定">
           <el-radio-group v-model="local.binding.kind" @change="onBindingKindChange">
             <el-radio value="none">不绑定</el-radio>
             <el-radio v-if="bindableKinds.includes('sensor')" value="sensor">传感器</el-radio>
             <el-radio v-if="bindableKinds.includes('device')" value="device">设备</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item v-if="bindableKinds.includes('automation')" label="控制来源">
+          <el-radio-group v-model="local.binding.kind" @change="onBindingKindChange">
+            <el-radio value="none">不绑定</el-radio>
+            <el-radio value="automation_rule">自动化脚本</el-radio>
+            <el-radio value="control_scheme">PI / PID</el-radio>
           </el-radio-group>
         </el-form-item>
 
@@ -43,13 +51,77 @@
             filterable
             :teleported="false"
             placeholder="搜索位号 / 名称"
-            @change="emitChange"
+            @change="onDeviceChange"
           >
             <el-option
               v-for="d in targets.devices"
               :key="d.id"
               :label="deviceOptionLabel(d)"
               :value="d.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          v-if="local.binding.kind === 'device' && bindableKinds.includes('device')"
+          label="显示变量"
+        >
+          <el-select
+            v-model="local.data.dataKey"
+            filterable
+            :teleported="false"
+            placeholder="选择设备状态字段"
+            @change="emitChange"
+          >
+            <el-option
+              v-for="field in selectedDeviceFields"
+              :key="field.value"
+              :label="field.label"
+              :value="field.value"
+            />
+          </el-select>
+          <div v-if="!selectedDeviceFields.length" class="props__hint">
+            该设备类型尚未配置可读变量
+          </div>
+        </el-form-item>
+
+        <el-form-item
+          v-if="local.binding.kind === 'device' && bindableKinds.includes('device')"
+          label="单位（可选）"
+        >
+          <el-input v-model="local.data.unit" placeholder="例如：% / rpm" @input="emitChange" />
+        </el-form-item>
+
+        <el-form-item v-if="local.binding.kind === 'automation_rule'" label="选择自动化脚本">
+          <el-select
+            v-model="local.binding.id"
+            filterable
+            :teleported="false"
+            placeholder="搜索脚本名称"
+            @change="emitChange"
+          >
+            <el-option
+              v-for="rule in targets.automationRules || []"
+              :key="rule.id"
+              :label="`${rule.name} · ${rule.script_id}`"
+              :value="rule.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="local.binding.kind === 'control_scheme'" label="选择 PI / PID 控制方案">
+          <el-select
+            v-model="local.binding.id"
+            filterable
+            :teleported="false"
+            placeholder="搜索控制方案"
+            @change="emitChange"
+          >
+            <el-option
+              v-for="scheme in targets.controlSchemes || []"
+              :key="scheme.id"
+              :label="`${scheme.name} · ${scheme.control_type_display || String(scheme.control_type || '').toUpperCase()}`"
+              :value="scheme.id"
             />
           </el-select>
         </el-form-item>
@@ -100,9 +172,6 @@
             <el-option label="信号线（细虚线）" value="signal" />
           </el-select>
         </el-form-item>
-        <el-form-item label="介质">
-          <el-input v-model="local.data.medium" placeholder="例如：物料A+物料B" @input="emitChange" />
-        </el-form-item>
         <el-form-item>
           <el-button type="danger" plain size="small" @click="$emit('delete-edge', node.id)">删除连线</el-button>
         </el-form-item>
@@ -118,7 +187,7 @@ import { getNodeMeta } from './symbols'
 
 const props = defineProps({
   selection: { type: Object, default: null },
-  targets:   { type: Object, default: () => ({ sensors: [], devices: [] }) },
+  targets:   { type: Object, default: () => ({ sensors: [], devices: [], automationRules: [], controlSchemes: [] }) },
 })
 
 const emit = defineEmits(['update-node', 'update-edge', 'delete-node', 'delete-edge'])
@@ -131,6 +200,7 @@ const kind = computed(() => props.selection?.kind || null)
 // 只需在 symbols.js 对应条目加标记，这里和模板自动跟着生效
 const meta = computed(() => getNodeMeta(node.value?.type))
 const bindableKinds = computed(() => meta.value?.bindable || [])
+const resourceBindableKinds = computed(() => bindableKinds.value.filter((kind) => kind !== 'automation'))
 const rotatable = computed(() => meta.value?.rotatable !== false)
 
 const local = reactive({
@@ -150,7 +220,11 @@ watch(() => props.selection, (sel) => {
 }, { immediate: true, deep: true })
 
 function onBindingKindChange() {
-  if (local.binding.kind === 'none') local.binding.id = ''
+  local.binding.id = ''
+  if (local.binding.kind !== 'device') {
+    local.data.dataKey = ''
+    local.data.unit = ''
+  }
   emitChange()
 }
 
@@ -175,6 +249,30 @@ function onSensorChange() {
     local.data.dataKey = target.data_key || (target.id.includes('::') ? target.id.split('::')[1] : '')
     local.data.unit = target.unit || ''
   }
+  emitChange()
+}
+
+function normalizeDeviceField(field) {
+  if (typeof field === 'string') return { value: field, label: field }
+  if (!field || typeof field !== 'object') return null
+  const value = field.key || field.name || field.id
+  if (!value) return null
+  return { value, label: field.label ? `${field.label} (${value})` : value }
+}
+
+const selectedDevice = computed(() => (
+  (props.targets.devices || []).find((device) => device.id === local.binding.id) || null
+))
+const selectedDeviceFields = computed(() => (
+  (selectedDevice.value?.data_fields || []).map(normalizeDeviceField).filter(Boolean)
+))
+
+function onDeviceChange() {
+  const fields = selectedDeviceFields.value
+  if (!fields.some((field) => field.value === local.data.dataKey)) {
+    local.data.dataKey = fields[0]?.value || ''
+  }
+  local.data.unit = ''
   emitChange()
 }
 
@@ -250,5 +348,12 @@ function deviceOptionLabel(d) {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.props__hint {
+  margin-top: 5px;
+  color: var(--iot-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
 }
 </style>

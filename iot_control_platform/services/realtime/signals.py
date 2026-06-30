@@ -21,7 +21,7 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from automation.models import AutomationRule
+from automation.models import AutomationRule, ControlScheme
 from devices.models import DeviceStatusCollection
 from sensors.models import SensorData, SensorStatusCollection
 
@@ -102,6 +102,8 @@ def on_automation_rule(sender, instance: AutomationRule, created: bool, **kwargs
         "id": instance.id,
         "name": instance.name,
         "script_id": instance.script_id,
+        "project": instance.project_id,
+        "section": instance.section_id,
         "is_launched": bool(instance.is_launched),
         "process_status": instance.process_status,
         "error_message": instance.error_message or "",
@@ -111,3 +113,31 @@ def on_automation_rule(sender, instance: AutomationRule, created: bool, **kwargs
         "created": bool(created),
     }
     transaction.on_commit(lambda: dispatch.publish_automation_rule(payload))
+
+
+@receiver(post_save, sender=ControlScheme, dispatch_uid="rt_control_scheme")
+def on_control_scheme(sender, instance: ControlScheme, created: bool, **kwargs):
+    """PI / PID 等结构化控制方案的运行态，供 P&ID 控制图元实时展示。"""
+    update_fields = kwargs.get("update_fields")
+    visible_fields = {"name", "control_type", "is_enabled", "status"}
+    if not created and update_fields is not None and visible_fields.isdisjoint(update_fields):
+        # 调度器每拍回写 PV / 输出值，图元不展示这些字段，避免无意义广播。
+        return
+    payload = {
+        "id": instance.id,
+        "name": instance.name,
+        "project": instance.project_id,
+        "section": instance.section_id,
+        "control_type": instance.control_type,
+        "control_type_display": instance.get_control_type_display(),
+        "is_enabled": bool(instance.is_enabled),
+        "status": instance.status,
+        "status_display": instance.get_status_display(),
+        "error_message": instance.error_message or "",
+        "last_run_time": instance.last_run_time.isoformat() if instance.last_run_time else None,
+        "last_pv": instance.last_pv,
+        "last_output": instance.last_output,
+        "updated_at": instance.updated_at.isoformat() if instance.updated_at else None,
+        "created": bool(created),
+    }
+    transaction.on_commit(lambda: dispatch.publish_control_scheme(payload))
