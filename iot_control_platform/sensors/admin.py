@@ -7,6 +7,7 @@ import json
 from django.utils import timezone
 from datetime import timedelta
 from .models import SensorType, Sensor, SensorData, SensorStatusCollection
+from resource_folders.models import ResourceFolder
 from services.sensors_service.sensor_command_send_service import sensor_command_send_service
 
 
@@ -25,6 +26,25 @@ class SensorOnlineFilter(admin.SimpleListFilter):
             return queryset.filter(last_seen__gte=threshold)
         if self.value() == '0':
             return queryset.filter(last_seen__lt=threshold) | queryset.filter(last_seen__isnull=True)
+        return queryset
+
+
+class SensorFolderFilter(admin.SimpleListFilter):
+    """只展示传感器目录，并提供“未分类”入口。"""
+    title = '文件夹'
+    parameter_name = 'folder'
+
+    def lookups(self, request, model_admin):
+        folders = ResourceFolder.objects.filter(
+            resource_type=ResourceFolder.SENSOR
+        ).select_related('parent')
+        return [('unfiled', '未分类')] + [(str(folder.pk), str(folder)) for folder in folders]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'unfiled':
+            return queryset.filter(folder__isnull=True)
+        if self.value() and self.value().isdigit():
+            return queryset.filter(folder_id=int(self.value()))
         return queryset
 
 
@@ -59,14 +79,19 @@ class SensorTypeAdmin(admin.ModelAdmin):
 class SensorAdmin(admin.ModelAdmin):
     """传感器管理"""
     
-    list_display = ['sensor_id', 'name', 'sensor_type', 'online_status', 'latest_data_time', 'created_at']
-    list_filter = ['sensor_type', SensorOnlineFilter, 'created_at']
-    search_fields = ['sensor_id', 'name', 'description']
+    list_display = ['sensor_id', 'name', 'sensor_type', 'folder_display', 'online_status', 'latest_data_time', 'created_at']
+    list_filter = [SensorFolderFilter, 'sensor_type', SensorOnlineFilter, 'created_at']
+    search_fields = ['sensor_id', 'name', 'description', 'folder__name']
+    list_select_related = ['sensor_type', 'folder']
     readonly_fields = ['created_at', 'updated_at', 'last_seen', 'command_buttons_detail_display']
 
     fieldsets = [
         ('基本信息', {
             'fields': ['sensor_id', 'name', 'sensor_type', 'description']
+        }),
+        ('目录管理', {
+            'fields': ['folder', 'sort_order'],
+            'description': '选择传感器管理页中的文件夹；留空表示“未分类”。'
         }),
         ('命令控制', {
             'fields': ['command_buttons_detail_display'],
@@ -91,6 +116,18 @@ class SensorAdmin(admin.ModelAdmin):
         if 'command_buttons_detail_display' not in base:
             base.append('command_buttons_detail_display')
         return base
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Admin 中只允许选择传感器目录，防止跨资源类型归档。"""
+        if db_field.name == 'folder':
+            kwargs['queryset'] = ResourceFolder.objects.filter(
+                resource_type=ResourceFolder.SENSOR
+            ).select_related('parent')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    @admin.display(description='文件夹', ordering='folder__name', empty_value='未分类')
+    def folder_display(self, obj):
+        return str(obj.folder) if obj.folder_id else None
 
     def online_status(self, obj):
         """基于 last_seen 动态计算在线状态"""

@@ -33,7 +33,14 @@ class ResourceFolder(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_resource_type_display()}/{self.name}"
+        names = [self.name]
+        current = self.parent
+        visited = {self.pk}
+        while current is not None and current.pk not in visited:
+            visited.add(current.pk)
+            names.insert(0, current.name)
+            current = current.parent
+        return f"{self.get_resource_type_display()}/{' / '.join(names)}"
 
     def clean(self):
         if self.parent_id:
@@ -44,4 +51,3 @@ class ResourceFolder(models.Model):
                 if current.pk == self.pk:
                     raise ValidationError({"parent": "不能将文件夹移动到自身或其子文件夹中"})
                 current = current.parent
-

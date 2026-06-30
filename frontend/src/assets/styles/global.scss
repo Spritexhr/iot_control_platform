@@ -66,7 +66,7 @@ a {
 
 /* ---------- 选中文本 ---------- */
 ::selection {
-  background-color: rgba(217, 119, 87, 0.25);
+  background-color: color-mix(in srgb, var(--iot-color-primary) 25%, transparent);
   color: var(--iot-text-primary);
 }
 
@@ -445,7 +445,7 @@ a {
   }
 
   &.is-focus {
-    box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25) inset,
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--iot-color-primary) 25%, transparent) inset,
                 0 0 0 1px var(--iot-color-primary) inset !important;
   }
 }
@@ -527,7 +527,7 @@ html.dark {
     box-shadow: 0 0 0 1px var(--iot-border-color) inset !important;
 
     &.is-focus {
-      box-shadow: 0 0 0 2px rgba(232, 136, 90, 0.20) inset,
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--iot-color-primary) 20%, transparent) inset,
                   0 0 0 1px var(--iot-color-primary) inset !important;
     }
   }

@@ -179,12 +179,15 @@ function renderChart() {
   const textClr = isDark ? '#C8BCB0' : '#4A4035'
   const splitLineClr = isDark ? '#2D2924' : '#EDE8E0'
   
+  // 动态读取当前主题的主色调
+  const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--iot-color-primary').trim() || '#D97757'
+  
   const points = seriesData.value.points || []
   const events = seriesData.value.events || []
   const fields = selectedFields.value.length ? selectedFields.value : availableFields.value.slice(0, 2)
 
-  // 优雅的曲线调色板
-  const lineColors = ['#D97757', '#4CAF82', '#D4A017', '#C94A3A', '#8B7B6B', '#3b82f6', '#8b5cf6']
+  // 优雅的曲线调色板，首选当前主色
+  const lineColors = [primaryColor, '#4CAF82', '#D4A017', '#C94A3A', '#8B7B6B', '#3b82f6', '#8b5cf6']
 
   const series = fields.map((field, idx) => ({
     name: field,
@@ -215,7 +218,7 @@ function renderChart() {
       markLine: {
         symbol: 'none',
         silent: true,
-        lineStyle: { color: isDark ? 'rgba(232, 136, 90, 0.4)' : 'rgba(217, 119, 87, 0.4)', type: 'dashed' },
+        lineStyle: { color: primaryColor + '66', type: 'dashed' },
         data: visibleEvents.slice(0, 50).map((e) => ({
           xAxis: e.t,
           label: {
@@ -267,7 +270,7 @@ function renderChart() {
         bottom: 10,
         textStyle: { color: textClr },
         borderColor: splitLineClr,
-        fillerColor: isDark ? 'rgba(232, 136, 90, 0.15)' : 'rgba(217, 119, 87, 0.1)',
+        fillerColor: isDark ? primaryColor + '26' : primaryColor + '1a',
         handleStyle: { color: '#8B7B6B' }
       }
     ],

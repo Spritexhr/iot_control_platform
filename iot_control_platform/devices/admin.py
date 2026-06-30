@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
 from .models import DeviceType, Device, DeviceStatusCollection
+from resource_folders.models import ResourceFolder
 from services.devices_service.device_command_send_service import device_command_send_service
 
 
@@ -28,6 +29,25 @@ class DeviceOnlineFilter(admin.SimpleListFilter):
             return queryset.filter(last_seen__gte=threshold)
         if self.value() == '0':
             return queryset.filter(last_seen__lt=threshold) | queryset.filter(last_seen__isnull=True)
+        return queryset
+
+
+class DeviceFolderFilter(admin.SimpleListFilter):
+    """只展示设备目录，并提供“未分类”入口。"""
+    title = '文件夹'
+    parameter_name = 'folder'
+
+    def lookups(self, request, model_admin):
+        folders = ResourceFolder.objects.filter(
+            resource_type=ResourceFolder.DEVICE
+        ).select_related('parent')
+        return [('unfiled', '未分类')] + [(str(folder.pk), str(folder)) for folder in folders]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'unfiled':
+            return queryset.filter(folder__isnull=True)
+        if self.value() and self.value().isdigit():
+            return queryset.filter(folder_id=int(self.value()))
         return queryset
 
 
@@ -59,9 +79,10 @@ class DeviceTypeAdmin(admin.ModelAdmin):
 class DeviceAdmin(admin.ModelAdmin):
     """设备管理"""
 
-    list_display = ['device_id', 'name', 'device_type', 'latest_data_time', 'online_indicator', 'created_at']
-    list_filter = ['device_type', DeviceOnlineFilter, 'created_at']
-    search_fields = ['device_id', 'name', 'description']
+    list_display = ['device_id', 'name', 'device_type', 'folder_display', 'latest_data_time', 'online_indicator', 'created_at']
+    list_filter = [DeviceFolderFilter, 'device_type', DeviceOnlineFilter, 'created_at']
+    search_fields = ['device_id', 'name', 'description', 'folder__name']
+    list_select_related = ['device_type', 'folder']
     readonly_fields = [
         'created_at', 'updated_at',
         'mqtt_topic_data', 'mqtt_topic_control',
@@ -72,6 +93,10 @@ class DeviceAdmin(admin.ModelAdmin):
     fieldsets = [
         ('基本信息', {
             'fields': ['device_id', 'name', 'device_type', 'description', 'location']
+        }),
+        ('目录管理', {
+            'fields': ['folder', 'sort_order'],
+            'description': '选择设备管理页中的文件夹；留空表示“未分类”。'
         }),
         ('命令控制', {
             'fields': ['command_buttons_detail_display'],
@@ -99,6 +124,18 @@ class DeviceAdmin(admin.ModelAdmin):
         if 'command_buttons_detail_display' not in base:
             base.append('command_buttons_detail_display')
         return base
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Admin 中只允许选择设备目录，防止跨资源类型归档。"""
+        if db_field.name == 'folder':
+            kwargs['queryset'] = ResourceFolder.objects.filter(
+                resource_type=ResourceFolder.DEVICE
+            ).select_related('parent')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    @admin.display(description='文件夹', ordering='folder__name', empty_value='未分类')
+    def folder_display(self, obj):
+        return str(obj.folder) if obj.folder_id else None
 
     def latest_data_time(self, obj):
         """最新数据时间（优先用 last_seen，避免每行触发 N+1 查询）"""

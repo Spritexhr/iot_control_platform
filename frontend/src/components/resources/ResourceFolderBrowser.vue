@@ -279,15 +279,15 @@ onMounted(loadFolders)
   position: relative;
   overflow: hidden;
   padding: 22px;
-  border: 1px solid rgba(217, 119, 87, .16);
+  border: 1px solid color-mix(in srgb, var(--iot-color-primary) 16%, transparent);
   background:
-    radial-gradient(circle at 92% 0, rgba(217, 119, 87, .11), transparent 30%),
-    linear-gradient(145deg, #fffdf8 0%, #faf5ec 100%);
+    radial-gradient(circle at 92% 0, color-mix(in srgb, var(--iot-color-primary) 11%, transparent), transparent 30%),
+    linear-gradient(145deg, var(--iot-bg-card) 0%, color-mix(in srgb, var(--iot-bg-page) 96%, var(--iot-color-primary)) 100%);
 }
-.folder-browser::after { content: ''; position: absolute; top: -28px; right: -22px; width: 110px; height: 76px; border: 1px solid rgba(217, 119, 87, .1); border-radius: 50%; transform: rotate(-12deg); pointer-events: none; }
-.folder-browser.is-dragging-resources { border-color: rgba(217, 119, 87, .48); box-shadow: 0 12px 34px rgba(121, 75, 48, .1); }
+.folder-browser::after { content: ''; position: absolute; top: -28px; right: -22px; width: 110px; height: 76px; border: 1px solid color-mix(in srgb, var(--iot-color-primary) 10%, transparent); border-radius: 50%; transform: rotate(-12deg); pointer-events: none; }
+.folder-browser.is-dragging-resources { border-color: color-mix(in srgb, var(--iot-color-primary) 48%, transparent); box-shadow: 0 12px 34px color-mix(in srgb, var(--iot-color-primary) 10%, transparent); }
 .folder-intro { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.folder-intro__icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: #c86647; background: rgba(217, 119, 87, .13); font-size: 22px; }
+.folder-intro__icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: var(--iot-color-primary-dark); background: var(--iot-color-primary-bg); font-size: 22px; }
 .folder-intro h2 { margin: 0; color: var(--iot-text-primary); font-size: 17px; }
 .folder-intro p { margin: 4px 0 0; color: var(--iot-text-secondary); font-size: 13px; }
 .folder-toolbar { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -295,25 +295,25 @@ onMounted(loadFolders)
 .folder-modes :deep(.el-button) { margin: 0; border: 0; border-radius: 9px; box-shadow: none; }
 .folder-breadcrumb { margin-top: 18px; padding: 11px 14px; border-radius: 10px; background: rgba(255,255,255,.62); }
 .crumb-button { border: 0; padding: 0; background: none; color: inherit; cursor: pointer; font: inherit; }
-.crumb-button:hover { color: var(--iot-color-primary, #d97757); }
-.folder-drag-hint { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding: 10px 13px; border: 1px dashed rgba(217, 119, 87, .55); border-radius: 10px; color: #a84e34; background: rgba(255, 245, 238, .78); font-size: 13px; }
-.folder-drag-hint__pulse { width: 8px; height: 8px; border-radius: 50%; background: #d97757; box-shadow: 0 0 0 5px rgba(217,119,87,.14); animation: drop-pulse 1.2s infinite; }
+.crumb-button:hover { color: var(--iot-color-primary); }
+.folder-drag-hint { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding: 10px 13px; border: 1px dashed color-mix(in srgb, var(--iot-color-primary) 55%, transparent); border-radius: 10px; color: var(--iot-color-primary-dark); background: color-mix(in srgb, var(--iot-color-primary) 8%, var(--iot-bg-card)); font-size: 13px; }
+.folder-drag-hint__pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--iot-color-primary); box-shadow: 0 0 0 5px color-mix(in srgb, var(--iot-color-primary) 14%, transparent); animation: drop-pulse 1.2s infinite; }
 .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 13px; margin-top: 18px; }
 .folder-card { position: relative; display: flex; align-items: center; gap: 13px; min-height: 84px; padding: 15px; overflow: hidden; border: 1px solid rgba(113, 91, 76, .14); border-radius: 14px; background: rgba(255, 255, 255, .84); box-shadow: 0 5px 16px rgba(81, 62, 48, .045); cursor: pointer; transition: border-color .18s, transform .18s, box-shadow .18s, background .18s; }
-.folder-card::before { content: ''; position: absolute; top: 0; left: 16px; width: 46px; height: 4px; border-radius: 0 0 4px 4px; background: rgba(217, 119, 87, .42); }
-.folder-card:hover { border-color: rgba(217, 119, 87, .52); box-shadow: 0 9px 22px rgba(102, 66, 45, .09); transform: translateY(-2px); }
+.folder-card::before { content: ''; position: absolute; top: 0; left: 16px; width: 46px; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in srgb, var(--iot-color-primary) 42%, transparent); }
+.folder-card:hover { border-color: color-mix(in srgb, var(--iot-color-primary) 52%, transparent); box-shadow: 0 9px 22px color-mix(in srgb, var(--iot-color-primary) 9%, transparent); transform: translateY(-2px); }
 .folder-card.is-drop-ready { border-style: dashed; }
-.folder-card.is-drop-active { border-color: #d97757; border-style: solid; background: #fff5ee; box-shadow: 0 0 0 4px rgba(217, 119, 87, .14), 0 12px 26px rgba(126, 67, 42, .14); transform: translateY(-3px) scale(1.01); }
-.folder-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: #cc6a4b; background: rgba(217, 119, 87, .11); font-size: 25px; }
-.is-drop-active .folder-icon { color: #fff; background: #d97757; }
+.folder-card.is-drop-active { border-color: var(--iot-color-primary); border-style: solid; background: var(--iot-color-primary-bg); box-shadow: 0 0 0 4px color-mix(in srgb, var(--iot-color-primary) 14%, transparent), 0 12px 26px rgba(0, 0, 0, 0.15); transform: translateY(-3px) scale(1.01); }
+.folder-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: var(--iot-color-primary); background: var(--iot-color-primary-bg); font-size: 25px; }
+.is-drop-active .folder-icon { color: #fff; background: var(--iot-color-primary); }
 .folder-meta { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; }
 .folder-meta strong { overflow: hidden; color: var(--iot-text-primary); text-overflow: ellipsis; white-space: nowrap; }
 .folder-meta span { color: var(--iot-text-secondary); font-size: 12px; }
-.folder-meta em { color: #bd5b3e; font-size: 12px; font-style: normal; font-weight: 600; }
+.folder-meta em { color: var(--iot-color-primary-dark); font-size: 12px; font-style: normal; font-weight: 600; }
 .drag-hint-enter-active, .drag-hint-leave-active { transition: opacity .18s, transform .18s; }
 .drag-hint-enter-from, .drag-hint-leave-to { opacity: 0; transform: translateY(-5px); }
-@keyframes drop-pulse { 50% { box-shadow: 0 0 0 8px rgba(217,119,87,0); } }
-:global(html.dark) .folder-browser { background: radial-gradient(circle at 92% 0, rgba(232,136,90,.10), transparent 30%), linear-gradient(145deg, var(--iot-bg-card), var(--iot-bg-page)); }
+@keyframes drop-pulse { 50% { box-shadow: 0 0 0 8px transparent; } }
+:global(html.dark) .folder-browser { background: radial-gradient(circle at 92% 0, color-mix(in srgb, var(--iot-color-primary) 10%, transparent), transparent 30%), linear-gradient(145deg, var(--iot-bg-card), var(--iot-bg-page)); }
 :global(html.dark) .folder-modes, :global(html.dark) .folder-breadcrumb { background: rgba(255,255,255,.035); }
 :global(html.dark) .folder-card { border-color: var(--iot-border-color); background: var(--iot-bg-card); }
 :global(html.dark) .folder-card.is-drop-active { border-color: var(--iot-color-primary); background: var(--iot-color-primary-bg); }

@@ -2,9 +2,12 @@
   <div class="csv">
     <!-- 工具栏 -->
     <div class="csv__toolbar">
-      <div class="csv__hint">
-        <el-icon><Cpu /></el-icon>
-        <span>选模板（双位 / PI / PID）→ 绑定传感器与设备 → 填参数 → 启用，后台自动闭环控制。</span>
+      <div class="csv__summary">
+        <span>控制方案</span>
+        <el-tag size="small" effect="plain">{{ schemes.length }}</el-tag>
+        <span class="csv__resource-count">
+          选模板（双位 / PI / PID）→ 绑定点位 → 启用自动闭环控制
+        </span>
       </div>
       <el-button v-if="isStaff" type="primary" :icon="Plus" @click="openCreate">新建控制方案</el-button>
     </div>
@@ -73,11 +76,11 @@
         </template>
       </el-table-column>
 
-      <el-table-column v-if="isStaff" label="操作" width="180" align="center">
+      <el-table-column v-if="isStaff" label="操作" width="190" align="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="testStep(row)">试一下</el-button>
-          <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="remove(row)">删除</el-button>
+          <el-button link type="success" size="small" :icon="VideoPlay" @click="testStep(row)">测试</el-button>
+          <el-button link type="primary" size="small" :icon="Edit" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="danger" size="small" :icon="Delete" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -210,8 +213,8 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+        <el-button @click="dialogVisible = false">关闭</el-button>
+        <el-button type="primary" :icon="Check" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -220,7 +223,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Cpu, Plus } from '@element-plus/icons-vue'
+import { Check, Cpu, Delete, Edit, Plus, VideoPlay } from '@element-plus/icons-vue'
 
 import {
   listControlSchemes, createControlScheme, updateControlScheme, deleteControlScheme,
@@ -464,12 +467,19 @@ watch(() => props.sectionId, () => { reload() })
   flex-wrap: wrap;
 }
 
-.csv__hint {
+.csv__summary {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-weight: 600;
+  color: var(--iot-text-primary);
+}
+
+.csv__resource-count {
+  font-size: var(--iot-font-size-xs);
+  font-weight: 400;
   color: var(--iot-text-secondary);
-  font-size: var(--iot-font-size-sm);
+  margin-left: 4px;
 }
 
 .csv__table {
@@ -527,7 +537,7 @@ watch(() => props.sectionId, () => { reload() })
     border-color: var(--iot-color-primary);
     /* 用 inset 内描边，不会被外层 overflow 裁剪（避免选中框被"拦腰截断"） */
     box-shadow: inset 0 0 0 1px var(--iot-color-primary);
-    background: var(--iot-color-primary-light, rgba(217, 119, 87, 0.06));
+    background: var(--iot-color-primary-bg);
   }
 
   &__name {

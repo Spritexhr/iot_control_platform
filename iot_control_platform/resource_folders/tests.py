@@ -1,7 +1,11 @@
+from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory
 from rest_framework.test import APITestCase
 
+from devices.admin import DeviceAdmin
 from devices.models import Device, DeviceType
+from sensors.admin import SensorAdmin
 from sensors.models import Sensor, SensorType
 
 from .models import ResourceFolder
@@ -114,3 +118,23 @@ class ResourceFolderApiTests(APITestCase):
         )
         self.assertEqual(after[:2], before[:2])
         self.assertEqual(after[2:4], list(reversed(page_two)))
+
+    def test_admin_folder_choices_are_limited_by_resource_type(self):
+        sensor_root = ResourceFolder.objects.create(name="厂区", resource_type="sensor")
+        sensor_child = ResourceFolder.objects.create(
+            name="车间", resource_type="sensor", parent=sensor_root
+        )
+        device_folder = ResourceFolder.objects.create(name="设备区", resource_type="device")
+        request = RequestFactory().get("/admin/")
+        request.user = self.admin
+
+        sensor_formfield = SensorAdmin(Sensor, admin.site).formfield_for_foreignkey(
+            Sensor._meta.get_field("folder"), request
+        )
+        device_formfield = DeviceAdmin(Device, admin.site).formfield_for_foreignkey(
+            Device._meta.get_field("folder"), request
+        )
+
+        self.assertEqual(list(sensor_formfield.queryset), [sensor_root, sensor_child])
+        self.assertEqual(list(device_formfield.queryset), [device_folder])
+        self.assertEqual(str(sensor_child), "传感器/厂区 / 车间")
