@@ -141,6 +141,90 @@ class ProjectMemberDeleteProtectionTests(APITestCase):
         self.assertEqual(payload["control_type"], "pi")
         self.assertEqual(payload["status"], "running")
 
+    def diagram_config(self):
+        return {
+            "version": 1,
+            "viewport": {"x": 0, "y": 0, "zoom": 1},
+            "nodes": [
+                {
+                    "id": "sensor-node",
+                    "type": "instrument",
+                    "position": {"x": 10, "y": 20},
+                    "size": {"w": 186, "h": 102},
+                    "binding": {"kind": "sensor", "id": self.sensor_member.point_id},
+                    "data": {"label": "T-1"},
+                },
+                {
+                    "id": "device-node",
+                    "type": "device_indicator",
+                    "position": {"x": 200, "y": 20},
+                    "binding": {"kind": "device", "id": self.device.device_id},
+                    "data": {"label": "V-1"},
+                },
+            ],
+            "edges": [
+                {
+                    "id": "edge-1",
+                    "source": "sensor-node",
+                    "target": "device-node",
+                    "sourcePort": "right",
+                    "targetPort": "left",
+                    "data": {"kind": "signal", "label": ""},
+                }
+            ],
+        }
+
+    def test_diagram_config_accepts_current_room_bindings(self):
+        response = self.client.post(
+            reverse("project-view-list"),
+            {
+                "project": self.project.id,
+                "section": self.section.id,
+                "name": "受校验的 P&ID",
+                "view_type": "diagram",
+                "config": self.diagram_config(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_diagram_config_rejects_missing_edge_endpoint(self):
+        config = self.diagram_config()
+        config["edges"][0]["target"] = "missing-node"
+        response = self.client.post(
+            reverse("project-view-list"),
+            {
+                "project": self.project.id,
+                "section": self.section.id,
+                "name": "损坏的 P&ID",
+                "view_type": "diagram",
+                "config": config,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("不存在的节点", str(response.data))
+
+    def test_diagram_config_rejects_binding_outside_section(self):
+        config = self.diagram_config()
+        config["nodes"][0]["binding"]["id"] = "sensor-outside-room"
+        response = self.client.post(
+            reverse("project-view-list"),
+            {
+                "project": self.project.id,
+                "section": self.section.id,
+                "name": "越界绑定 P&ID",
+                "view_type": "diagram",
+                "config": config,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("不属于当前房间", str(response.data))
+
     def test_medium_cleanup_migration_preserves_other_edge_data(self):
         view = ProjectView.objects.create(
             project=self.project,

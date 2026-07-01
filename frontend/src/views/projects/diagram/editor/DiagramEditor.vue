@@ -13,14 +13,15 @@
         :snap-grid="[10, 10]"
         :delete-key-code="['Backspace', 'Delete']"
         :connection-mode="ConnectionMode.Loose"
-        fit-view-on-init
-        @nodes-change="onChange"
-        @edges-change="onChange"
+        @nodes-change="onNodesChange"
+        @nodes-initialized="onNodesInitialized"
+        @node-drag-stop="onNodeDragStop"
+        @edges-change="onEdgesChange"
         @connect="onConnect"
         @node-click="onNodeClick"
         @edge-click="onEdgeClick"
         @pane-click="clearSelection"
-        @viewport-change="onViewportChange"
+        @viewport-change-end="onViewportChangeEnd"
       >
         <Background pattern-color="#d8d2c4" :gap="16" />
         <Controls />
@@ -39,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { ConnectionMode, VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -52,6 +53,8 @@ import ToolboxPanel from './ToolboxPanel.vue'
 import PropertiesPanel from './PropertiesPanel.vue'
 import { buildNodeTypes } from './nodeTypes'
 import { buildEdgeTypes, getPidEdgeStyle, normalizeEdgeData } from '../edgeTypes'
+import { canvasToFlow, flowToCanvas as encodeCanvas } from '../canvasCodec'
+import { computeNearAlignedPositions } from '../alignment'
 
 const props = defineProps({
   diagram: { type: Object, required: true },
@@ -65,60 +68,8 @@ const edgeTypes = buildEdgeTypes()
 
 const { project, screenToFlowCoordinate, updateNode, updateNodeInternals, setEdges } = useVueFlow()
 
-// ============ canvas <-> Vue Flow 互转 ============
-// canvas.nodes 形如：{ id, type, position, size, binding, data }
-// Vue Flow 节点：{ id, type, position, data:{...原 data, binding, size} }
-function canvasToFlow(canvas) {
-  const nodes = (canvas?.nodes || []).map((n) => ({
-    id: n.id,
-    type: n.type,
-    position: { x: n.position?.x || 0, y: n.position?.y || 0 },
-    data: { ...(n.data || {}), binding: n.binding || { kind: 'none', id: '' }, size: n.size },
-  }))
-  const edges = (canvas?.edges || []).map((e) => {
-    const data = normalizeEdgeData(e.data)
-    return {
-      id: e.id,
-      source: e.source,
-      sourceHandle: e.sourcePort || e.sourceHandle || 'right',
-      target: e.target,
-      targetHandle: e.targetPort || e.targetHandle || 'left',
-      type: 'pid',
-      data,
-      label: data.label,
-      style: getPidEdgeStyle(data.kind),
-      markerEnd: 'arrowclosed',
-    }
-  })
-  return { nodes, edges }
-}
-
 function flowToCanvas() {
-  return {
-    version: 1,
-    viewport: viewport.value,
-    nodes: nodes.value.map((n) => ({
-      id: n.id,
-      type: n.type,
-      position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
-      size: n.data?.size,
-      binding: n.data?.binding || { kind: 'none', id: '' },
-      data: stripBindingAndSize(n.data),
-    })),
-    edges: edges.value.map((e) => ({
-      id: e.id,
-      source: e.source, sourcePort: e.sourceHandle || 'right',
-      target: e.target, targetPort: e.targetHandle || 'left',
-      type: 'process_line',
-      data: normalizeEdgeData(e.data),
-    })),
-  }
-}
-
-function stripBindingAndSize(data) {
-  if (!data) return {}
-  const { binding, size, ...rest } = data
-  return rest
+  return encodeCanvas({ nodes: nodes.value, edges: edges.value, viewport: viewport.value })
 }
 
 // ============ state ============
@@ -127,6 +78,7 @@ const nodes = ref(initial.nodes)
 const edges = ref(initial.edges)
 const viewport = ref(props.diagram?.canvas?.viewport || { x: 0, y: 0, zoom: 1 })
 const defaultViewport = viewport.value
+const nodesReady = ref(false)
 
 const selection = ref(null)        // { kind: 'node'|'edge', payload }
 
@@ -136,6 +88,7 @@ watch(() => props.diagram?.id, () => {
   nodes.value = init.nodes
   edges.value = init.edges
   viewport.value = props.diagram?.canvas?.viewport || { x: 0, y: 0, zoom: 1 }
+  nodesReady.value = false
   selection.value = null
 })
 
@@ -143,15 +96,60 @@ watch(() => props.diagram?.id, () => {
 function emitCanvas() {
   emit('change', flowToCanvas())
 }
-function onChange() {
-  emitCanvas()
+function onEdgesChange(changes = []) {
+  if (changes.some((change) => change.type !== 'select')) emitCanvas()
 }
-function onViewportChange(v) {
+
+function storeMeasuredSize(nodeId, dimensions) {
+  const width = Number(dimensions?.width || 0)
+  const height = Number(dimensions?.height || 0)
+  if (!width || !height) return false
+  const index = nodes.value.findIndex((node) => node.id === nodeId)
+  if (index < 0) return false
+  const current = nodes.value[index]
+  const oldSize = current.data?.size
+  if (oldSize?.w === width && oldSize?.h === height) return false
+  nodes.value[index] = {
+    ...current,
+    data: { ...(current.data || {}), size: { w: width, h: height } },
+  }
+  return true
+}
+
+function onNodesChange(changes = []) {
+  let sizeChanged = false
+  let shouldPersist = false
+  for (const change of changes) {
+    if (change.type === 'dimensions') {
+      sizeChanged = storeMeasuredSize(change.id, change.dimensions) || sizeChanged
+    } else if (change.type === 'remove' || change.type === 'add' || change.type === 'reset') {
+      shouldPersist = true
+    } else if (change.type === 'position' && change.dragging === false) {
+      // 键盘方向键移动没有 node-drag-stop，需在最终 position change 落盘。
+      shouldPersist = true
+    }
+  }
+  if (nodesReady.value && (sizeChanged || shouldPersist)) emitCanvas()
+}
+
+async function onNodesInitialized(initializedNodes = []) {
+  let sizeChanged = false
+  for (const node of initializedNodes) {
+    sizeChanged = storeMeasuredSize(node.id, node.dimensions) || sizeChanged
+  }
+  await nextTick()
+  // 重新打开画布时，必须等 DOM 尺寸测量完成后再校正；
+  // 否则只有左上角坐标，会再次把连接点中心当成节点边缘。
+  const aligned = await normalizeNearAlignedEdges()
+  nodesReady.value = true
+  if (aligned || sizeChanged) emitCanvas()
+}
+function onViewportChangeEnd(v) {
   viewport.value = v
   emitCanvas()
 }
 
-function onConnect(connection) {
+async function onConnect(connection) {
   const id = `e_${Date.now()}_${Math.floor(Math.random() * 1000)}`
   const data = normalizeEdgeData()
   edges.value.push({
@@ -166,6 +164,10 @@ function onConnect(connection) {
     style: getPidEdgeStyle(data.kind),
     markerEnd: 'arrowclosed',
   })
+  await normalizeNearAlignedEdges({
+    anchorNodeId: connection.source,
+    scopeNodeId: connection.source,
+  })
   emitCanvas()
 }
 
@@ -179,18 +181,50 @@ function clearSelection() {
   selection.value = null
 }
 
+// ============ 连接点近对齐自动校正 ============
+// Vue Flow 的网格吸附对齐的是节点左上角，不是连接点中心。节点尺寸不同时，
+// 即使看起来已对齐，线端仍可能差几像素，SmoothStepEdge 会把它画成小折皱。
+const HANDLE_ALIGN_THRESHOLD = 10
+async function normalizeNearAlignedEdges({ anchorNodeId = null, scopeNodeId = null } = {}) {
+  const changed = computeNearAlignedPositions({
+    nodes: nodes.value,
+    edges: edges.value,
+    threshold: HANDLE_ALIGN_THRESHOLD,
+    anchorNodeId,
+    scopeNodeId,
+  })
+  if (!changed.size) return false
+  for (const [nodeId, position] of changed) {
+    const index = nodes.value.findIndex((item) => item.id === nodeId)
+    nodes.value[index] = { ...nodes.value[index], position }
+    updateNode(nodeId, { position, data: nodes.value[index].data })
+  }
+  await nextTick()
+  updateNodeInternals([...changed.keys()])
+  return true
+}
+
+async function onNodeDragStop({ node }) {
+  await normalizeNearAlignedEdges({ anchorNodeId: node?.id, scopeNodeId: node?.id })
+  // 无论是否发生自动对齐，拖动结束都是一次完整的持久化事件。
+  emitCanvas()
+}
+
 function applyNodePatch({ id, patch }) {
   const idx = nodes.value.findIndex((n) => n.id === id)
   if (idx < 0) return
   const newData = { ...nodes.value[idx].data, ...patch.data }
   const newPos = patch.position ?? nodes.value[idx].position
-  // updateNode 写入 Vue Flow 内部 store，节点组件立刻重渲染
+  const nextNode = { ...nodes.value[idx], data: newData, position: newPos }
+  // 先写 v-model 数据源，再更新 Vue Flow 内部 store。这样属性面板连续输入时
+  // selection 不会拿到旧节点反向覆盖表单，保存时也能直接读到最新参数。
+  nodes.value[idx] = nextNode
   updateNode(id, { data: newData, position: newPos })
   // 旋转/镜像后连接点的实际渲染位置变了，得让 Vue Flow 重新量一下，
   // 否则连线还接在节点变换前的旧位置上
   updateNodeInternals([id])
   if (selection.value?.kind === 'node' && selection.value.payload.id === id) {
-    selection.value = { kind: 'node', payload: nodes.value[idx] }
+    selection.value = { kind: 'node', payload: nextNode }
   }
   emitCanvas()
 }
@@ -205,7 +239,9 @@ function applyEdgePatch({ id, patch }) {
     label: data.label,
     style: getPidEdgeStyle(data.kind),
   } : edge)
-  // setEdges 同步更新 Vue Flow 内部状态，避免 data 与顶层 label/style 出现双份状态漂移。
+  // 与节点修改一样，先写 v-model 数据源，再写 Vue Flow 内部 store。
+  // 否则紧接着的 emitCanvas 可能仍序列化旧连线。
+  edges.value = nextEdges
   setEdges(nextEdges)
   if (selection.value?.kind === 'edge' && selection.value.payload.id === id) {
     selection.value = { kind: 'edge', payload: nextEdges[idx] }

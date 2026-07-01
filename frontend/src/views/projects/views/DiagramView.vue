@@ -7,7 +7,8 @@
         <el-button v-if="canEdit" size="small" @click="toggleMode">
           {{ mode === 'edit' ? '预览模式' : '编辑模式' }}
         </el-button>
-        <el-button v-if="mode === 'edit' && canEdit" type="primary" size="small" :loading="saving" @click="save">
+        <el-button v-if="mode === 'edit' && canEdit" type="primary" size="small"
+                   :loading="saving" :disabled="!dirty" @click="save">
           保存
         </el-button>
         <el-button size="small" @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏'">
@@ -35,7 +36,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { onBeforeRouteLeave } from 'vue-router'
 
 import DiagramEditor from '../diagram/editor/DiagramEditor.vue'
 import DiagramRuntime from '../diagram/runtime/DiagramRuntime.vue'
@@ -43,6 +45,7 @@ import { useProjectStore } from '@/stores/project'
 import { updateView } from '@/api/projects'
 import { getAutomationRules } from '@/api/automation'
 import { listControlSchemes } from '@/api/controlSchemes'
+import { emptyCanvas } from '../diagram/canvasCodec'
 
 const props = defineProps({
   // ProjectView 对象：{ id, name, view_type:'diagram', config(canvas) }
@@ -69,12 +72,38 @@ function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
 }
 
-onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
-onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
+function onBeforeUnload(event) {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
 
-const EMPTY = () => ({ version: 1, viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [] })
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
+
+onBeforeRouteLeave(async () => {
+  if (!dirty.value) return true
+  try {
+    await ElMessageBox.confirm('当前 P&ID 画布尚未保存，离开后修改将丢失。', '未保存修改', {
+      confirmButtonText: '放弃修改并离开',
+      cancelButtonText: '继续编辑',
+      type: 'warning',
+      distinguishCancelAndClose: true,
+    })
+    return true
+  } catch {
+    return false
+  }
+})
+
 const canvas = ref(
-  props.view.config && Array.isArray(props.view.config.nodes) ? props.view.config : EMPTY(),
+  props.view.config && Array.isArray(props.view.config.nodes) ? props.view.config : emptyCanvas(),
 )
 
 const mode = ref('view')

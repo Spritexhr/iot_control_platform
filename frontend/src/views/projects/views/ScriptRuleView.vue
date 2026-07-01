@@ -102,6 +102,22 @@
 
     <el-empty v-else :description="emptyText" />
 
+    <section class="psr-terminal psr-terminal--board">
+      <div class="psr-terminal__head">
+        <span>自动化终端</span>
+        <el-button v-if="terminalLines.length" link size="small" @click="clearTerminal">清空</el-button>
+      </div>
+      <div class="psr-terminal__body">
+        <div v-if="!terminalLines.length" class="psr-terminal__empty">
+          等待执行输出……点击任一脚本的“测试”后，print 与运行日志会显示在这里。
+        </div>
+        <div v-for="(line, index) in terminalLines" :key="index" class="psr-terminal__line"
+             :class="`is-${line.type}`">
+          <span>{{ line.time }}</span><strong>{{ line.type.toUpperCase() }}</strong><span>{{ line.message }}</span>
+        </div>
+      </div>
+    </section>
+
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="min(1040px, 94vw)" top="3vh"
                append-to-body destroy-on-close class="psr-dialog" @closed="resetDialog">
       <div v-loading="detailLoading" class="psr-editor">
@@ -159,14 +175,17 @@
                       :style="{ minHeight: '360px', fontSize: '13px' }" class="psr-codemirror" />
         </section>
 
-        <section v-if="terminalLines.length" class="psr-terminal">
+        <section class="psr-terminal">
           <div class="psr-terminal__head">
             <span>执行结果</span>
-            <el-button link size="small" @click="terminalLines = []">清空</el-button>
+            <el-button v-if="terminalLines.length" link size="small" @click="clearTerminal">清空</el-button>
           </div>
-          <div v-for="(line, index) in terminalLines" :key="index" class="psr-terminal__line"
-               :class="`is-${line.type}`">
-            <span>{{ line.time }}</span><strong>{{ line.type.toUpperCase() }}</strong><span>{{ line.message }}</span>
+          <div class="psr-terminal__body">
+            <div v-if="!terminalLines.length" class="psr-terminal__empty">等待执行输出……</div>
+            <div v-for="(line, index) in terminalLines" :key="index" class="psr-terminal__line"
+                 :class="`is-${line.type}`">
+              <span>{{ line.time }}</span><strong>{{ line.type.toUpperCase() }}</strong><span>{{ line.message }}</span>
+            </div>
           </div>
         </section>
       </div>
@@ -287,13 +306,11 @@ function addResource() {
 
 function openCreate() {
   form.value = emptyForm()
-  terminalLines.value = []
   dialogVisible.value = true
 }
 async function openEdit(row) {
   dialogVisible.value = true
   detailLoading.value = true
-  terminalLines.value = []
   try {
     const detail = await getAutomationRule(row.id)
     form.value = { ...emptyForm(), ...detail, device_list: detail.device_list || [] }
@@ -306,7 +323,6 @@ async function openEdit(row) {
 }
 function resetDialog() {
   form.value = emptyForm()
-  terminalLines.value = []
 }
 function insertTemplate() {
   const sensor = availableSources.value.sensors[0]?.id || 'sensor_id'
@@ -347,22 +363,31 @@ async function save() {
 
 function appendResult(result) {
   const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-  if (result.output) result.output.trim().split('\n').forEach((message) => terminalLines.value.push({ time: now, type: 'info', message }))
+  const ruleLabel = result.rule_name ? ` [${result.rule_name}]` : ''
+  terminalLines.value.push({ time: now, type: 'command', message: `> 执行${ruleLabel}` })
+  if (result.output) result.output.replace(/\n$/, '').split('\n').forEach((message) => terminalLines.value.push({ time: now, type: 'info', message }))
   for (const log of result.logs || []) {
-    terminalLines.value.push({ time: now, type: log.level === 'ERROR' ? 'error' : 'info', message: log.message })
+    const type = log.level === 'ERROR' ? 'error' : (log.level === 'WARNING' ? 'warning' : 'info')
+    terminalLines.value.push({ time: now, type, message: log.message })
   }
   terminalLines.value.push({ time: now, type: result.success ? 'success' : 'error', message: result.success ? '执行成功' : (result.error || '执行未满足条件') })
+  if (terminalLines.value.length > 500) terminalLines.value.splice(0, terminalLines.value.length - 500)
+}
+function clearTerminal() {
+  terminalLines.value = []
 }
 async function execute(row, inDialog = false) {
   if (inDialog) dialogExecuting.value = true
   else executeLoading.value[row.id] = true
   try {
     const result = await executeAutomationRule(row.id)
-    if (inDialog) appendResult(result)
+    appendResult(result)
     ElMessage[result.success ? 'success' : 'warning'](result.success ? '执行成功' : '执行未满足条件')
   } catch (error) {
     const message = errorMessage(error, '执行失败')
-    if (inDialog) terminalLines.value.push({ time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), type: 'error', message })
+    const result = error?.response?.data
+    if (result && typeof result === 'object' && ('output' in result || 'logs' in result)) appendResult(result)
+    else terminalLines.value.push({ time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), type: 'error', message })
     ElMessage.error(message)
   } finally {
     if (inDialog) dialogExecuting.value = false
@@ -445,8 +470,14 @@ watch(() => props.sectionId, reload)
 .psr-codemirror { border: 1px solid #363b46; overflow: hidden; border-radius: 4px; }
 .psr-codemirror :deep(.cm-editor) { min-height: 360px; }
 .psr-terminal { margin-top: 16px; background: #1f232b; color: #d8dee9; border-radius: 4px; overflow: hidden; }
+.psr-terminal--board { margin-top: 20px; border: 1px solid #343b47; box-shadow: var(--iot-shadow-sm); }
 .psr-terminal__head { justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #3a404b; font-size: 12px; }
+.psr-terminal__body { min-height: 96px; max-height: 280px; overflow: auto; padding: 6px 0; }
+.psr-terminal__empty { padding: 18px 12px; color: #7f8998; font: 12px/1.6 var(--iot-font-mono, monospace); }
 .psr-terminal__line { display: grid; grid-template-columns: 72px 58px 1fr; gap: 8px; padding: 4px 12px; font: 12px/1.5 var(--iot-font-mono, monospace); }
+.psr-terminal__line > span:last-child { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.psr-terminal__line.is-command strong { color: #8fb7ff; }
+.psr-terminal__line.is-warning strong { color: #f0c36a; }
 .psr-terminal__line.is-error strong { color: #ff8a7a; }
 .psr-terminal__line.is-success strong { color: #80c99b; }
 :global(.psr-dialog) {

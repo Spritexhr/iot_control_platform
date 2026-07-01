@@ -159,7 +159,7 @@ export const SIMPLE_SYMBOLS = {
 const SPECIAL = {
   instrument: {
     label: '仪表', group: '仪表/容器',
-    defaultData: { symbol: 'TT', label: '新仪表', show_value: true, show_threshold: true },
+    defaultData: { label: '新仪表' },
     // 目前唯一支持绑定的图元（绑传感器实时取值）。以后要给其他图元（如阀门/泵）
     // 加设备绑定+命令，只需在对应条目加 bindable:['device']，PropertiesPanel 会自动出现绑定 UI
     bindable: ['sensor'],

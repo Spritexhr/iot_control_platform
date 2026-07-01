@@ -169,6 +169,21 @@ class ProjectViewSerializer(_SectionScopedSerializerMixin, serializers.ModelSeri
         ]
         read_only_fields = ["id", "project", "section_name", "created_at", "updated_at"]
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        view_type = attrs.get("view_type") or getattr(self.instance, "view_type", "card")
+        section = attrs.get("section") or getattr(self.instance, "section", None)
+        config = attrs.get("config")
+        if config is None and self.instance is not None and "section" in attrs:
+            config = self.instance.config
+        if view_type == "diagram" and config is not None and section is not None:
+            from .diagram_validation import validate_diagram_config
+            try:
+                attrs["config"] = validate_diagram_config(config, section)
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({"config": exc.detail}) from exc
+        return attrs
+
 
 class BindableSensorSerializer(serializers.ModelSerializer):
     """供「挑选要导入到本房间的传感器」下拉用。bound_data_keys 优先按当前房间(section)过滤，

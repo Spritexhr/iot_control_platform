@@ -209,7 +209,7 @@ const local = reactive({
   position: { x: 0, y: 0 },
 })
 
-watch(() => props.selection, (sel) => {
+function hydrateSelection(sel) {
   if (!sel) return
   const p = sel.payload
   local.data = { ...(p.data || {}) }
@@ -217,7 +217,25 @@ watch(() => props.selection, (sel) => {
     local.binding = { ...(p.data?.binding || { kind: 'none', id: '' }) }
     local.position = { x: Math.round(p.position?.x ?? 0), y: Math.round(p.position?.y ?? 0) }
   }
-}, { immediate: true, deep: true })
+}
+
+// 只在真正切换节点/连线时重建表单。不能深度监听整个 selection：
+// Vue Flow 会持续更新 dimensions/position/data，深度监听会在用户输入设备编号或
+// 传感器编号的过程中反复覆盖 v-model，并关闭可搜索下拉框。
+watch(
+  () => `${props.selection?.kind || ''}:${props.selection?.payload?.id || ''}`,
+  () => hydrateSelection(props.selection),
+  { immediate: true },
+)
+
+// 拖动已选节点时只同步坐标，不碰 data/binding，避免干扰正在输入的控件。
+watch(
+  () => [props.selection?.payload?.position?.x, props.selection?.payload?.position?.y],
+  ([x, y]) => {
+    if (kind.value !== 'node') return
+    local.position = { x: Math.round(x ?? 0), y: Math.round(y ?? 0) }
+  },
+)
 
 function onBindingKindChange() {
   local.binding.id = ''
