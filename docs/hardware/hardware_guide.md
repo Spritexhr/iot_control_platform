@@ -193,7 +193,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 ### 6.3 check_code 回传
 
 - 收到带 `check_code` 的命令时，在状态上报中**原样回传**
-- 后端依赖此流程实现 `send_custom_command_with_make_sure` 的确认
+- 后端依赖此流程实现 `send_command_with_make_sure` 的确认
 - 心跳等非命令响应可不带 `check_code`
 
 ---

@@ -76,7 +76,7 @@ class SensorListSerializer(serializers.ModelSerializer):
         model = Sensor
         fields = [
             'id', 'sensor_id', 'name', 'description', 'location',
-            'mqtt_topic_data', 'mqtt_topic_control',
+            'mqtt_topic_data', 'mqtt_topic_status', 'mqtt_topic_control',
             'is_online', 'last_seen',
             'sort_order',
             'created_at', 'updated_at',

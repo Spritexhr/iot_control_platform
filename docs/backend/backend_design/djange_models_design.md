@@ -66,6 +66,7 @@ ProjectDeviceMember 1 ── N ControlScheme（PROTECT）
 | `description` | `TextField(blank=True)` | 描述 |
 | `location` | `CharField(200, blank=True)` | 物理位置 |
 | `mqtt_topic_data` | `CharField(200, blank=True)` | 数据主题 |
+| `mqtt_topic_status` | `CharField(200, blank=True)` | 状态主题 |
 | `mqtt_topic_control` | `CharField(200, blank=True)` | 控制主题 |
 | `is_online` | `BooleanField(default=False, db_index=True)` | 持久化在线标记 |
 | `last_seen` | `DateTimeField(null=True, blank=True)` | 最后上报时间 |
@@ -75,14 +76,15 @@ ProjectDeviceMember 1 ── N ControlScheme（PROTECT）
 
 默认排序：`sort_order`、`-created_at`。
 
-保存时若 MQTT topic 为空，会生成：
+保存时三个 MQTT topic 由 `sensor_id` 统一生成：
 
 ```text
 iot/sensors/{sensor_id}/data
+iot/sensors/{sensor_id}/status
 iot/sensors/{sensor_id}/control
 ```
 
-因此空字符串不会被长期保留；旧文档“只有 None 才自动生成”的描述已经失效。
+修改 `sensor_id` 时三个主题会同步更新。
 
 主要行为：
 

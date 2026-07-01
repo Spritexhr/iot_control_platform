@@ -68,8 +68,8 @@ class BaseCommandSendService:
             return {}
         return getattr(type_obj, 'commands', None) or {}
 
-    def send_command(self, object_id: str, command_payload: Dict) -> bool:
-        """发送命令到设备/传感器"""
+    def _publish_command(self, object_id: str, command_payload: Dict) -> bool:
+        """将已经组装完成的命令 payload 发布到设备/传感器控制主题。"""
         try:
             obj = self._get_object(object_id)
         except self.model_class.DoesNotExist:
@@ -143,7 +143,7 @@ class BaseCommandSendService:
         msg['check_code'] = str(random.randint(100000, 999999))
         return msg
 
-    def send_custom_command(
+    def send_command(
         self,
         object_id: str,
         command_name: str,
@@ -171,9 +171,9 @@ class BaseCommandSendService:
             mqtt_message = self._apply_params_to_message(mqtt_message, params)
         # 普通命令：直接下发，不带校验码（确认执行请走 with_make_sure）
         mqtt_message = self._strip_check_code(mqtt_message)
-        return self.send_command(object_id, mqtt_message)
+        return self._publish_command(object_id, mqtt_message)
 
-    def send_custom_command_with_make_sure(
+    def send_command_with_make_sure(
         self,
         object_id: str,
         command_name: str,
@@ -217,12 +217,12 @@ class BaseCommandSendService:
         check_code = mqtt_message.get('check_code')
 
         if not check_code:
-            return self.send_command(object_id, mqtt_message)
+            return self._publish_command(object_id, mqtt_message)
 
         evt = threading.Event()
         self._waiting_events[check_code] = evt
 
-        if not self.send_command(object_id, mqtt_message):
+        if not self._publish_command(object_id, mqtt_message):
             self._waiting_events.pop(check_code, None)
             return False
 

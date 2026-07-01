@@ -130,6 +130,12 @@ class Sensor(models.Model):
         blank=True,
         verbose_name="数据主题"
     )
+
+    mqtt_topic_status = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="状态主题"
+    )
     
     mqtt_topic_control = models.CharField(
         max_length=200,
@@ -212,11 +218,20 @@ class Sensor(models.Model):
 
     def save(self, *args, **kwargs):
         """保存时自动设置 MQTT 主题，与 Arduino 固件保持一致"""
-        # CharField 默认存 ""（不是 None），所以判断 falsy 覆盖空字符串和 None
-        if not self.mqtt_topic_data:
-            self.mqtt_topic_data = f"iot/sensors/{self.sensor_id}/data"
-        if not self.mqtt_topic_control:
-            self.mqtt_topic_control = f"iot/sensors/{self.sensor_id}/control"
+        expected_topics = {
+            'mqtt_topic_data': f"iot/sensors/{self.sensor_id}/data",
+            'mqtt_topic_status': f"iot/sensors/{self.sensor_id}/status",
+            'mqtt_topic_control': f"iot/sensors/{self.sensor_id}/control",
+        }
+        generated_fields = []
+        for field_name, expected_value in expected_topics.items():
+            if getattr(self, field_name) != expected_value:
+                setattr(self, field_name, expected_value)
+                generated_fields.append(field_name)
+
+        # update_fields 场景也要把新生成的主题真正写入数据库。
+        if generated_fields and kwargs.get('update_fields') is not None:
+            kwargs['update_fields'] = set(kwargs['update_fields']) | set(generated_fields)
 
         super().save(*args, **kwargs)
 

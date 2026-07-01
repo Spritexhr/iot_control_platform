@@ -294,7 +294,7 @@ python simulation/devices/pump/pump.py \
 
 1. 在 `sensors/` 或 `devices/` 下新建目录 `xxx/`，在其中建 `xxx.py`（目录名必须 = 文件名）和空 `__init__.py`。继承 `MqttNode`，设置 `NODE_TYPE`（`"sensor"`/`"device"`）和 `ID_FIELD`（`"sensor_id"`/`"device_id"`），实现：
    - `build_status_payload()` —— 返回 status 字典
-   - `handle_command(command, payload, check_code)` —— 处理控制命令；**响应命令后必须调用 `self.publish_status(event, check_code)`**，把收到的 check_code 原样回传，否则后端 `send_custom_command_with_make_sure` 会超时
+   - `handle_command(command, payload, check_code)` —— 处理控制命令；**响应命令后必须调用 `self.publish_status(event, check_code)`**，把收到的 check_code 原样回传，否则后端 `send_command_with_make_sure` 会超时
    - `on_tick()` —— （可选）周期任务，比如发数据。基类的 tick 频率约 10 Hz
 
    同时建议声明三个类属性（webui 表单与 manifest 校验都靠它们）：
@@ -345,7 +345,7 @@ cd simulation && uvicorn webui.server:app --port 8800
 | `Connection refused 127.0.0.1:1883` | 单脚本没传 `--broker`，用了默认本地地址 | `--broker <你的IP>` 或改用 `run.py` 跑 |
 | `未知节点模块 'xxx'` | yaml 里 module 名拼错 / 目录名≠文件名导致自动发现失败 | 对照 [节点目录](#节点目录) 表格；看启动日志"已发现 N 个节点模块"与"跳过节点模块"警告 |
 | simulator 日志正常但后端没入库 | `sensor_id`/`device_id` 在 Django 里不存在 | admin 里建对应记录 |
-| `send_custom_command_with_make_sure` 超时 | check_code 没回传 | L2 抓包看 status payload 是否带 `check_code` 字段 |
+| `send_command_with_make_sure` 超时 | check_code 没回传 | L2 抓包看 status payload 是否带 `check_code` 字段 |
 | 心跳很正常但没收到 data | 该节点是事件驱动（touch/h2010）或 disabled | 等状态翻转 / 发 enable 命令 |
 
 更多排错见 [测试验证教程](testing_guide.md) 末尾的"常见问题排查"表。

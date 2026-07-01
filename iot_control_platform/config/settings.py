@@ -255,6 +255,8 @@ MQTT_PASSWORD = _lazy_config("mqtt_password", "")
 # MQTT主题配置
 MQTT_TOPICS = {
     "SENSOR_DATA": "iot/sensors/+/data",  # 传感器数据上报主题
+    "SENSOR_STATUS": "iot/sensors/+/status",  # 传感器状态上报主题
+    "SENSOR_CONTROL": "iot/sensors/+/control",  # 传感器控制主题
     "DEVICE_CONTROL": "iot/devices/+/control",  # 设备控制主题
     "DEVICE_STATUS": "iot/devices/+/status",  # 设备状态反馈主题
 }

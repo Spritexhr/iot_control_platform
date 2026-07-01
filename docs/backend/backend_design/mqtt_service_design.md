@@ -163,9 +163,9 @@ MQTT 服务支持断线自动重连，采用指数退避策略：
 | 方法 | 说明 |
 |-----|------|
 | `set_mqtt_service(mqtt_service)` | 注入 MQTT 服务实例 |
-| `send_command(id, command_payload)` | 直接发布原始 payload 到控制主题 |
-| `send_custom_command(id, command_name, params)` | 按类型定义构造 mqtt_message 并发送 |
-| `send_custom_command_with_make_sure(id, command_name, params, time_out=3)` | 注入 check_code，发送后等待确认 |
+| `_publish_command(id, command_payload)` | 内部方法：直接发布已组装的 payload 到控制主题 |
+| `send_command(id, command_name, params)` | 按类型定义构造 mqtt_message 并发送 |
+| `send_command_with_make_sure(id, command_name, params, timeout=3)` | 注入 check_code，发送后等待确认 |
 | `_get_commands(entity)` | 获取实体的可用命令（从 type 字段读取） |
 | `_apply_params_to_message(msg, params)` | 将 mqtt_message 中的占位符替换为实际参数 |
 | `_inject_check_code(msg)` | 注入 6 位随机校验码 |
@@ -174,10 +174,10 @@ MQTT 服务支持断线自动重连，采用指数退避策略：
 **check_code 确认流程**：
 
 ```
-send_custom_command_with_make_sure()
+send_command_with_make_sure()
     → _inject_check_code()  # 注入 6 位随机码
-    → send_command()        # 发布到 MQTT
-    → threading.Event.wait(time_out)  # 等待确认
+    → _publish_command()    # 发布到 MQTT
+    → threading.Event.wait(timeout)  # 等待确认
         ↓ 超时或收到确认
     ← 返回 True/False
 
@@ -229,7 +229,7 @@ send_service 构造 mqtt_message
     → Event.set()，wait 返回
 ```
 
-**前提**：使用 `send_custom_command_with_make_sure` 前需已调用 `mqtt_service.setup_sensor_status_handler()` 或 `mqtt_service.setup_device_status_handler()`。
+**前提**：使用 `send_command_with_make_sure` 前需已调用 `mqtt_service.setup_sensor_status_handler()` 或 `mqtt_service.setup_device_status_handler()`。
 
 ---
 
@@ -270,7 +270,7 @@ MQTT Broker → mqtt_service._on_message
 
 ```
 业务 / API / 自动化
-    → send_service.send_command / send_custom_command / send_custom_command_with_make_sure
+    → send_service.send_command / send_command_with_make_sure
     → mqtt_service.publish(mqtt_topic_control, payload)
     → MQTT Broker → 设备/传感器
 ```
@@ -298,12 +298,12 @@ device_command_send_service.set_mqtt_service(mqtt_service)
 
 ```python
 # 简单发送
-sensor_command_send_service.send_custom_command("DHT11-WEMOS-001", "turn_on")
-device_command_send_service.send_custom_command("SG_80_01", "set_brightness", {"val": 80})
+sensor_command_send_service.send_command("DHT11-WEMOS-001", "turn_on")
+device_command_send_service.send_command("SG_80_01", "set_brightness", {"val": 80})
 
 # 带确认发送（需先 setup_sensor_status_handler / setup_device_status_handler）
-success = sensor_command_send_service.send_custom_command_with_make_sure(
-    "DHT11-WEMOS-001", "set_interval", {"val": 60}, time_out=3
+success = sensor_command_send_service.send_command_with_make_sure(
+    "DHT11-WEMOS-001", "set_interval", {"val": 60}, timeout=3
 )
 ```
 

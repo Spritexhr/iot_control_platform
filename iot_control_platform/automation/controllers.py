@@ -217,7 +217,7 @@ def run_control_scheme(scheme, send: bool = True) -> dict:
                 device_command_send_service,
             )
             device_id = scheme.device_member.device.device_id
-            sent = device_command_send_service.send_custom_command_with_make_sure(
+            sent = device_command_send_service.send_command_with_make_sure(
                 object_id=device_id,
                 command_name=command,
                 params=cmd_params or {},

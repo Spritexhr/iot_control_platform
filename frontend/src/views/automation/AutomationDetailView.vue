@@ -298,7 +298,8 @@
             <ul>
               <li><code>devices.get('device_id')</code> — 获取设备包装对象（未关联或不存在时返回 None）</li>
               <li><code>.current_state</code> — 最新 DeviceStatusCollection.data 字典</li>
-              <li><code>.send_command('name', params)</code> — 发送控制命令（等待确认最多 3 秒）</li>
+              <li><code>.send_command('name', params)</code> — 普通发送；返回值仅表示 MQTT 发布是否成功，不等待设备确认</li>
+              <li><code>.send_command_with_make_sure('name', params, timeout=3)</code> — 确认发送；等待设备回传 <code>check_code</code>，成功返回 <code>True</code>，超时或失败返回 <code>False</code></li>
               <li><code>.refresh()</code> — 重新读取设备最新状态</li>
               <li><code>.is_online</code> — 是否在线（3 分钟内有数据）</li>
             </ul>
@@ -315,8 +316,7 @@ class TempAlert:
             return False
         avg_temp = sensor.average('temperature', minutes=5)
         if avg_temp and avg_temp > 30:
-            fan.send_command('turn_on', {})
-            return True
+            return fan.send_command_with_make_sure('turn_on', {}, timeout=3)
         return False</pre>
           </div>
         </div>

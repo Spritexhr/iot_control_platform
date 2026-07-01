@@ -220,6 +220,7 @@ PI0201 → PIC0201 → PV0201
 
 ```text
 iot/sensors/<Sensor ID>/data
+iot/sensors/<Sensor ID>/status
 iot/sensors/<Sensor ID>/control
 ```
 
@@ -227,6 +228,7 @@ iot/sensors/<Sensor ID>/control
 
 ```text
 iot/sensors/TI0201/data
+iot/sensors/TI0201/status
 iot/sensors/TI0201/control
 ```
 

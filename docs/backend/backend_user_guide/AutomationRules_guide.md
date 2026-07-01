@@ -67,8 +67,9 @@ if sensor:
 device = devices.get('SG_80_01')
 if device:
     state = device.current_state  # 最新 DeviceStatusCollection.data
-    device.send_command('turn_on', {})           # 无参数命令
+    device.send_command('turn_on', {})           # 普通发送
     device.send_command('set_brightness', {'val': 80})  # 带参数命令
+    device.send_command_with_make_sure('turn_on', {}, timeout=3)  # 发送并等待确认
 ```
 
 **DeviceWrapper 属性：**
@@ -77,12 +78,13 @@ if device:
 |-----|------|
 | `device_id` | 设备 ID |
 | `current_state` | 最新状态数据，dict |
-| `send_command(name, params)` | 发送控制命令，等待确认，返回 True/False |
+| `send_command(name, params)` | 普通发送；返回值仅表示 MQTT 发布是否成功 |
+| `send_command_with_make_sure(name, params, timeout=3)` | 发送并等待设备回传 `check_code` 确认 |
 | `model` | Device 模型实例 |
 
 ---
 
-## 三、send_command 用法
+## 三、设备命令用法
 
 ### 3.1 命令名称与参数
 
@@ -100,7 +102,17 @@ device.send_command('set_angle', {'val': 90})
 
 ### 3.2 返回值
 
-`send_command` 内部使用 `send_custom_command_with_make_sure`，会等待设备回传确认（默认 3 秒）。成功返回 `True`，超时或失败返回 `False`。
+`send_command` 不等待设备回传：MQTT 发布成功返回 `True`，发布失败返回 `False`。
+
+`send_command_with_make_sure` 会动态注入 `check_code`，并等待设备在状态上报中原样回传。确认成功返回 `True`，超时或失败返回 `False`：
+
+```python
+ok = device.send_command_with_make_sure(
+    'set_angle',
+    {'val': 90},
+    timeout=3,
+)
+```
 
 ---
 

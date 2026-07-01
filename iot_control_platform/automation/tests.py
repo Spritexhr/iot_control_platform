@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -8,6 +10,7 @@ from devices.models import Device, DeviceType
 from projects.models import Project, ProjectDeviceMember, ProjectSection, ProjectSensorMember
 from sensors.models import Sensor, SensorType
 
+from .head_files.devices import build_devices
 from .models import AutomationRule, ControlScheme
 from .resources import RuleResourceUnavailable, effective_device_list
 from .scheduler import _process_automation_rules
@@ -107,6 +110,33 @@ class ProjectAutomationRuleApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("未导入当前房间", str(response.data))
+
+    @patch("services.devices_service.device_command_send_service.device_command_send_service.send_command_with_make_sure")
+    @patch("services.devices_service.device_command_send_service.device_command_send_service.send_command")
+    def test_script_device_exposes_normal_and_confirmed_send(
+        self, send_command, send_command_with_make_sure
+    ):
+        send_command.return_value = True
+        send_command_with_make_sure.return_value = True
+        devices = build_devices([
+            {"device_id": self.device.device_id, "device_type": "Device"},
+        ])
+        wrapper = devices.get(self.device.device_id)
+
+        self.assertTrue(wrapper.send_command("turn_on", {}))
+        send_command.assert_called_once_with(
+            object_id=self.device.device_id,
+            command_name="turn_on",
+            params={},
+        )
+
+        self.assertTrue(wrapper.send_command_with_make_sure("turn_on", {}, timeout=5))
+        send_command_with_make_sure.assert_called_once_with(
+            object_id=self.device.device_id,
+            command_name="turn_on",
+            params={},
+            timeout=5,
+        )
 
     def test_project_and_section_must_match(self):
         other_project = Project.objects.create(code="P2", name="项目二")

@@ -3,7 +3,9 @@
 提供 devices.get(device_id) 获取设备包装对象，含：
   .current_state              — 最新 DeviceStatusCollection.data（首次访问时查询，本次循环内缓存）
   .refresh()                  — 从数据库重新读取，刷新缓存
-  .send_command(name, params) — 发送控制命令（阻塞等待确认，timeout=3s）
+  .send_command(name, params) — 发送控制命令，不等待设备确认
+  .send_command_with_make_sure(name, params, timeout=3)
+                              — 发送控制命令并等待设备确认
   .is_online                  — 是否在线（3 分钟内有数据上报）
   .model                      — 原始 Device 模型实例
 """
@@ -16,10 +18,12 @@ logger = logging.getLogger(__name__)
 class DeviceWrapper:
     """设备包装对象，每次执行周期构建一次；current_state 首次访问时惰性加载。"""
 
-    def __init__(self, device_id: str, device_model, send_command_fn):
+    def __init__(self, device_id: str, device_model, send_command_fn,
+                 send_command_with_make_sure_fn):
         self.device_id = device_id
         self._device = device_model
         self._send_command_fn = send_command_fn
+        self._send_command_with_make_sure_fn = send_command_with_make_sure_fn
         self._state_cache: Optional[dict] = None
 
     @property
@@ -43,8 +47,17 @@ class DeviceWrapper:
         return self._state_cache
 
     def send_command(self, name: str, params: Optional[Dict] = None) -> Any:
-        """发送控制命令并等待确认（最多 3 秒）"""
+        """发送控制命令，只确认 MQTT 发布是否成功，不等待设备回传。"""
         return self._send_command_fn(name, params)
+
+    def send_command_with_make_sure(
+        self,
+        name: str,
+        params: Optional[Dict] = None,
+        timeout: int = 3,
+    ) -> Any:
+        """发送控制命令，并等待设备回传 check_code 确认。"""
+        return self._send_command_with_make_sure_fn(name, params, timeout)
 
     @property
     def is_online(self) -> bool:
@@ -57,8 +70,8 @@ class DeviceWrapper:
 
 
 def _make_noop_send(device_id: str):
-    """为未找到的设备返回空操作 send_command"""
-    def _noop(name=None, params=None):
+    """为未找到的设备返回空操作命令函数。"""
+    def _noop(name=None, params=None, timeout=None):
         logger.warning("自动化规则：设备 %s 不存在，忽略命令 %s", device_id, name)
         return False
     return _noop
@@ -89,18 +102,33 @@ def build_devices(device_list: List[Dict]) -> Any:
 
             def _make_send_cmd(did: str):
                 def _send_cmd(name: str, params: Optional[Dict] = None):
-                    return device_command_send_service.send_custom_command_with_make_sure(
+                    return device_command_send_service.send_command(
                         object_id=did,
                         command_name=name,
                         params=params or {},
-                        timeout=3,
                     )
                 return _send_cmd
 
-            registry[device_id] = DeviceWrapper(device_id, dev, _make_send_cmd(device_id))
+            def _make_send_cmd_with_make_sure(did: str):
+                def _send_cmd(name: str, params: Optional[Dict] = None, timeout: int = 3):
+                    return device_command_send_service.send_command_with_make_sure(
+                        object_id=did,
+                        command_name=name,
+                        params=params or {},
+                        timeout=timeout,
+                    )
+                return _send_cmd
+
+            registry[device_id] = DeviceWrapper(
+                device_id,
+                dev,
+                _make_send_cmd(device_id),
+                _make_send_cmd_with_make_sure(device_id),
+            )
         except Device.DoesNotExist:
             logger.warning("自动化规则：未找到设备 %s", device_id)
-            registry[device_id] = DeviceWrapper(device_id, None, _make_noop_send(device_id))
+            noop = _make_noop_send(device_id)
+            registry[device_id] = DeviceWrapper(device_id, None, noop, noop)
 
     return _make_devices_proxy(registry)
 

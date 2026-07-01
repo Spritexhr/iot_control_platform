@@ -194,11 +194,11 @@ class SensorViewSet(viewsets.ModelViewSet):
         try:
             from services.sensors_service.sensor_command_send_service import sensor_command_send_service
             if make_sure:
-                result = sensor_command_send_service.send_custom_command_with_make_sure(
+                result = sensor_command_send_service.send_command_with_make_sure(
                     sensor.sensor_id, command_name, params or None
                 )
             else:
-                result = sensor_command_send_service.send_custom_command(
+                result = sensor_command_send_service.send_command(
                     sensor.sensor_id, command_name, params or None
                 )
             return Response({'success': result, 'command': command_name})

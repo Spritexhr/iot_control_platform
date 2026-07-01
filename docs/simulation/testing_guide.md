@@ -194,7 +194,7 @@ Django 日志同时会打印：
 
 ### 3.3 验证控制命令 + check_code 链路（核心）
 
-这是 simulator 最关键的复刻点：收到带 `check_code` 的命令后，要在 status 中原样回传，否则 `send_custom_command_with_make_sure` 会超时失败。
+这是 simulator 最关键的复刻点：收到带 `check_code` 的命令后，要在 status 中原样回传，否则 `send_command_with_make_sure` 会超时失败。
 
 在 Django shell 里发命令：
 
@@ -211,19 +211,19 @@ sensor_command_send_service.set_mqtt_service(mqtt_service)
 device_command_send_service.set_mqtt_service(mqtt_service)
 
 # 场景 1：set_data_interval（传感器侧应回 event=interval_updated 且 check_code 一致）
-ok = sensor_command_send_service.send_custom_command_with_make_sure(
+ok = sensor_command_send_service.send_command_with_make_sure(
     'DHT11-WEMOS-001', 'set_data_interval', {'val': 8}, timeout=5
 )
 print(f"set_data_interval -> {ok}")  # 预期 True
 
 # 场景 2：disable
-ok = sensor_command_send_service.send_custom_command_with_make_sure(
+ok = sensor_command_send_service.send_command_with_make_sure(
     'DHT11-WEMOS-001', 'turn_off', {}, timeout=5
 )
 print(f"turn_off -> {ok}")
 
 # 场景 3：set_angle
-ok = device_command_send_service.send_custom_command_with_make_sure(
+ok = device_command_send_service.send_command_with_make_sure(
     'sg90_001', 'set_angle', {'val': 45}, timeout=5
 )
 print(f"set_angle 45 -> {ok}")
@@ -290,7 +290,7 @@ INFO [sg90_001] 已停止
 |------|----------|------|
 | `✗ 无法连接 ...` | broker 不可达 / 防火墙 | `nc -zv <host> 1883` 检查 |
 | simulator 日志正常但 Django 没入库 | `Sensor.sensor_id` 与 simulator `--id` 不一致 / Django mqtt_service 未连接 | 检查 admin 和 Django 日志 |
-| `send_custom_command_with_make_sure` 超时 | check_code 链路断了 | 在 L2 抓包看 simulator status 是否带 `check_code` 字段 |
+| `send_command_with_make_sure` 超时 | check_code 链路断了 | 在 L2 抓包看 simulator status 是否带 `check_code` 字段 |
 | 收到命令但 simulator 无反应 | command 名称不匹配 | 看 simulator 日志的 `← control:` 行，确认命令名 |
 | 设备 `is_online` 一直 False | 没收到任何心跳 / `last_seen` 未更新 | 检查 broker 是否有 status 消息（L2） |
 

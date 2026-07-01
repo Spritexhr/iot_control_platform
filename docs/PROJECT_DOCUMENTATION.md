@@ -79,6 +79,7 @@
 
 #### 2.2.1 主题结构
 *   **传感器数据上报**：`iot/sensors/{sensor_id}/data`
+*   **传感器状态上报**：`iot/sensors/{sensor_id}/status`
 *   **传感器控制/配置**：`iot/sensors/{sensor_id}/control`
 *   **设备（执行器）状态反馈**：`iot/devices/{device_id}/status`
 *   **设备（执行器）控制指令**：`iot/devices/{device_id}/control`

@@ -8,6 +8,45 @@ from datetime import timedelta
 from sensors.models import SensorType, Sensor, SensorData
 
 
+class SensorMqttTopicTest(TestCase):
+    """传感器 data / status / control 三主题一致性测试。"""
+
+    def setUp(self):
+        self.sensor_type = SensorType.objects.create(
+            SensorType_id="mqtt-topic-type",
+            name="MQTT 主题测试类型",
+            data_fields=["value"],
+            config_parameters=["enabled"],
+            commands={},
+        )
+
+    def test_auto_generate_all_mqtt_topics(self):
+        sensor = Sensor.objects.create(
+            sensor_id="MQTT-001",
+            name="测试传感器",
+            sensor_type=self.sensor_type,
+        )
+
+        self.assertEqual(sensor.mqtt_topic_data, "iot/sensors/MQTT-001/data")
+        self.assertEqual(sensor.mqtt_topic_status, "iot/sensors/MQTT-001/status")
+        self.assertEqual(sensor.mqtt_topic_control, "iot/sensors/MQTT-001/control")
+
+    def test_update_sensor_id_regenerates_all_mqtt_topics(self):
+        sensor = Sensor.objects.create(
+            sensor_id="MQTT-001",
+            name="测试传感器",
+            sensor_type=self.sensor_type,
+        )
+
+        sensor.sensor_id = "MQTT-002"
+        sensor.save(update_fields=['sensor_id'])
+        sensor.refresh_from_db()
+
+        self.assertEqual(sensor.mqtt_topic_data, "iot/sensors/MQTT-002/data")
+        self.assertEqual(sensor.mqtt_topic_status, "iot/sensors/MQTT-002/status")
+        self.assertEqual(sensor.mqtt_topic_control, "iot/sensors/MQTT-002/control")
+
+
 class SensorTypeTest(TestCase):
     """传感器类型模型测试"""
     

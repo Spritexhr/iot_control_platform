@@ -11,6 +11,7 @@ import re
 import time
 from typing import Callable, Dict, Optional
 import paho.mqtt.client as mqtt
+from django.conf import settings
 
 from config.platform_config import get_config
 from .sensors_service.sensor_upload_data_handlers import handle_mqtt_data_message
@@ -203,8 +204,9 @@ class MQTTService:
         快速设置传感器数据处理器
         自动注册处理器并订阅数据主题
         """
-        self.register_handler('iot/sensors/+/data', handle_mqtt_data_message)
-        self.subscribe('iot/sensors/+/data', qos=1)
+        topic = settings.MQTT_TOPICS['SENSOR_DATA']
+        self.register_handler(topic, handle_mqtt_data_message)
+        self.subscribe(topic, qos=1)
         logger.info("传感器数据处理器设置完成")
 
     def setup_sensor_status_handler(self):
@@ -212,8 +214,9 @@ class MQTTService:
         快速设置传感器状态处理器
         自动注册处理器并订阅状态主题
         """
-        self.register_handler('iot/sensors/+/status', handle_mqtt_status_message)
-        self.subscribe('iot/sensors/+/status', qos=1)
+        topic = settings.MQTT_TOPICS['SENSOR_STATUS']
+        self.register_handler(topic, handle_mqtt_status_message)
+        self.subscribe(topic, qos=1)
         logger.info("传感器状态处理器设置完成")
 
     def setup_device_status_handler(self):

@@ -136,7 +136,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 - 明确可识别的 `command` 及 `interval`、`angle` 等参数
 - 后端 `SensorType.commands` 按此格式构造 mqtt_message 下发
-- `check_code` 在响应时原样回传，供后端 `send_custom_command_with_make_sure` 确认
+- `check_code` 在响应时原样回传，供后端 `send_command_with_make_sure` 确认
 
 ### 3.3 设备：SG_90
 
@@ -309,7 +309,7 @@ void sendStatusUpdate(const char* event, const char* checkCode) {
 
 - 约定 `sensor_id`/`device_id`、`event`、`status`、`timestamp`、`check_code`
 - 后端 `sensor_upload_status_handlers` / `device_upload_status_handlers` 据此解析并写入 `SensorStatusCollection` / `DeviceData`
-- `check_code` 用于 `verify_xxx_check_code`，支持 `send_custom_command_with_make_sure` 的确认流程
+- `check_code` 用于 `verify_xxx_check_code`，支持 `send_command_with_make_sure` 的确认流程
 
 ---
 
@@ -350,4 +350,4 @@ void sendStatusUpdate(const char* event, const char* checkCode) {
 
 - 后端下发命令时可选注入 6 位 `check_code`
 - 嵌入式执行命令后，在状态上报中**原样回传** `check_code`
-- 后端据此确认命令已执行，配合 `send_custom_command_with_make_sure` 使用
+- 后端据此确认命令已执行，配合 `send_command_with_make_sure` 使用

@@ -2,7 +2,7 @@
 MQTT设备状态接收解析程序
 负责接收MQTT消息，解析设备状态数据并存入数据库
 符合 mqtt_status_form: device_id, event, status, check_code(可选), timestamp
-若含 check_code 则调用 device_command_send_service 校验（用于 send_custom_command_with_make_sure）
+若含 check_code 则调用 device_command_send_service 校验（用于 send_command_with_make_sure）
 """
 import logging
 from datetime import datetime, timezone

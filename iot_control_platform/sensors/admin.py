@@ -83,7 +83,10 @@ class SensorAdmin(admin.ModelAdmin):
     list_filter = [SensorFolderFilter, 'sensor_type', SensorOnlineFilter, 'created_at']
     search_fields = ['sensor_id', 'name', 'description', 'folder__name']
     list_select_related = ['sensor_type', 'folder']
-    readonly_fields = ['created_at', 'updated_at', 'last_seen', 'command_buttons_detail_display']
+    readonly_fields = [
+        'created_at', 'updated_at', 'last_seen', 'command_buttons_detail_display',
+        'mqtt_topic_data', 'mqtt_topic_status', 'mqtt_topic_control',
+    ]
 
     fieldsets = [
         ('基本信息', {
@@ -98,8 +101,8 @@ class SensorAdmin(admin.ModelAdmin):
             'description': '发送控制命令到该传感器（需先保存传感器；需在传感器类型中配置 commands）'
         }),
         ('MQTT配置', {
-            'fields': ['mqtt_topic_data', 'mqtt_topic_control'],
-            'description': '保存时会自动生成，格式：iot/sensors/{sensor_id}/xxx'
+            'fields': ['mqtt_topic_data', 'mqtt_topic_status', 'mqtt_topic_control'],
+            'description': '保存时会自动生成 data / status / control 三个主题'
         }),
         ('状态信息', {
             'fields': ['last_seen', 'location'],
@@ -203,7 +206,7 @@ class SensorAdmin(admin.ModelAdmin):
                         except (ValueError, TypeError):
                             param_dict[p] = val
 
-                success = sensor_command_send_service.send_custom_command(
+                success = sensor_command_send_service.send_command(
                     sensor.sensor_id, cmd_name, param_dict if param_dict else None
                 )
                 desc = command_info.get('description', cmd_name)

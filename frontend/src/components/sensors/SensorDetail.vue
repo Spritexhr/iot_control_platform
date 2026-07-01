@@ -135,6 +135,10 @@
             <span class="info-value mono">{{ sensor.mqtt_topic_data || '--' }}</span>
           </div>
           <div class="info-row">
+            <span class="info-label">MQTT 状态主题</span>
+            <span class="info-value mono">{{ sensor.mqtt_topic_status || '--' }}</span>
+          </div>
+          <div class="info-row">
             <span class="info-label">MQTT 控制主题</span>
             <span class="info-value mono">{{ sensor.mqtt_topic_control || '--' }}</span>
           </div>

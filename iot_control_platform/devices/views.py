@@ -182,11 +182,11 @@ class DeviceViewSet(viewsets.ModelViewSet):
         try:
             from services.devices_service.device_command_send_service import device_command_send_service
             if make_sure:
-                result = device_command_send_service.send_custom_command_with_make_sure(
+                result = device_command_send_service.send_command_with_make_sure(
                     device.device_id, command_name, params or None
                 )
             else:
-                result = device_command_send_service.send_custom_command(
+                result = device_command_send_service.send_command(
                     device.device_id, command_name, params or None
                 )
             return Response({'success': result, 'command': command_name})

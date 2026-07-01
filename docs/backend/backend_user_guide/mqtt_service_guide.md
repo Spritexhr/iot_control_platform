@@ -44,7 +44,8 @@ python manage.py shell
 ```
 
 ```python
-from services import sensor_command_send_service, mqtt_service
+from services.mqtt_service import mqtt_service
+from services.sensors_service.sensor_command_send_service import sensor_command_send_service
 from sensors.models import Sensor, SensorType
 
 # 或使用完整路径
@@ -66,8 +67,8 @@ for cmd_name, info in available.items():
 ### 2.3 发送无参数命令
 
 ```python
-success = sensor_command_send_service.send_custom_command(
-    sensor_id='DHT11-WEMOS-001',
+success = sensor_command_send_service.send_command(
+    object_id='DHT11-WEMOS-001',
     command_name='enable'  # 需在 SensorType.commands 中定义
 )
 # 返回 True 表示 MQTT 发布成功，不表示设备已执行
@@ -76,19 +77,10 @@ success = sensor_command_send_service.send_custom_command(
 ### 2.4 发送带参数命令
 
 ```python
-success = sensor_command_send_service.send_custom_command(
-    sensor_id='DHT11-WEMOS-001',
+success = sensor_command_send_service.send_command(
+    object_id='DHT11-WEMOS-001',
     command_name='set_interval',
     params={'val': 120}  # 参数名需与 commands 中 params 一致
-)
-```
-
-### 2.5 发送原始 payload（不按类型定义）
-
-```python
-success = sensor_command_send_service.send_command(
-    sensor_id='DHT11-WEMOS-001',
-    command_payload={'command': 'enable', 'extra': 'value'}
 )
 ```
 
@@ -99,7 +91,7 @@ success = sensor_command_send_service.send_command(
 ### 3.1 导入
 
 ```python
-from services import device_command_send_service
+from services.devices_service.device_command_send_service import device_command_send_service
 from devices.models import Device, DeviceType
 ```
 
@@ -117,30 +109,25 @@ for cmd_name, info in available.items():
 
 ```python
 # 无参数
-success = device_command_send_service.send_custom_command(
-    device_id='SG_80_01',
+success = device_command_send_service.send_command(
+    object_id='SG_80_01',
     command_name='turn_on'
 )
 
 # 带参数
-success = device_command_send_service.send_custom_command(
-    device_id='SG_80_01',
+success = device_command_send_service.send_command(
+    object_id='SG_80_01',
     command_name='set_brightness',
     params={'val': 80}
 )
 
-# 原始 payload
-success = device_command_send_service.send_command(
-    device_id='SG_80_01',
-    command_payload={'command': 'power_on'}
-)
 ```
 
 ---
 
-## 四、带确认的命令（send_custom_command_with_make_sure）
+## 四、带确认的命令（send_command_with_make_sure）
 
-当需要确认设备/传感器已正确执行时，使用 `send_custom_command_with_make_sure`。该方法会注入 `check_code`，阻塞等待回传确认，超时则返回 `False`。
+当需要确认设备/传感器已正确执行时，使用 `send_command_with_make_sure`。该方法会注入 `check_code`，阻塞等待回传确认，超时则返回 `False`。
 
 ### 4.1 前提
 
@@ -151,30 +138,30 @@ success = device_command_send_service.send_command(
 
 ```python
 # 默认等待 3 秒
-success = sensor_command_send_service.send_custom_command_with_make_sure(
-    sensor_id='DHT11-WEMOS-001',
+success = sensor_command_send_service.send_command_with_make_sure(
+    object_id='DHT11-WEMOS-001',
     command_name='set_interval',
     params={'val': 60},
-    time_out=3
+    timeout=3
 )
 
 # 指定等待 5 秒
-success = sensor_command_send_service.send_custom_command_with_make_sure(
-    sensor_id='DHT11-WEMOS-001',
+success = sensor_command_send_service.send_command_with_make_sure(
+    object_id='DHT11-WEMOS-001',
     command_name='enable',
-    time_out=5
+    timeout=5
 )
 ```
 
 ### 4.3 设备
 
 ```python
-# 注意：传感器和设备现已统一使用 time_out 参数（基类统一）
-success = device_command_send_service.send_custom_command_with_make_sure(
-    device_id='SG_80_01',
+# 传感器和设备统一使用 timeout 参数
+success = device_command_send_service.send_command_with_make_sure(
+    object_id='SG_80_01',
     command_name='set_brightness',
     params={'val': 80},
-    time_out=3
+    timeout=3
 )
 ```
 
@@ -182,8 +169,8 @@ success = device_command_send_service.send_custom_command_with_make_sure(
 
 | 方法 | 校验码 | 返回值含义 |
 |-----|--------|------------|
-| `send_custom_command` | 不包含 | 仅表示 MQTT 是否发布成功 |
-| `send_custom_command_with_make_sure` | 自动注入并校验 | 表示设备/传感器是否在限定时间内回传确认 |
+| `send_command` | 不包含 | 仅表示 MQTT 是否发布成功 |
+| `send_command_with_make_sure` | 自动注入并校验 | 表示设备/传感器是否在限定时间内回传确认 |
 
 ---
 
@@ -194,7 +181,9 @@ success = device_command_send_service.send_custom_command_with_make_sure(
 ### 5.1 导入与检查连接状态
 
 ```python
-from services import mqtt_service, sensor_command_send_service, device_command_send_service
+from services.mqtt_service import mqtt_service
+from services.sensors_service.sensor_command_send_service import sensor_command_send_service
+from services.devices_service.device_command_send_service import device_command_send_service
 
 # 检查当前连接状态
 print(mqtt_service.is_connected)  # True/False
@@ -239,7 +228,7 @@ mqtt_service.setup_sensor_data_handler()
 
 ### 5.5 setup_sensor_status_handler()：传感器状态接收
 
-注册并订阅 `iot/sensors/+/status`，消息写入 `SensorStatusCollection`，支持 `check_code` 校验（`send_custom_command_with_make_sure` 依赖此）：
+注册并订阅 `iot/sensors/+/status`，消息写入 `SensorStatusCollection`，支持 `check_code` 校验（`send_command_with_make_sure` 依赖此）：
 
 ```python
 mqtt_service.setup_sensor_status_handler()
@@ -264,7 +253,9 @@ mqtt_service.stop()
 
 ```python
 import time
-from services import mqtt_service, sensor_command_send_service, device_command_send_service
+from services.mqtt_service import mqtt_service
+from services.sensors_service.sensor_command_send_service import sensor_command_send_service
+from services.devices_service.device_command_send_service import device_command_send_service
 
 # 1. 断开（若已连接）
 if mqtt_service.is_connected:
@@ -288,7 +279,7 @@ mqtt_service.setup_device_status_handler()
 from sensors.models import Sensor
 s = Sensor.objects.first()
 if s:
-    success = sensor_command_send_service.send_custom_command(s.sensor_id, 'enable')
+    success = sensor_command_send_service.send_command(s.sensor_id, 'enable')
     print(f"发送结果: {success}")
 ```
 
@@ -329,7 +320,9 @@ mqtt_service.register_handler('iot/custom/+/events', my_handler)
 ```python
 import logging
 import time
-from services import mqtt_service, sensor_command_send_service, device_command_send_service
+from services.mqtt_service import mqtt_service
+from services.sensors_service.sensor_command_send_service import sensor_command_send_service
+from services.devices_service.device_command_send_service import device_command_send_service
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s %(message)s')
 
@@ -354,7 +347,7 @@ mqtt_service.setup_sensor_status_handler()
 mqtt_service.setup_device_status_handler()
 
 # 5. 开始发送命令
-success = sensor_command_send_service.send_custom_command('DHT11-WEMOS-001', 'enable')
+success = sensor_command_send_service.send_command('DHT11-WEMOS-001', 'enable')
 print(f"发送结果: {success}")
 ```
 
@@ -395,17 +388,17 @@ print(f"发送结果: {success}")
 
 | 服务 | 导入方式 |
 |-----|---------|
-| mqtt_service | `from services import mqtt_service` |
-| sensor_command_send_service | `from services import sensor_command_send_service` |
-| device_command_send_service | `from services import device_command_send_service` |
+| mqtt_service | `from services.mqtt_service import mqtt_service` |
+| sensor_command_send_service | `from services.sensors_service.sensor_command_send_service import sensor_command_send_service` |
+| device_command_send_service | `from services.devices_service.device_command_send_service import device_command_send_service` |
 
 | 方法 | 说明 |
 |-----|------|
-| `sensor_command_send_service.send_custom_command(sensor_id, command_name, params?)` | 发送传感器命令 |
-| `sensor_command_send_service.send_custom_command_with_make_sure(sensor_id, command_name, params?, time_out=3)` | 发送并等待确认 |
+| `sensor_command_send_service.send_command(object_id, command_name, params?)` | 发送传感器命令 |
+| `sensor_command_send_service.send_command_with_make_sure(object_id, command_name, params?, timeout=3)` | 发送并等待确认 |
 | `sensor_command_send_service.show_sensor_control_commands(sensor)` | 查看传感器可用命令 |
-| `device_command_send_service.send_custom_command(device_id, command_name, params?)` | 发送设备命令 |
-| `device_command_send_service.send_custom_command_with_make_sure(device_id, command_name, params?, time_out=3)` | 发送并等待确认 |
+| `device_command_send_service.send_command(object_id, command_name, params?)` | 发送设备命令 |
+| `device_command_send_service.send_command_with_make_sure(object_id, command_name, params?, timeout=3)` | 发送并等待确认 |
 | `device_command_send_service.show_device_control_commands(device)` | 查看设备可用命令 |
 | `mqtt_service.publish(topic, payload, qos=1)` | 直接发布消息 |
 | `mqtt_service.subscribe(topic, qos=1)` | 订阅主题 |

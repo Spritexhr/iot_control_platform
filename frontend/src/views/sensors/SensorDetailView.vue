@@ -79,6 +79,10 @@
                 <span class="info-item__value mono">{{ sensor.mqtt_topic_data || '--' }}</span>
               </div>
               <div class="info-item">
+                <span class="info-item__label">{{ ls.t('sensorDetail.mqttStatusTopic') }}</span>
+                <span class="info-item__value mono">{{ sensor.mqtt_topic_status || '--' }}</span>
+              </div>
+              <div class="info-item">
                 <span class="info-item__label">{{ ls.t('sensorDetail.mqttControlTopic') }}</span>
                 <span class="info-item__value mono">{{ sensor.mqtt_topic_control || '--' }}</span>
               </div>

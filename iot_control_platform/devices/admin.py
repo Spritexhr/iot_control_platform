@@ -216,7 +216,7 @@ class DeviceAdmin(admin.ModelAdmin):
                         except (ValueError, TypeError):
                             param_dict[p] = val
 
-                success = device_command_send_service.send_custom_command(
+                success = device_command_send_service.send_command(
                     device.device_id, cmd_name, param_dict if param_dict else None
                 )
                 desc = command_info.get('description', cmd_name)
